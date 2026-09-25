@@ -1,0 +1,27 @@
+// Pi provides TypeBox to its extensions. Current Pi uses "typebox".
+// Legacy installations using @sinclair/typebox are supported by the fallback.
+import { registerMonitor } from './monitor.mjs';
+
+export default async function (pi: any) {
+  let schema: any;
+  try {
+    let module: any;
+    try { module = await import('typebox'); }
+    catch { module = await import('@sinclair/typebox'); }
+    const T = module.Type;
+    schema = T.Object({
+      reason: T.Optional(T.String({ description: 'Why the workflow changed; no secrets' })),
+      stages: T.Array(T.Object({
+        id: T.String(), title: T.String(),
+        agent: T.Optional(T.String()), model: T.Optional(T.String()),
+        status: T.Union(['pending', 'running', 'done', 'error', 'blocked', 'cancelled'].map(s => T.Literal(s)))
+      }), { minItems: 1, maxItems: 20 })
+    });
+  } catch {
+    // Basic monitoring still works. Warn clearly rather than inventing a tool.
+    pi.on('session_start', (_e: any, ctx: any) => {
+      ctx.ui?.notify?.('Agent Desk: workflow_report unavailable (TypeBox not resolved). Basic monitoring remains enabled.', 'warning');
+    });
+  }
+  registerMonitor(pi, { schema });
+}

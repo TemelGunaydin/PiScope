@@ -1,0 +1,127 @@
+import { existsSync, mkdirSync, readFileSync, appendFileSync, renameSync, rmSync, statSync, chmodSync } from 'node:fs';
+import { join } from 'node:path';
+import { validateEvent } from './events.mjs';
+
+const MAX_EVENTS = 350, MAX_RUNS = 30, MAX_SESSIONS = 80;
+
+export class EventStore {
+  constructor(dir, { maxBytes = 20 * 1024 * 1024 } = {}) {
+    this.dir = dir; this.maxBytes = maxBytes;
+    this.sessions = new Map(); this.seen = new Set(); this.sequence = 0; this.warnings = [];
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    for (const file of ['events.2.jsonl', 'events.1.jsonl', 'events.jsonl']) {
+      const path = join(dir, file);
+      if (!existsSync(path)) continue;
+      for (const line of readFileSync(path, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const raw = JSON.parse(line);
+          const event = validateEvent(raw, new Date(raw.receivedAt || raw.time));
+          if (!this.seen.has(event.id)) this.reduce(event);
+        } catch { this.warnings.push(`Ignored an invalid or truncated record in ${file}`); }
+      }
+    }
+    this.warnings = [...new Set(this.warnings)];
+    // A persisted heartbeat is never proof that a process survived a restart.
+    for (const session of this.sessions.values()) session.connected = false;
+    this.bytes = existsSync(this.logPath) ? statSync(this.logPath).size : 0;
+  }
+  get logPath() { return join(this.dir, 'events.jsonl'); }
+  append(raw) {
+    const event = validateEvent(raw);
+    if (this.seen.has(event.id)) return { duplicate: true, event };
+    if (event.type !== 'session.heartbeat') {
+      const line = JSON.stringify(event) + '\n';
+      if (this.bytes + Buffer.byteLength(line) > this.maxBytes) {
+        rmSync(join(this.dir, 'events.2.jsonl'), { force: true });
+        if (existsSync(join(this.dir, 'events.1.jsonl'))) renameSync(join(this.dir, 'events.1.jsonl'), join(this.dir, 'events.2.jsonl'));
+        if (existsSync(this.logPath)) renameSync(this.logPath, join(this.dir, 'events.1.jsonl'));
+        this.bytes = 0;
+      }
+      appendFileSync(this.logPath, line, { mode: 0o600 });
+      chmodSync(this.logPath, 0o600);
+      this.bytes += Buffer.byteLength(line);
+    }
+    this.reduce(event);
+    return { duplicate: false, event };
+  }
+  reduce(e) {
+    this.seen.add(e.id);
+    if (this.seen.size > 60000) this.seen.delete(this.seen.values().next().value);
+    this.sequence++;
+    let s = this.sessions.get(e.sessionId);
+    if (!s) {
+      s = { id: e.sessionId, projectId: e.projectId, projectName: e.projectName,
+        demo: e.demo, connected: true, model: '', runs: [], lastSeen: e.receivedAt };
+      this.sessions.set(s.id, s);
+    }
+    s.lastSeen = e.receivedAt; s.connected = e.type !== 'session.disconnected';
+    if (['session.connected', 'model.selected'].includes(e.type) && e.data.model) s.model = e.data.model;
+    if (e.type === 'session.disconnected') s.connected = false;
+    if (this.sessions.size > MAX_SESSIONS) {
+      const oldest = [...this.sessions.values()].sort((a, b) => a.lastSeen.localeCompare(b.lastSeen))[0];
+      this.sessions.delete(oldest.id);
+    }
+    if (e.type === 'session.heartbeat' || !e.runId) return;
+    let r = s.runs.find(r => r.id === e.runId);
+    if (!r) {
+      r = { id: e.runId, prompt: '', model: s.model, startedAt: e.time,
+        status: 'running', events: [], tools: Object.create(null), agents: Object.create(null), stages: [], usage: Object.create(null), files: [], summary: '' };
+      s.runs.push(r); if (s.runs.length > MAX_RUNS) s.runs.shift();
+    }
+    const d = e.data;
+    switch (e.type) {
+      case 'prompt.received': r.prompt = d.prompt || ''; break;
+      case 'run.started': r.status = 'running'; r.model = d.model || s.model; break;
+      case 'model.selected': r.model = d.model || ''; break;
+      case 'run.ended':
+        r.status = d.outcome === 'error' ? 'error' : d.outcome === 'aborted' ? 'cancelled' : 'idle';
+        r.endedAt = e.time; r.summary = d.summary || r.summary; break;
+      case 'run.settled': if (r.status === 'running') r.status = 'idle'; r.settled = true; r.endedAt ||= e.time; break;
+      case 'workflow.updated': r.stages = d.stages; r.stageReason = d.reason || ''; break;
+      case 'message.completed':
+        if (d.summary) r.summary = d.summary;
+        if (d.usage) r.usage[e.id] = { model: d.model || r.model, ...d.usage };
+        break;
+      case 'tool.started':
+      case 'tool.finished': {
+        const key = d.toolCallId || e.id;
+        r.tools[key] = { ...r.tools[key], id: key, name: d.toolName,
+          file: d.file || r.tools[key]?.file || '', model: d.model || r.model,
+          status: e.type === 'tool.started' ? 'running' : d.isError ? 'error' : 'done',
+          startedAt: r.tools[key]?.startedAt || e.time, endedAt: e.type === 'tool.finished' ? e.time : undefined };
+        if (e.type === 'tool.finished' && !d.isError && ['edit', 'write'].includes(d.toolName) && d.file && !r.files.includes(d.file)) r.files.push(d.file);
+        break;
+      }
+      case 'agent.started':
+      case 'agent.progress':
+      case 'agent.finished': {
+        const key = d.agentCallId || e.id;
+        const old = r.agents[key] || {};
+        r.agents[key] = { ...old, id: key, agent: d.agent || old.agent,
+          model: d.model || old.model || '', modelSource: d.source === 'observed' ? 'observed' : old.modelSource || d.source || 'unknown', task: d.task || old.task || '',
+          status: e.type === 'agent.started' ? 'starting' : e.type === 'agent.finished' ? (d.isError ? 'error' : 'done') : d.status || 'running',
+          tools: d.tools || old.tools || [], usage: d.usage || old.usage,
+          elapsedMs: d.elapsedMs ?? old.elapsedMs, summary: d.summary || old.summary || '',
+          startedAt: old.startedAt || e.time, endedAt: e.type === 'agent.finished' ? e.time : undefined };
+        // Agent usage is cumulative; one key per invocation avoids double counting.
+        if (d.usage) r.usage[`agent:${key}`] = { model: d.model || old.model || 'unknown', ...d.usage };
+        break;
+      }
+    }
+    // Progress snapshots update cards without flooding the visible timeline.
+    if (e.type !== 'agent.progress') { r.events.push(e); if (r.events.length > MAX_EVENTS) r.events.shift(); }
+    for (const object of [r.tools, r.agents, r.usage]) {
+      const keys = Object.keys(object); for (const k of keys.slice(0, Math.max(0, keys.length - 2000))) delete object[k];
+    }
+    if (r.files.length > 500) r.files = r.files.slice(-500);
+    if (this.sessions.size > MAX_SESSIONS) {
+      const oldest = [...this.sessions.values()].sort((a, b) => a.lastSeen.localeCompare(b.lastSeen))[0];
+      this.sessions.delete(oldest.id);
+    }
+  }
+  snapshot() {
+    return { schemaVersion: 1, sequence: this.sequence, now: new Date().toISOString(),
+      warnings: this.warnings, sessions: [...this.sessions.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)) };
+  }
+}
