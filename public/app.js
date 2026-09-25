@@ -65,6 +65,7 @@ function renderModels(s, r) {
     node.append(heading, el('span', 'model-id', card.model || 'Alt agent ilerleme olayı bekleniyor'), el('p', 'model-task', card.task || card.summary || 'Görev bilgisi bildirilmedi.'));
     const currentTools = (card.tools || []).filter(t => t.status === 'running');
     node.append(el('p', 'model-source', card.main ? 'Pi ana oturumundan gözlendi' : currentTools.length ? `Aktif: ${currentTools.map(t => t.name + (t.file ? ' · ' + t.file : '')).join(', ')}` : card.modelSource === 'requested' ? 'Talep edilen model; henüz çalıştığı doğrulanmadı' : card.model ? 'Alt agent ilerleme / sonuç kaydından' : 'Model kimliği bekleniyor'));
+    if (card.summary) { const details = el('details', 'model-result'); details.append(el('summary', '', 'Alt agent sonucunu gör'), el('p', '', card.summary)); node.append(details); }
     $('models').append(node);
   }
 }
@@ -78,7 +79,7 @@ function eventPresentation(e) {
     'run.ended': d.outcome === 'error' ? 'Ana çalışma hata ile durdu' : d.outcome === 'aborted' ? 'Ana çalışma iptal edildi' : 'Ana model yanıtını bitirdi',
     'run.settled': 'Pi otomatik devam döngüsü sonlandı', 'monitor.warning': 'İzleme uyarısı', 'session.disconnected': 'Pi bağlantısı kapandı'
   }[e.type] || e.type;
-  const detail = d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
+  const detail = (e.type === 'agent.finished' ? [d.model, d.summary].filter(Boolean).join('\n') : '') || d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
   return { title, detail, icon: e.type.startsWith('agent.') ? '↗' : e.type === 'tool.finished' ? (d.isError ? '!' : '✓') : e.type === 'workflow.updated' ? '≡' : '·' };
 }
 function renderTimeline(r) {
@@ -98,6 +99,8 @@ function updateDuration() {
   const { s, r } = selected(); if (!s || !r) return;
   const fresh = s.connected && Date.now() - Date.parse(s.lastSeen) < 30000;
   $('freshness').textContent = demo ? 'Örnek veri' : fresh ? '● Pi sinyali güncel' : `○ Pi sinyali eski / kapalı · ${time(s.lastSeen)}`;
+  if (!demo && !fresh && r.status === 'running') $('run-status').textContent = 'Bağlantı yok · son durum: çalışıyor';
+  else $('run-status').textContent = labels[r.status] || r.status;
   $('metric-duration').textContent = duration(r.startedAt, r.endedAt || (!fresh && !demo ? s.lastSeen : undefined));
   $('duration-label').textContent = !fresh && !r.endedAt && !demo ? 'Son sinyaldeki süre; sonuç bilinmiyor' : 'Duvar saati süresi';
 }

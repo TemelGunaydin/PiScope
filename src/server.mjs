@@ -18,13 +18,23 @@ function json(res, code, value) {
 }
 async function body(req) {
   if (!(req.headers['content-type'] || '').startsWith('application/json')) throw Object.assign(new Error('JSON content type required'), { status: 415 });
-  let size = 0; const chunks = [];
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > 256 * 1024) throw Object.assign(new Error('Request too large'), { status: 413 });
-    chunks.push(chunk);
-  }
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+  const raw = await new Promise((resolve, reject) => {
+    let size = 0, rejected = false; const chunks = [];
+    req.on('data', chunk => {
+      if (rejected) return;
+      size += chunk.length;
+      if (size > 256 * 1024) {
+        rejected = true; chunks.length = 0;
+        reject(Object.assign(new Error('Request too large'), { status: 413 }));
+        return; // Keep draining without buffering; do not destroy the response socket.
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => { if (!rejected) resolve(Buffer.concat(chunks).toString('utf8')); });
+    req.on('error', err => reject(Object.assign(err, { status: 400 })));
+    req.on('aborted', () => reject(Object.assign(new Error('Request aborted'), { status: 400 })));
+  });
+  try { return JSON.parse(raw); }
   catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
 }
 
@@ -54,6 +64,7 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 
       if (req.headers.origin && !origins.has(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
       const url = new URL(req.url, requestOrigin);
       if (url.pathname === '/health' && req.method === 'GET') return json(res, 200, { ok: true, version: '0.1.0' });
+      if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
       if (assets.has(url.pathname) && req.method === 'GET') {
         const [name, contentType] = assets.get(url.pathname);
         res.writeHead(200, { 'Content-Type': contentType });

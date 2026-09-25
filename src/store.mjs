@@ -24,6 +24,11 @@ export class EventStore {
     this.warnings = [...new Set(this.warnings)];
     // A persisted heartbeat is never proof that a process survived a restart.
     for (const session of this.sessions.values()) session.connected = false;
+    // Separate an incomplete final record from subsequent valid appends.
+    if (existsSync(this.logPath)) {
+      const contents = readFileSync(this.logPath, 'utf8');
+      if (contents && !contents.endsWith('\n')) appendFileSync(this.logPath, '\n', { mode: 0o600 });
+    }
     this.bytes = existsSync(this.logPath) ? statSync(this.logPath).size : 0;
   }
   get logPath() { return join(this.dir, 'events.jsonl'); }
@@ -72,7 +77,7 @@ export class EventStore {
     const d = e.data;
     switch (e.type) {
       case 'prompt.received': r.prompt = d.prompt || ''; break;
-      case 'run.started': r.status = 'running'; r.model = d.model || s.model; break;
+      case 'run.started': r.status = 'running'; delete r.endedAt; r.settled = false; r.model = d.model || s.model; break;
       case 'model.selected': r.model = d.model || ''; break;
       case 'run.ended':
         r.status = d.outcome === 'error' ? 'error' : d.outcome === 'aborted' ? 'cancelled' : 'idle';

@@ -65,3 +65,17 @@ test('requested model remains distinguishable until observed', t => {
   store.append(event('agent.progress', { agentCallId: 'a', model: 'p/other', source: 'observed' }));
   assert.equal(store.sessions.get('session-a').runs[0].agents.a.modelSource, 'observed');
 });
+
+test('valid writes after recovering a torn record are readable on next restart', t => {
+  const dir = directory(t); const original = new EventStore(dir); original.append(event());
+  appendFileSync(join(dir, 'events.jsonl'), '{torn-record');
+  const recovered = new EventStore(dir); recovered.append(event('prompt.received', { prompt: 'after recovery' }, { runId: 'run-new' }));
+  const again = new EventStore(dir);
+  assert.equal(again.sessions.get('session-a').runs.find(r => r.id === 'run-new').prompt, 'after recovery');
+});
+
+test('automatic continuation clears the old end time', t => {
+  const store = new EventStore(directory(t)); store.append(event('run.ended', { outcome: 'idle' }));
+  store.append(event('run.started', { model: 'p/model' }));
+  const run = store.sessions.get('session-a').runs[0]; assert.equal(run.status, 'running'); assert.equal(run.endedAt, undefined);
+});

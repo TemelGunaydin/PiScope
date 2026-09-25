@@ -62,3 +62,9 @@ test('malformed JSON, unknown paths and non-JSON ingestion fail safely', async t
   assert.equal((await f.request('/api/events', { method: 'POST', body: '{}' })).status, 415);
   assert.equal((await f.request('/auth.token')).status, 404);
 });
+
+test('oversized ingestion is refused without accepting an event', async t => {
+  const f = await fixture(t); const huge = JSON.stringify(event('prompt.received', { prompt: 'x'.repeat(300000) }));
+  const response = await f.request('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: huge });
+  assert.equal(response.status, 413); assert.equal(f.app.store.sequence, 0);
+});
