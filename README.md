@@ -2,14 +2,17 @@
 
 **Pi için yerel, modelden bağımsız workflow izleme ekranı.**
 
-Sol’un planını, Qwen’e devredilen araştırmayı ve MiMo’nun uygulama görevini aynı
-HTML ekranında takip et. Dashboard **izler**; modelleri çağırmaz, model değiştirmez,
+Ana agent’ın planını, alt agent’ların görevlerini ve inceleme sonuçlarını aynı
+HTML ekranında takip et. Güncel örnek akış: **Sol → MiMo → DeepSeek → Sol**.
+Dashboard **izler**; modelleri çağırmaz, model değiştirmez,
 kod yazmaz ve mevcut orchestration/izin sisteminin yerini almaz.
 
 > **Durum: ilk çalışan sürüm / v0.1.0.** Sunucu, olay kaydı ve adapter testleri
-> çalıştırıldı. Gerçek Mac + kurulu Pi + model sağlayıcılarıyla uçtan uca doğrulama
-> henüz yapılmadı. GitHub’da repo oluşturma/push bu geliştirme oturumunda mümkün
-> olmadı; pakette yerel Git geçmişi ve isteğe bağlı yayınlama betiği var.
+> çalıştırıldı. Mac’te Pi 0.87.1 + pi-open-agents 0.1.22 ile Sol, MiMo ve DeepSeek’in
+> gerçek model çağrıları, izole ve salt okunur bir test görevinde doğrulandı.
+> Bu kontrol tüm kod geliştirme akışlarının doğrulandığı anlamına gelmez.
+> GitHub’da repo oluşturma/push yapılmadı; pakette yerel Git geçmişi ve
+> isteğe bağlı yayınlama betiği var.
 
 ![Demo verisiyle Agent Desk ekranı](docs/preview.png)
 
@@ -65,16 +68,16 @@ Projenin içindeki Pi oturumunda:
 ```
 
 `connected` görünmeli. Kurulu `pi-open-agents` ile çalışıyorsan mevcut
-`orchestrator` agent’ını kullanmaya devam et:
+ana agent’ını kullanmaya devam et (güncel kurulumdaki adı `sol`):
 
 ```text
-/agent orchestrator
+/agent sol
 ```
 
 Ardından normal bir görev ver. Pi olayları otomatik kaydedilir.
 
-**Bu izleme eklentisi `pi-open-agents` kurmaz.** Sende çalışan Qwen/MiMo/Sol
-model ve agent tanımlarını aynen kullanır. Aynı eklentiyi hem global hem proje
+**Bu izleme eklentisi `pi-open-agents` kurmaz.** Sende çalışan model ve agent
+tanımlarını aynen kullanır. Aynı eklentiyi hem global hem proje
 dizininden iki kez yükleme; çift kayıt oluşabilir.
 
 ### “Sıradaki görev” nasıl görünür?
@@ -170,16 +173,48 @@ başlatmada korunur. Kapsamı yürütme kanıtıdır; kalite doğrulaması deği
   Oran tanımı açıktır: **payda = sonuçlanmış istekler (tamamlanan + hata +
   iptal)**; sonuçsuz istekler paydada ve başarıda yer almaz. Demo verileri
   canlı toplamdan hariçtir; Demo sekmesi kendi örnek toplamını gösterir.
-- Sınırlar: test çıktısı/junit/xcresult kanıtı, görev doğrulama, maliyet/ücret
-  hesabı ve model karşılaştırma bu dilimde değildir.
+- Sınırlar: görev doğrulama ve maliyet/ücret hesabı yapılmaz. JUnit raporları
+  aşağıdaki ayrı akışla içe aktarılır; teknik tamamlanma oranını değiştirmez.
 
-## Windows’taki Qwen için
+## Workflow karşılaştırması
 
-Dashboard ve izleme eklentisi **Pi’nin çalıştığı Mac’e** kurulur. Qwen yine
-Windows’taki LM Studio üzerinden çalışır. Dashboard için Windows’a ikinci bir
-sunucu veya ajan kurman gerekmez; mevcut Pi → LM Studio bağlantın değişmez.
-Dashboard model API çağrısı yapmaz; mevcut Pi workflow’unun API/abonelik
-kullanımı normal şekilde devam eder.
+Modeller değişebilir; dashboard Sol/MiMo/DeepSeek adlarına bağlı değildir.
+Kod projesindeki `.pi/agent-dashboard.workflow.json` dosyasında workflow
+kimliğini, sürümünü ve rol → agent eşleşmesini tanımla.
+[Örnek profil](examples/workflow-profile.json) ve [kullanım rehberi](docs/WORKFLOWS.md).
+
+Her istek kendi profilini ve gözlenen modellerini saklar. Karşılaştırma tablosu
+aynı projenin workflow sürümlerini/model dağılımlarını ayrı gruplarda gösterir:
+teknik tamamlanma, süre, bildirilen token ve ölçüm sayısı. Ortak görevleri
+karşılaştırmak için `taskSet` etiketi ve görev kümesi filtresi vardır. Model
+değişiklikleri eski sonuçları yeniden etiketlemez. Kalite veya ücret puanı üretilmez.
+
+## Test raporu ekleme
+
+Pi'deki istek bittikten sonra, aynı oturumda proje içindeki güncel JUnit XML
+raporunu seç:
+
+```text
+/dashboard-evidence reports/junit.xml
+```
+
+Dashboard, rapordaki geçen/başarısız/hatalı/atlanmış testleri ve dosya özetini
+ilgili isteğe bağlar. Workflow karşılaştırmasında farklı test kümeleri ayrı
+gösterilir. Boş rapor veya “testler geçti” diyen agent mesajı başarı sayılmaz.
+Komut test çalıştırmaz; yalnızca seçilen raporu okur. Eski ve proje dışındaki
+raporlar reddedilir. Kullanım, desteklenen XML yapısı ve güven sınırları:
+[EVIDENCE.md](docs/EVIDENCE.md).
+
+Web arayüzü açık temalıdır; ana metin 16 px, yardımcı metinler en az 14 px'tir.
+Görev akışı ve çalışan modeller önde, yürütme ayrıntıları açılır bölümde kalır.
+
+## Farklı sağlayıcılar ve yerel modeller
+
+Dashboard ve izleme eklentisi **Pi’nin çalıştığı Mac’e** kurulur. Belirli bir
+model veya Windows/LM Studio kurulumu gerektirmez. Model kimliklerini Pi ve
+alt agent olaylarından alır; sağlayıcı yönlendirmesini değiştirmez. Başka bir
+cihazdaki yerel modeli kullanıyorsan o cihaza ayrıca dashboard kurman gerekmez.
+Mevcut Pi workflow’unun API/abonelik kullanımı normal şekilde devam eder.
 
 ## Demo
 
@@ -193,7 +228,7 @@ Tarayıcıda **Demo** sekmesine geç. Varsayılan Canlı görünümü örnek ver
 doldurulmaz. Demo bir model çağırmaz, repository dosyalarına dokunmaz.
 
 ```bash
-npm run demo -- --hold     # MiMo çalışma aşamasında bırak
+npm run demo -- --hold     # DeepSeek inceleme aşamasında bırak
 npm run demo -- --error    # Başarısız uygulama / engellenen inceleme örneği
 npm run demo -- --fast     # Bekleme olmadan örnek olay gönder
 ```
@@ -201,9 +236,17 @@ npm run demo -- --fast     # Bekleme olmadan örnek olay gönder
 ## Günlük kullanım ve kayıtlar
 
 Her gün dashboard klasöründe `npm start`, kod projesinde normal Pi oturumun
-çalışır. Sayfanın kapanması kaydı durdurmaz; **sunucunun durması** kaydı durdurur.
-Pi eklentisi kısa kopmalarda en fazla 500 olayı bellekte tutarak yeniden dener.
-Pi kapanınca teslim edilmemiş olaylar kaybolabilir; kalıcı offline kuyruk yoktur.
+çalışır. Sayfanın kapanması kaydı durdurmaz. Sunucu kapalıyken Pi eklentisi
+olayları yerel diskte bekletir; bağlantı gelince yeniden gönderir. Pi kapanır
+veya çökerse teslim edilmemiş kayıtlar sonraki Pi başlangıcında ya da `/reload`
+ile kurtarılır. Teslimat için dashboard ile izleme eklentisinin yüklü olduğu
+en az bir Pi süreci çalışmalıdır.
+
+Her izleme istemcisinin varsayılan bekleyen kayıt sınırı **5.000 olay / 20 MiB**.
+Sınır dolunca yeni olay reddedilir; kabul edilmiş eski kayıtlar silinmez.
+`/dashboard-status`, bekleyen olay/byte, kurtarılan, reddedilen ve karantinadaki
+kayıt sayılarını ve disk hatalarını gösterir. Disk yazılamazsa olayın kaydedildiği
+iddia edilmez. Bu sınırlar kuyruk içindir; teslim edilmiş journal ayrı tutulur.
 
 Kayıtlar repository’ye değil şu dizine gider:
 
@@ -214,8 +257,20 @@ Kayıtlar repository’ye değil şu dizine gider:
 ├── events.jsonl           # Güncel kayıt
 ├── events.1.jsonl          # Döndürülmüş kayıt
 ├── events.2.jsonl          # Döndürülmüş kayıt
+├── spool/                 # Pi'nin henüz teslim edilmemiş olayları
+│   ├── <üretici dizinleri>/ # Sürece ait, sıralı olay dosyaları
+│   └── quarantine/        # Bozuk/yarım veya collector'ın reddettiği kayıtlar
 └── backups/               # İsteğe bağlı kurulum/güncelleme yedekleri
 ```
+
+Kuyruk dosyaları diske yazılmadan önce güvenli alanlara indirgenir ve maskelenir;
+dosyalar `0600`, dizinler `0700` izinleriyle tutulur. Her üreticinin olay sırası
+korunur; bağımsız Pi süreçleri arasında ortak yürütme sırası varsayılmaz.
+Yaşayan süreçlerin kuyrukları devralınmaz. Birden fazla eski kuyruk kurtarılırsa
+toplam geçici olarak sınırı aşabilir; yeni kayıtlar ancak yer açılınca kabul edilir.
+Heartbeat'ler kalıcı değildir, kurtarılan geçmiş Pi'yi canlı göstermez.
+Karantina kayıtları otomatik yeniden gönderilmez veya silinmez; bekleyen kuyruk
+sınırına dahil değildir. Ayrıntılar: [teslimat mimarisi](docs/ARCHITECTURE.md#teslimat-ve-yeniden-bağlanma).
 
 Güncel dosya 20 MB sınırında döndürülür; iki eski dosya saklanır. Dashboard
 belleğinde oturum başına son 30 istek ve istek başına son 350 zaman çizelgesi
@@ -266,6 +321,16 @@ kaldırabilirsin. Eski kayıtlar otomatik silinmez.
 npm run check
 npm test
 ```
+
+Kurulu Pi ile model çağrısı yapmadan eklenti/TypeBox yüklemesini, sunucu
+kapalıyken kaydı, süreç yeniden başlatıldıktan sonra sıralı teslimatı ve temiz
+kapanışı izole geçici dizinde doğrulamak için:
+
+```bash
+npm run test:pi
+```
+
+Pi `PATH` üzerinde değilse `PI_BIN=/tam/yol/pi npm run test:pi` kullan.
 
 Geliştirme ortamındaki doğrulama ve test kapsamı:
 [docs/VERIFICATION.md](docs/VERIFICATION.md).

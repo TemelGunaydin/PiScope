@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, appendFileSync, renameSync, rmSync
 import { join } from 'node:path';
 import { validateEvent } from './events.mjs';
 import { aggregateRuns, runPerformance, terminalStatus } from './metrics.mjs';
+import { compareWorkflows } from './workflows.mjs';
+import { runEvidence } from './evidence.mjs';
 
 const MAX_EVENTS = 350, MAX_RUNS = 30, MAX_SESSIONS = 80;
 
@@ -61,7 +63,9 @@ export class EventStore {
         demo: e.demo, connected: true, model: '', runs: [], lastSeen: e.receivedAt };
       this.sessions.set(s.id, s);
     }
-    s.lastSeen = e.receivedAt; s.connected = e.type !== 'session.disconnected';
+    // An abandoned producer's backlog is history, not a fresh Pi connection.
+    s.lastSeen = e.recovered ? e.time : e.receivedAt;
+    s.connected = !e.recovered && e.type !== 'session.disconnected';
     if (['session.connected', 'model.selected'].includes(e.type) && e.data.model) s.model = e.data.model;
     if (e.type === 'session.disconnected') s.connected = false;
     if (this.sessions.size > MAX_SESSIONS) {
@@ -76,9 +80,17 @@ export class EventStore {
       s.runs.push(r); if (s.runs.length > MAX_RUNS) s.runs.shift();
     }
     const d = e.data;
+    const rememberModel = (models, model) => {
+      if (!model || models.includes(model)) return;
+      if (models.length >= 100) { r.modelsTruncated = true; return; }
+      models.push(model);
+    };
+    if (['run.started', 'model.selected', 'message.completed'].includes(e.type)) {
+      rememberModel(r.primaryModels ||= [], d.model);
+    }
     switch (e.type) {
       case 'prompt.received': r.prompt = d.prompt || ''; break;
-      case 'run.started': r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.model = d.model || s.model; break;
+      case 'run.started': r.observedStartedAt ||= e.time; r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.model = d.model || s.model; break;
       case 'model.selected': r.model = d.model || ''; break;
       case 'run.ended':
         // Only known terminal outcomes map to a settled status; an unrecognized
@@ -94,6 +106,17 @@ export class EventStore {
         if (r.status === 'running') r.status = 'unknown';
         r.settled = true; r.endedAt ||= e.time; break;
       case 'workflow.updated': r.stages = d.stages; r.stageReason = d.reason || ''; break;
+      case 'tests.recorded': {
+        r.testReports ||= Object.create(null);
+        const report = d.evidence;
+        if (!r.testReports[report.reportKey] && Object.keys(r.testReports).length >= 20) r.evidenceTruncated = true;
+        else r.testReports[report.reportKey] = { ...report, importedAt: e.time };
+        break;
+      }
+      case 'workflow.configured':
+        if (!r.workflow) r.workflow = d.workflow;
+        else if (JSON.stringify(r.workflow) !== JSON.stringify(d.workflow)) r.workflowConflict = true;
+        break;
       case 'message.completed':
         if (d.summary) r.summary = d.summary;
         if (d.usage) r.usage[e.id] = { model: d.model || r.model, ...d.usage };
@@ -113,10 +136,12 @@ export class EventStore {
       case 'agent.finished': {
         const key = d.agentCallId || e.id;
         const old = r.agents[key] || {};
+        const observedModels = [...(old.observedModels || [])];
+        if (d.source === 'observed') rememberModel(observedModels, d.model);
         // agent.finished is the only terminal mark; a late progress/status event
         // must never regress a finished invocation back to running/done.
         const finished = e.type === 'agent.finished' || Boolean(old.finished);
-        r.agents[key] = { ...old, id: key, agent: d.agent || old.agent,
+        r.agents[key] = { ...old, observedModels, id: key, agent: d.agent || old.agent,
           model: d.model || old.model || '', modelSource: d.source === 'observed' ? 'observed' : old.modelSource || d.source || 'unknown', task: d.task || old.task || '',
           // agent.finished status is conservatively normalized (metrics
           // terminalStatus): known failure literals ('error'/'failed'/
@@ -154,7 +179,7 @@ export class EventStore {
     // restart rebuild identical verdicts. Demo and live history stay separated.
     const sessions = [...this.sessions.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)).map(s => ({
       ...s,
-      runs: s.runs.map(r => ({ ...r, performance: runPerformance(r, { now, lastSeen: s.lastSeen, connected: s.connected }) }))
+      runs: s.runs.map(r => ({ ...r, testEvidence: runEvidence(r), performance: runPerformance(r, { now, lastSeen: s.lastSeen, connected: s.connected }) }))
     }));
     const projects = new Map();
     for (const s of this.sessions.values()) {
@@ -165,6 +190,7 @@ export class EventStore {
     return { schemaVersion: 1, sequence: this.sequence, now: new Date().toISOString(),
       warnings: this.warnings, sessions,
       projects: [...projects.values()].map(p => ({ projectId: p.projectId, projectName: p.projectName,
-        live: aggregateRuns(p.live), demo: aggregateRuns(p.demo) })) };
+        live: aggregateRuns(p.live), demo: aggregateRuns(p.demo),
+        workflows: { live: compareWorkflows(p.live), demo: compareWorkflows(p.demo) } })) };
   }
 }

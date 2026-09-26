@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "implement-review",
+  "version": "1",
+  "label": "Uygulama ve bağımsız inceleme",
+  "taskSet": "",
+  "roles": [
+    { "role": "implementation", "agent": "mimo" },
+    { "role": "review", "agent": "deepseek" }
+  ]
+}

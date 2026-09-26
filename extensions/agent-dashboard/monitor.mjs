@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { basename, relative, isAbsolute } from 'node:path';
 import { MonitorClient } from './client.mjs';
 import { redact } from './privacy.mjs';
+import { readWorkflowProfile } from './workflow.mjs';
+import { readJUnitReport } from './evidence.mjs';
 
 const hash = s => createHash('sha256').update(s).digest('hex').slice(0, 28);
 const textOnly = message => (Array.isArray(message?.content) ? message.content.filter(p => p.type === 'text').map(p => p.text).join('\n') : typeof message?.content === 'string' ? message.content : '');
@@ -18,18 +20,19 @@ function usage(u) {
 }
 
 /** Pi adapter separated from schema imports so its behavior is unit-testable. */
-export function registerMonitor(pi, { schema, client = new MonitorClient(), now = () => new Date(), capturePrompts = process.env.AGENT_DASHBOARD_CAPTURE_PROMPTS !== '0' } = {}) {
-  let context; let runId; let identity; let heartbeat; let droppedReported = 0;
+export function registerMonitor(pi, { schema, client = new MonitorClient(), now = () => new Date(), capturePrompts = process.env.AGENT_DASHBOARD_CAPTURE_PROMPTS !== '0', readProfile = readWorkflowProfile } = {}) {
+  let context; let runId; let identity; let heartbeat; let droppedReported = 0; let running = false;
+  let runStartedAt; const reportKeys = new Set();
   const toolCalls = new Map(), fingerprints = new Map();
   function identify(ctx) {
     const cwd = ctx.cwd || process.cwd();
     const session = ctx.sessionManager?.getSessionId?.() || ctx.sessionManager?.getSessionFile?.() || `process-${process.pid}`;
     return { sessionId: hash(`${cwd}\0${session}`), projectId: hash(cwd), projectName: basename(cwd) || cwd };
   }
-  function emit(type, data = {}, ctx = context) {
+  function emit(type, data = {}, ctx = context, runScoped = true) {
     if (!ctx) return;
     identity ||= identify(ctx);
-    client.enqueue({ schemaVersion: 1, id: randomUUID(), type, ...identity, runId,
+    return client.enqueue({ schemaVersion: 1, id: randomUUID(), type, ...identity, runId: runScoped ? runId : undefined,
       time: now().toISOString(), data });
   }
   const listen = (event, handler) => pi.on(event, (e, ctx) => {
@@ -39,29 +42,37 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     }
   });
   listen('session_start', (_e, ctx) => {
-    context = ctx; identity = identify(ctx); runId = undefined;
+    context = ctx; identity = identify(ctx); runId = undefined; running = false;
+    runStartedAt = undefined; reportKeys.clear();
     toolCalls.clear(); fingerprints.clear(); clearInterval(heartbeat); client.start();
     emit('session.connected', { model: modelName(ctx.model) }, ctx);
     heartbeat = setInterval(() => {
       emit('session.heartbeat');
       if (client.dropped > droppedReported) {
         const dropped = client.dropped - droppedReported; droppedReported = client.dropped;
-        emit('monitor.warning', { message: 'Some monitor events were dropped while offline or overloaded', dropped });
+        emit('monitor.warning', { message: 'Some monitor events were not queued or were quarantined; check /dashboard-status', dropped });
       }
     }, 10000); heartbeat.unref();
   });
   listen('before_agent_start', (e, ctx) => {
-    context = ctx; identity = identify(ctx); runId = randomUUID();
+    context = ctx; identity = identify(ctx); runId = randomUUID(); running = true;
+    runStartedAt = now().getTime(); reportKeys.clear();
     toolCalls.clear(); fingerprints.clear();
     emit('prompt.received', { prompt: capturePrompts ? redact(e.prompt, 12000) : '[Prompt capture disabled]' }, ctx);
+    try {
+      const workflow = readProfile(ctx.cwd || process.cwd());
+      if (workflow) emit('workflow.configured', { workflow }, ctx);
+    } catch {
+      emit('monitor.warning', { message: 'Workflow profile invalid or unreadable; this run is excluded from workflow comparisons.' }, ctx);
+    }
   });
   listen('agent_start', (_e, ctx) => {
-    context = ctx; runId ||= randomUUID();
+    context = ctx; runId ||= randomUUID(); running = true;
     emit('run.started', { model: modelName(ctx.model) }, ctx);
   });
   listen('model_select', (e, ctx) => emit('model.selected', {
     model: modelName(e.model), previousModel: modelName(e.previousModel), source: e.source
-  }, ctx));
+  }, ctx, running));
   listen('message_end', (e, ctx) => {
     if (e.message?.role !== 'assistant') return;
     const m = e.message;
@@ -118,6 +129,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
       outcome: last?.stopReason === 'error' ? 'error' : last?.stopReason === 'aborted' ? 'aborted' : 'idle',
       summary: capturePrompts ? redact(textOnly(last), 4000) : ''
     }, ctx);
+    running = false;
   });
   listen('agent_settled', (_e, ctx) => emit('run.settled', {}, ctx));
   // New session/reload tears down timers. No disk/HTTP handles remain in Pi.
@@ -129,7 +141,28 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     description: 'Show the local Agent Desk connection; does not start model work',
     handler: async (_args, ctx) => {
       await client.flush(true);
-      ctx.ui?.notify?.(`Agent Desk: ${client.status}; queued=${client.queue.length}; dropped=${client.dropped}${client.lastError && client.status !== 'connected' ? `; ${client.lastError}` : ''}`, client.status === 'connected' ? 'info' : 'warning');
+      const storage = client.spool ? `; persisted=${client.spool.records.length}; bytes=${client.spool.bytes}; recovered=${client.spool.recovered}; quarantined=${client.spool.quarantined}` : '';
+      const error = client.persistenceError ? `; ${client.persistenceError}` : '';
+      ctx.ui?.notify?.(`Agent Desk: ${client.status}; queued=${client.queue.length}; dropped=${client.dropped}${storage}${error}${client.lastError && client.status !== 'connected' ? `; ${client.lastError}` : ''}`, client.status === 'connected' && !client.persistenceError && !client.dropped ? 'info' : 'warning');
+    }
+  });
+  pi.registerCommand('dashboard-evidence', {
+    description: 'Import a project-local JUnit XML report for the latest completed request (does not run tests)',
+    handler: async (args, ctx) => {
+      try {
+        if (!runId || runStartedAt === undefined || running || identify(ctx).sessionId !== identity?.sessionId) throw new Error('Finish a request in this Pi session before importing its report');
+        let path = args.trim();
+        if (path.startsWith('"') && path.endsWith('"') || path.startsWith("'") && path.endsWith("'")) path = path.slice(1, -1);
+        if (!path) throw new Error('Usage: /dashboard-evidence path/to/junit.xml');
+        const evidence = readJUnitReport(ctx.cwd || process.cwd(), path, runStartedAt, now().getTime());
+        if (!reportKeys.has(evidence.reportKey) && reportKeys.size >= 20) throw new Error('At most 20 report files can be attached to one request');
+        if (emit('tests.recorded', { evidence }, ctx) === false) throw new Error('Report summary could not be persisted; check /dashboard-status');
+        reportKeys.add(evidence.reportKey);
+        ctx.ui?.notify?.(`JUnit report queued: ${evidence.tests} tests; ${evidence.passed} passed, ${evidence.failures} failed, ${evidence.errors} errors, ${evidence.skipped} skipped. This imports a report; it does not execute or certify tests.`, 'info');
+      } catch (error) {
+        // Do not echo raw paths, XML, assertion messages or stack traces into Pi.
+        ctx.ui?.notify?.(`Agent Desk: ${error.code ? `Report could not be read (${error.code})` : redact(error.message, 300)}`, 'warning');
+      }
     }
   });
   if (schema) pi.registerTool({
@@ -139,8 +172,8 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     promptGuidelines: ['For multi-step work, report the full plan with workflow_report before starting and after stage transitions. Report state only; actual delegation still uses subagent. Never imply tests passed without evidence.'],
     parameters: schema,
     async execute(_id, params, _signal, _update, ctx) {
-      emit('workflow.updated', { stages: params.stages, reason: redact(params.reason || '', 500), source: 'reported' }, ctx);
-      return { content: [{ type: 'text', text: 'Workflow update queued for the local monitor. No work was executed.' }], details: { recorded: true } };
+      const recorded = emit('workflow.updated', { stages: params.stages, reason: redact(params.reason || '', 500), source: 'reported' }, ctx) !== false;
+      return { content: [{ type: 'text', text: recorded ? 'Workflow update queued for the local monitor. No work was executed.' : 'Workflow update could not be persisted. Check /dashboard-status. No work was executed.' }], details: { recorded } };
     }
   });
   return { client };

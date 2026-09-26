@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark light"><title>Agent Desk · Yerel Workflow</title>
+  <meta name="color-scheme" content="light"><title>Agent Desk · Yerel Workflow</title>
   <link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -15,22 +15,26 @@
     <div class="sidebar-bottom"><span class="shield">◇</span><strong>Verilerin bu Mac’te.</strong><p>Model API anahtarları okunmaz.<br>Bulut senkronizasyonu yok.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Bağlanıyor</span><span class="local-tag">LOCAL</span></div></div>
   </aside>
   <main>
-    <header class="topbar"><div><span class="crumb">Workspace</span><span class="slash">/</span><span id="project-name">Pi oturumları</span></div><div class="top-actions"><span class="version">v0.1.0</span><button id="theme" type="button" class="icon-button" aria-label="Temayı değiştir">◐</button><a class="button subtle" id="export" href="/api/export">Geçmişi dışa aktar ↗</a></div></header>
+    <header class="topbar"><div><span class="crumb">Workspace</span><span class="slash">/</span><span id="project-name">Pi oturumları</span></div><div class="top-actions"><span class="version">v0.1.0</span><a class="button subtle" id="export" href="/api/export">Geçmişi dışa aktar ↗</a></div></header>
     <div class="content">
       <div id="pairing" class="notice hidden"><strong>Bu tarayıcı henüz eşleşmedi.</strong><p><code>npm start</code> çıktısındaki özel bağlantıyı aç veya <code>npm run open</code> çalıştır. Bu bağlantıyı paylaşma.</p></div>
       <div id="demo-banner" class="notice demo-banner hidden">DEMO MODU <span>Aşağıdaki olaylar simülasyondur. Hiçbir model çağrılmadı veya proje değiştirilmedi.</span></div>
       <div id="storage-warning" class="notice hidden"></div>
-      <section class="page-heading"><div><div class="eyebrow">GÖRÜNÜR İŞ AKIŞI</div><h1>Her görevin izini sür.</h1><p>Kim çalışıyor, ne yaptı ve sırada ne var — tek bir yerde.</p></div><div class="run-select-wrap"><label for="run-select">İstek geçmişi</label><select id="run-select"><option>Henüz istek yok</option></select></div></section>
+      <section class="page-heading"><div><div class="eyebrow">GÖRÜNÜR İŞ AKIŞI</div><h1>Workflow takibi</h1><p>İstekler, modeller ve test sonuçları.</p></div><div class="run-select-wrap"><label for="run-select">İstek geçmişi</label><select id="run-select"><option>Henüz istek yok</option></select></div></section>
       <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>İlk Pi sinyalini bekliyor.</h2><p>Dashboard’u açık tut. Projene izleme eklentisini yükle ve Pi’de bir görev başlat.</p><code>npm run install:pi -- /tam/yol/projen</code><p class="small">Ardından Pi’de <code>/reload</code> ve <code>/dashboard-status</code> kullan.<br>Arayüzü denemek için başka terminalde <code>npm run demo</code> çalıştırıp Demo sekmesini seç.</p></section>
       <div id="run-content" class="hidden">
         <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">AKTİF İSTEK</span><span id="run-status" class="badge">Bekliyor</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div></section>
         <section class="metrics" aria-label="Özet"><article><span class="metric-label">Gözlenen araçlar</span><strong id="metric-tools">0</strong><small>Ana oturum + alt agent kayıtları</small></article><article><span class="metric-label">Alt agent görevleri</span><strong id="metric-agents">0</strong><small>Ayrı çağrılar, ayrı sonuçlar</small></article><article><span class="metric-label">Bildirilen token</span><strong id="metric-tokens">—</strong><small>Fatura veya ücret hesabı değildir</small></article><article><span class="metric-label">İstek süresi</span><strong id="metric-duration">—</strong><small id="duration-label">Duvar saati süresi</small></article></section>
+        <section class="panel workflow-panel"><div class="panel-header"><div><h2>Görev akışı</h2><p>Agent’ın bildirdiği plan · otomatik doğrulama değildir</p></div><span class="tag">BİLDİRİLEN</span></div><div id="stages" class="stages"></div><p id="stage-reason" class="stage-reason"></p></section>
+        <section class="model-area"><div class="section-heading"><h2>Çalışan ekip</h2><span>Model kimlikleri Pi olaylarından alınır</span></div><div id="models" class="model-grid"></div></section>
+        <section class="panel comparison-panel" aria-labelledby="evidence-heading"><div class="panel-header"><div><h2 id="evidence-heading">Test raporları</h2><p>Seçili isteğe eklenen JUnit sonuçları · testler dashboard tarafından çalıştırılmaz</p></div><span class="tag">RAPORDAN</span></div><div id="test-evidence" class="perf-body"></div></section>
+        <section class="panel comparison-panel" aria-labelledby="comparison-heading"><div class="panel-header"><div><h2 id="comparison-heading">Workflow karşılaştırması</h2><p>Profil sürümü ve gözlenen modeller · seçili projenin kayıtları</p></div><div class="comparison-filter"><label for="workflow-task-set">Görev kümesi</label><select id="workflow-task-set"><option value="">Tüm kayıtlar</option></select></div></div><div id="workflow-comparison" class="perf-body"></div></section>
+        <details class="execution-details"><summary>Yürütme ayrıntıları ve proje geçmişi</summary>
         <section class="measure-grid">
           <section class="panel"><div class="panel-header"><div><h2>Yürütme performansı</h2><p>Yalnızca gözlenen olaylar · bildirim ve yanıtlar doğrulama değildir</p></div><span class="tag">GÖZLENEN</span></div><div id="perf" class="perf-body"></div></section>
           <section class="panel"><div class="panel-header"><div><h2>Proje yürütme geçmişi</h2><p>Seçili proje · son kayıtlı istekler</p></div><span class="tag">GÖZLENEN</span></div><div id="history" class="perf-body"></div></section>
         </section>
-        <section class="panel workflow-panel"><div class="panel-header"><div><h2>Görev akışı</h2><p>Agent’ın bildirdiği plan · otomatik doğrulama değildir</p></div><span class="tag">BİLDİRİLEN</span></div><div id="stages" class="stages"></div><p id="stage-reason" class="stage-reason"></p></section>
-        <section class="model-area"><div class="section-heading"><h2>Çalışan ekip</h2><span>Model kimlikleri Pi olaylarından alınır</span></div><div id="models" class="model-grid"></div></section>
+        </details>
         <div class="detail-grid">
           <section class="panel timeline-panel"><div class="panel-header"><div><h2>Aktivite akışı</h2><p>Araçlar, devirler ve sonuçlar</p></div><input id="event-search" type="search" aria-label="Olaylarda ara" placeholder="Olaylarda ara…"></div><div id="timeline" class="timeline" aria-live="off"></div></section>
           <div class="right-column"><section class="panel next-panel"><div class="panel-header"><h2>Sıradaki görev</h2><span class="tag">PLAN</span></div><div id="next-task"></div></section><section class="panel"><div class="panel-header"><h2>Son yanıt</h2><span class="tag">METİN</span></div><p id="summary" class="summary"></p></section><section class="privacy-note"><span>◎</span><p>“Araç bitti” başarılı test anlamına gelmez. Gelecek görevler yalnızca workflow bildirildiğinde görünür. Gizli model düşünceleri toplanmaz.</p></section></div>

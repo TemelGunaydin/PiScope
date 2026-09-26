@@ -8,6 +8,7 @@ function duration(start, end) { if (!start) return '—'; const n = Math.max(0, 
 function modelLabel(model) {
   if (!model) return 'Model henüz bildirilmedi';
   if (/mimo/i.test(model)) return 'MiMo'; if (/qwen/i.test(model)) return 'Qwen'; if (/sol/i.test(model)) return 'Sol';
+  if (/deepseek/i.test(model)) return 'DeepSeek';
   if (/glm/i.test(model)) return 'GLM'; return model.split('/').slice(-1)[0];
 }
 function badge(status) { return el('span', `badge ${status}`, labels[status] || status); }
@@ -92,11 +93,13 @@ function eventPresentation(e) {
     'model.selected': 'Ana oturum modeli değişti', 'tool.started': `${d.toolName || 'Araç'} başladı`,
     'tool.finished': `${d.toolName || 'Araç'} ${d.isError ? 'hata döndürdü' : 'tamamlandı'}`,
     'agent.started': `${d.agent || 'Alt agent'} için görev gönderildi`, 'agent.finished': `${d.agent || 'Alt agent'} ${d.isError ? 'başarısız oldu' : 'sonuç döndürdü'}`,
-    'message.completed': 'Model yanıtı kaydedildi', 'workflow.updated': 'Görev planı güncellendi',
+    'message.completed': 'Model yanıtı kaydedildi', 'workflow.updated': 'Görev planı güncellendi', 'workflow.configured': 'Workflow profili kaydedildi',
+    'tests.recorded': 'JUnit test raporu eklendi',
     'run.ended': d.outcome === 'error' ? 'Ana çalışma hata ile durdu' : d.outcome === 'aborted' ? 'Ana çalışma iptal edildi' : d.outcome === 'idle' ? 'Ana model yanıtını bitirdi' : d.outcome ? `Ana çalışma bilinmeyen bir sonuçla durdu (${d.outcome})` : 'Ana çalışma sonuç bilgisi olmadan durdu',
     'run.settled': 'Pi otomatik devam döngüsü sonlandı', 'monitor.warning': 'İzleme uyarısı', 'session.disconnected': 'Pi bağlantısı kapandı'
   }[e.type] || e.type;
-  const detail = (e.type === 'agent.finished' ? [d.model, d.summary].filter(Boolean).join('\n') : '') || d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
+  const reportDetail = e.type === 'tests.recorded' ? `${d.evidence.file} · ${d.evidence.passed} geçti / ${d.evidence.failures + d.evidence.errors} başarısız / ${d.evidence.skipped} atlandı · SHA-256 ${d.evidence.sha256.slice(0, 12)}` : '';
+  const detail = reportDetail || (e.type === 'workflow.configured' ? `${d.workflow.label} · ${d.workflow.id} @ ${d.workflow.version}` : '') || (e.type === 'agent.finished' ? [d.model, d.summary].filter(Boolean).join('\n') : '') || d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
   return { title, detail, icon: e.type.startsWith('agent.') ? '↗' : e.type === 'tool.finished' ? (d.isError ? '!' : '✓') : e.type === 'workflow.updated' ? '≡' : '·' };
 }
 function renderPerf(s, r) {
@@ -171,9 +174,67 @@ function renderTimeline(r) {
     const p = eventPresentation(e); const item = el('article', `event ${e.type.startsWith('agent.') ? 'agent' : ''} ${e.data.isError ? 'error' : ''}`);
     const body = el('div', 'event-body'), top = el('div', 'event-top');
     top.append(el('span', 'event-title', p.title), el('time', '', time(e.time)));
-    body.append(top, el('p', 'event-detail', p.detail), el('p', 'event-kind', `${e.type}${e.type === 'workflow.updated' ? ' · AGENT BİLDİRİMİ' : ' · GÖZLENEN OLAY'}`));
+    body.append(top, el('p', 'event-detail', p.detail), el('p', 'event-kind', `${e.type}${e.type === 'workflow.updated' ? ' · AGENT BİLDİRİMİ' : e.type === 'workflow.configured' ? ' · YAPILANDIRMA' : e.type === 'tests.recorded' ? ' · İÇE AKTARILAN RAPOR' : ' · GÖZLENEN OLAY'}`));
     item.append(el('div', 'event-icon', p.icon), body); $('timeline').append(item);
   }
+}
+function renderWorkflowComparison(s, r) {
+  const box = $('workflow-comparison'); box.replaceChildren();
+  const data = snapshot.projects?.find(p => p.projectId === s.projectId)?.workflows?.[demo ? 'demo' : 'live'];
+  const filter = $('workflow-task-set'), previous = filter.value;
+  filter.replaceChildren(Object.assign(el('option', '', 'Tüm kayıtlar'), { value: '' }));
+  for (const name of [...new Set((data?.groups || []).map(g => g.taskSet).filter(Boolean))].sort()) {
+    filter.append(Object.assign(el('option', '', name), { value: name }));
+  }
+  filter.value = [...filter.options].some(o => o.value === previous) ? previous : '';
+  box.append(el('p', 'perf-note', r.workflow ? `Seçili istek: ${r.workflow.label} · ${r.workflow.id} @ ${r.workflow.version}${r.workflowConflict ? ' · profil çakışması; karşılaştırma dışında' : ''}` : 'Seçili istekte workflow profili kaydedilmemiş.'));
+  if (!data?.groups.length) {
+    box.append(el('p', 'perf-note', 'Henüz karşılaştırılabilir profil kaydı yok. Projendeki .pi/agent-dashboard.workflow.json dosyasıyla rolleri tanımla; sonraki istekler otomatik gruplanır.'));
+    return;
+  }
+  const wrap = el('div', 'comparison-scroll'), table = el('table', 'comparison-table');
+  wrap.tabIndex = 0; wrap.setAttribute('role', 'region'); wrap.setAttribute('aria-label', 'Workflow sonuçları; dar ekranda yatay kaydırılabilir');
+  const head = el('tr');
+  for (const title of ['Workflow / modeller', 'İstek', 'Teknik tamamlanma', 'Ort. süre', 'Ort. bildirilen token', 'JUnit sonuçları']) head.append(el('th', '', title));
+  const thead = el('thead'); thead.append(head); table.append(thead);
+  const body = el('tbody');
+  for (const group of data.groups.filter(g => !filter.value || g.taskSet === filter.value)) {
+    const row = el('tr'), identity = el('td');
+    identity.append(el('strong', '', `${group.label} · v${group.version}`), el('small', '', `${group.id} · ${group.taskSet || 'Görev kümesi belirtilmedi'}`));
+    for (const assignment of group.models) identity.append(el('small', '', `${assignment.role}: ${assignment.models.join(', ') || 'Model gözlenmedi'}`));
+    const total = el('td', '', count(group.total));
+    total.append(el('small', '', `${group.failed} hata · ${group.cancelled} iptal · ${group.unknown} sonuçsuz`));
+    const ratio = el('td', '', group.terminal ? `%${Math.round(group.technicalCompletionRatio * 100)}` : '—');
+    ratio.append(el('small', '', `${group.completed} / ${group.terminal} sonuçlanmış`));
+    const elapsed = el('td', '', msDuration(group.meanElapsedMs)); elapsed.append(el('small', '', `${group.durationSamples} ölçüm`));
+    const tokens = el('td', '', group.meanReportedTokens === undefined ? '—' : count(Math.round(group.meanReportedTokens))); tokens.append(el('small', '', `${group.tokenSamples} ölçüm`));
+    const tests = el('td', 'comparison-evidence'), evidence = group.testEvidence;
+    tests.append(el('span', '', evidence?.coveredRuns ? `${evidence.coveredRuns} / ${group.total} istekte rapor` : 'Rapor yok'));
+    for (const set of evidence?.sets || []) tests.append(el('small', '', `${set.suiteHash.slice(0, 8)} · ${set.tests} test: ${set.passed} geçti / ${set.failed} kaldı / ${set.inconclusive} belirsiz istek`));
+    if (evidence?.unusableRuns) tests.append(el('small', '', `${evidence.unusableRuns} isteğin raporları sınırı aştı; hariç tutuldu`));
+    row.append(identity, total, ratio, elapsed, tokens, tests); body.append(row);
+  }
+  table.append(body); wrap.append(table); box.append(wrap);
+  const scope = el('details', 'model-result'); scope.append(el('summary', '', 'Ölçüm kapsamı'));
+  scope.append(el('p', 'perf-note', 'Aynı görev kümesiyle karşılaştır. Süre ve token ortalamaları yalnızca sonuçlanmış ve ilgili ölçümü bulunan istekleri kapsar; eksik veri sıfır sayılmaz. Model listeleri gözlenen kimliklerdir, yürütme sırası değildir.'));
+  scope.append(el('p', 'perf-note', 'JUnit sonuçları test adları kümesine göre ayrıdır; aynı kısa kimlik aynı test adlarını belirtir, test kodunun veya çalıştırma koşullarının eşitliğini doğrulamaz. Raporu olmayan, boş veya yalnızca atlanmış testli istekler geçti sayılmaz.'));
+  scope.append(el('p', 'perf-note', `Kalite ve ücret ölçülmez. Profil olmayan ${data.unconfigured}, çakışan veya model kaydı sınırını aşan ${data.conflicted} istek tablo dışındadır. Yalnızca elde tutulan kayıtlar${demo ? ' ve demo verileri' : ''} gösterilir.`));
+  box.append(scope);
+}
+function renderEvidence(r) {
+  const box = $('test-evidence'); box.replaceChildren();
+  const evidence = r.testEvidence, reports = evidence?.reports || [];
+  if (!reports.length) box.append(el('p', 'perf-note', 'Bu isteğe test raporu eklenmedi. İstek bittikten sonra Pi’de /dashboard-evidence path/to/junit.xml kullan.'));
+  if (evidence?.truncated) box.append(el('p', 'perf-note', 'Rapor sayısı sınırı aşıldı; bu isteğin test sonuçları karşılaştırma dışında.'));
+  for (const report of reports) {
+    const row = el('article', 'evidence-report'), failed = report.failures + report.errors;
+    row.append(el('strong', '', report.file), el('span', `badge ${failed ? 'error' : report.passed ? 'done' : 'unknown'}`, failed ? 'Raporda başarısız' : report.passed ? 'Raporda geçti' : 'Sonuç belirsiz'));
+    row.append(el('p', 'perf-note', `${report.tests} test · ${report.passed} geçti · ${report.failures} başarısız · ${report.errors} hata · ${report.skipped} atlandı`));
+    const details = el('details', 'model-result'); details.append(el('summary', '', 'Rapor kaynağı ve dosya özeti'));
+    details.append(el('p', '', `JUnit XML · kullanıcı komutuyla içe aktarıldı\nTest kümesi: ${report.suiteHash}\nSHA-256: ${report.sha256}\nDosya: ${report.bytes} byte · değişiklik: ${report.modifiedAt}\nİçe aktarma: ${report.importedAt}`));
+    row.append(details); box.append(row);
+  }
+  if (reports.length) box.append(el('p', 'perf-note', 'Son içe aktarılan rapor dosya başına gösterilir; önceki özetler aktivite kaydındadır. Rapor içeriği testin gerçekten çalıştırıldığını, güncel kodu veya görev kalitesini tek başına kanıtlamaz.'));
 }
 function updateDuration() {
   const { s, r } = selected(); if (!s || !r) return;
@@ -206,7 +267,7 @@ function render() {
   const uses = Object.values(r.usage);
   $('metric-tokens').textContent = uses.length ? count(uses.reduce((sum, u) => sum + (u.input || 0) + (u.output || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0), 0)) : '—';
   $('summary').textContent = r.summary || 'Henüz tamamlanmış bir metin yanıtı yok.';
-  renderStages(r); renderModels(s, r); renderPerf(s, r); renderHistory(s); renderTimeline(r); updateDuration();
+  renderStages(r); renderModels(s, r); renderPerf(s, r); renderHistory(s); renderEvidence(r); renderWorkflowComparison(s, r); renderTimeline(r); updateDuration();
 }
 function connect() {
   eventSource?.close();
@@ -221,8 +282,7 @@ $('live-mode').onclick = () => { demo = false; sessionId = ''; runId = ''; rende
 $('demo-mode').onclick = () => { demo = true; sessionId = ''; runId = ''; render(); };
 $('run-select').onchange = e => { runId = e.target.value; render(); };
 $('event-search').oninput = () => { const { r } = selected(); if (r) renderTimeline(r); };
-try { document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark'; } catch {}
-$('theme').onclick = () => { const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('theme', theme); } catch {} };
+$('workflow-task-set').onchange = () => { const { s, r } = selected(); if (r) renderWorkflowComparison(s, r); };
 setInterval(updateDuration, 1000);
 async function boot() {
   const token = new URLSearchParams(location.hash.slice(1)).get('token');

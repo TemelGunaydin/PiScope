@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fixture, event, token } from './helpers.mjs';
+import { fixture, event, token, snapshots } from './helpers.mjs';
 
 test('server listens on loopback; static HTML contains no access token', async t => {
   const f = await fixture(t);
@@ -40,21 +40,38 @@ test('ingestion redacts before persistence and rejects invalid batch atomically'
 });
 test('SSE immediately supplies a snapshot and delivers updates', async t => {
   const f = await fixture(t); const controller = new AbortController(); t.after(() => controller.abort());
-  const response = await f.request('/api/events', { signal: controller.signal });
+  const response = await f.request('/api/events', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]) });
   assert.equal(response.headers.get('content-type'), 'text/event-stream');
-  const reader = response.body.getReader(); const initial = new TextDecoder().decode((await reader.read()).value);
-  assert.match(initial, /event: snapshot/);
+  const stream = snapshots(response.body);
+  const initial = (await stream.next()).value;
+  assert.deepEqual(initial.sessions, []);
   await f.post(event('prompt.received', { prompt: 'live message' }));
-  const updated = new TextDecoder().decode((await reader.read()).value);
-  assert.match(updated, /live message/); controller.abort();
+  const updated = (await stream.next()).value;
+  assert.equal(updated.sessions[0].runs[0].prompt, 'live message');
+  controller.abort(); await stream.return();
 });
 test('reconnected SSE includes durable latest state, not a blank session', async t => {
   const f = await fixture(t); await f.post(event('prompt.received', { prompt: 'keep me' }));
   for (let i = 0; i < 2; i++) {
-    const controller = new AbortController(); const response = await f.request('/api/events', { signal: controller.signal });
-    const value = new TextDecoder().decode((await response.body.getReader().read()).value);
-    assert.match(value, /keep me/); controller.abort();
+    const controller = new AbortController(); t.after(() => controller.abort());
+    const response = await f.request('/api/events', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]) });
+    const stream = snapshots(response.body);
+    const value = (await stream.next()).value;
+    assert.equal(value.sessions[0].runs[0].prompt, 'keep me');
+    controller.abort(); await stream.return();
   }
+});
+test('SSE snapshot reader handles split UTF-8, retry frames and coalesced snapshots', async () => {
+  const bytes = new TextEncoder().encode('retry: 2000\n\n: heartbeat\n\nevent: snapshot\ndata: {"prompt":"İş"}\n\nevent: snapshot\ndata: {"prompt":"updated"}\n\n');
+  const split = bytes.indexOf(0xc4) + 1; // Split inside the first Turkish character.
+  const body = new ReadableStream({ start(controller) {
+    for (const chunk of [bytes.slice(0, 7), bytes.slice(7, split), bytes.slice(split)]) controller.enqueue(chunk);
+    controller.close();
+  } });
+  const stream = snapshots(body);
+  assert.deepEqual((await stream.next()).value, { prompt: 'İş' });
+  assert.deepEqual((await stream.next()).value, { prompt: 'updated' });
+  await assert.rejects(stream.next(), /stream ended/);
 });
 test('malformed JSON, unknown paths and non-JSON ingestion fail safely', async t => {
   const f = await fixture(t);

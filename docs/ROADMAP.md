@@ -1,26 +1,44 @@
 # Yol haritası
 
-Bunlar mevcut özellik değil, sonraki geliştirme adaylarıdır.
+Tamamlanan temel ve sonraki geliştirme adayları aşağıda ayrı gösterilir.
 
-## Bir sonraki doğrulama
+## Tamamlanan doğrulama ve karşılaştırma temeli
 
-Gerçek Mac kurulumunda `pi --version` ve `pi-open-agents` sürümünü kaydet.
-Qwen → MiMo → Sol akışını gerçek bir test repository’sinde çalıştır. Her
-subagent’ın model kimliğini ve araç durumunu terminalle karşılaştır. Eksik olay
-varsa sağlayıcıya özel değil, harness event şemasına uygun adapter düzeltmesi yap.
+Mac / Pi 0.87.1 / pi-open-agents 0.1.22 ile Sol → MiMo → DeepSeek → Sol akışı,
+izole salt okunur görevde gerçek sağlayıcı çağrılarıyla doğrulandı. Başarı ve
+eksik model hatası kayıtları uyumluluk fixture’larına eklendi. Node 26 SSE
+testlerinin ağ parçasını olay sanma hatası giderildi. `npm run test:pi` model
+çağrısı yapmadan gerçek eklenti yükleme ve bağlantıyı doğrular.
+
+Modelden bağımsız workflow profili, istek başına profil/model geçmişi ve
+görev kümesi filtreli yürütme karşılaştırması eklendi. Kullanım:
+[WORKFLOWS.md](WORKFLOWS.md). Farklı iş yüklerinin sonuçlarını kalite kıyası
+saymadan önce ortak görev kümesi ve bağımsız test kanıtı gerekir.
+
+Kalıcı offline kuyruk tamamlandı: disk üzerinde olay başına atomik kayıt,
+süreç kapanması/çökmesi sonrası kurtarma, üretici başına teslimat sırası,
+onaydan sonra silme, kapasite sınırları ve görünür kuyruk/karantina sayaçları.
+Gerçek Pi'de dashboard kapalıyken kayıt ve sonraki Pi sürecinden teslimat
+doğrulandı. Ayrıntılar: [VERIFICATION.md](VERIFICATION.md).
+
+JUnit rapor içe aktarma tamamlandı: açık Pi komutu, güncel/proje içi dosya
+kontrolü, gerçek testcase sayımı, kalıcı rapor özeti ve test kümesi başına
+workflow karşılaştırması. Agent beyanlarından ve teknik tamamlanmadan ayrı
+tutulur. Runner/commit doğrulaması yerine geçmez. [EVIDENCE.md](EVIDENCE.md).
+Arayüz açık ve sade tasarıma geçirildi; büyük metin ve açılır yürütme ayrıntıları
+masaüstü/mobil tarayıcıda doğrulandı.
 
 ## Sonraki işler
 
 Yürütme performansı ölçümünün ilk dilimi eklendi (teknik tamamlanma / sonuçsuz
 ayrımı, çağrı bazlı süre, proje geçmişi toplamı). Sıradaki adımlar:
 
-- Gerçek subagent hatalarında ve custom provider modellerinde uyumluluk fixture’ları.
-- Test komutlarını/junit/xcresult çıktısını açık izinle okuyan kanıt adapter’ı.
-- Kalıcı offline spool, teslimat sırası ve geri basınç metrikleri.
+- Test runner/exit-code ve commit bağlamıyla yürütme kanıtını güçlendirme; gerekirse xcresult adapter'ı.
+- Yeni Pi/alt agent sürümleri ve farklı sağlayıcı hata biçimleri için uyumluluk fixture’larını genişletme.
 - Ayrı tüm-journal dışa aktarma, arama ve saklama sınırı arayüzü.
 - Proje bazlı TODO düzenleme ve açık kullanıcı onaylı görev çalıştırma.
 - Gerekiyorsa deterministik workflow state machine; sınırlı retry ve iptal.
-- Ölçülmüş sonuçlarla model karşılaştırma; bilinmeyen maliyeti sıfır saymama.
+- Workflow karşılaştırmasına doğrulanabilir maliyet verisi ekleme.
 - Ayrı testlerle OpenCode/OMP adapter’ları.
 
 Görev başlatma, model routing, retry politikası ve otomatik commit gibi yazıcı

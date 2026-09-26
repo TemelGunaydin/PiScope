@@ -1,0 +1,234 @@
+{
+  "provenance": {
+    "pi": "0.87.1",
+    "piOpenAgents": "0.1.22",
+    "date": "2026-09-26",
+    "method": "Real isolated read-only Pi runs. Event/tool IDs normalized; retained model, status, duration and token fields are observed. Raw provider reasoning, costs, session paths and unrelated fields omitted.",
+    "mainModel": "openai-codex/gpt-6-sol"
+  },
+  "cases": [
+    {
+      "name": "configured models complete",
+      "expectedVerdict": "completed",
+      "events": [
+        {
+          "type": "tool_execution_start",
+          "toolCallId": "mimo-call",
+          "toolName": "subagent",
+          "args": {
+            "agent": "mimo",
+            "session": "none",
+            "task": "Read fixture.txt once and report its arithmetic result in one sentence. No edits or other work."
+          }
+        },
+        {
+          "type": "tool_execution_update",
+          "toolCallId": "mimo-call",
+          "toolName": "subagent",
+          "partialResult": {
+            "details": {
+              "agent": "mimo",
+              "model": "mimo-v2.6-pro",
+              "status": "done",
+              "elapsedMs": 6314,
+              "output": "The fixture's arithmetic result is 42 (from 19 + 23).",
+              "usage": {
+                "input": 505,
+                "output": 66,
+                "cacheRead": 256,
+                "cacheWrite": 0
+              },
+              "tools": [
+                {
+                  "id": "read-1",
+                  "name": "read",
+                  "args": {
+                    "path": "fixture.txt"
+                  },
+                  "status": "done"
+                }
+              ]
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "The fixture's arithmetic result is 42 (from 19 + 23)."
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool_execution_end",
+          "toolCallId": "mimo-call",
+          "toolName": "subagent",
+          "result": {
+            "details": {
+              "agent": "mimo",
+              "model": "mimo-v2.6-pro",
+              "status": "done",
+              "elapsedMs": 6314,
+              "isError": false,
+              "exitCode": 0,
+              "output": "The fixture's arithmetic result is 42 (from 19 + 23).",
+              "usage": {
+                "input": 505,
+                "output": 66,
+                "cacheRead": 256,
+                "cacheWrite": 0
+              },
+              "tools": [
+                {
+                  "id": "read-1",
+                  "name": "read",
+                  "args": {
+                    "path": "fixture.txt"
+                  },
+                  "status": "done"
+                }
+              ]
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "The fixture's arithmetic result is 42 (from 19 + 23)."
+              }
+            ]
+          },
+          "isError": false
+        },
+        {
+          "type": "tool_execution_start",
+          "toolCallId": "deepseek-call",
+          "toolName": "subagent",
+          "args": {
+            "agent": "deepseek",
+            "session": "none",
+            "task": "Read fixture.txt once and verify 19+23=42 in one sentence. No edits or other work."
+          }
+        },
+        {
+          "type": "tool_execution_update",
+          "toolCallId": "deepseek-call",
+          "toolName": "subagent",
+          "partialResult": {
+            "details": {
+              "agent": "deepseek",
+              "model": "deepseek-flash",
+              "status": "done",
+              "elapsedMs": 2480,
+              "output": "fixture.txt reads \"Dashboard integration fixture: 19 + 23 = 42,\" which confirms that 19+23=42.",
+              "usage": {
+                "input": 782,
+                "output": 115,
+                "cacheRead": 384,
+                "cacheWrite": 0
+              },
+              "tools": [
+                {
+                  "id": "read-1",
+                  "name": "read",
+                  "args": {
+                    "path": "fixture.txt"
+                  },
+                  "status": "done"
+                }
+              ]
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "fixture.txt reads \"Dashboard integration fixture: 19 + 23 = 42,\" which confirms that 19+23=42."
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool_execution_end",
+          "toolCallId": "deepseek-call",
+          "toolName": "subagent",
+          "result": {
+            "details": {
+              "agent": "deepseek",
+              "model": "deepseek-flash",
+              "status": "done",
+              "elapsedMs": 2480,
+              "isError": false,
+              "exitCode": 0,
+              "output": "fixture.txt reads \"Dashboard integration fixture: 19 + 23 = 42,\" which confirms that 19+23=42.",
+              "usage": {
+                "input": 782,
+                "output": 115,
+                "cacheRead": 384,
+                "cacheWrite": 0
+              },
+              "tools": [
+                {
+                  "id": "read-1",
+                  "name": "read",
+                  "args": {
+                    "path": "fixture.txt"
+                  },
+                  "status": "done"
+                }
+              ]
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "fixture.txt reads \"Dashboard integration fixture: 19 + 23 = 42,\" which confirms that 19+23=42."
+              }
+            ]
+          },
+          "isError": false
+        }
+      ]
+    },
+    {
+      "name": "missing override model fails while parent replies normally",
+      "expectedVerdict": "failed",
+      "events": [
+        {
+          "type": "tool_execution_start",
+          "toolCallId": "deepseek-call",
+          "toolName": "subagent",
+          "args": {
+            "agent": "deepseek",
+            "model": "dashboard-missing-provider/missing-model",
+            "session": "none",
+            "task": "read fixture.txt and report 42"
+          }
+        },
+        {
+          "type": "tool_execution_end",
+          "toolCallId": "deepseek-call",
+          "toolName": "subagent",
+          "result": {
+            "details": {
+              "agent": "deepseek",
+              "model": "deepseek/deepseek-flash",
+              "status": "error",
+              "elapsedMs": 200,
+              "isError": true,
+              "exitCode": 1,
+              "output": "Error: Model \"dashboard-missing-provider/missing-model\" not found. Use --list-models to see available models.\n",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0
+              },
+              "tools": []
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Error: Model \"dashboard-missing-provider/missing-model\" not found. Use --list-models to see available models.\n"
+              }
+            ]
+          },
+          "isError": false
+        }
+      ]
+    }
+  ]
+}

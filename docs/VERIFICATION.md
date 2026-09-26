@@ -1,5 +1,135 @@
 # Doğrulama kaydı
 
+## Güncel doğrulama: JUnit raporları ve sade arayüz — 2026-09-26
+
+Ortam: macOS, Node.js v26.5.0, kurulu Pi 0.87.1, sistem Google Chrome.
+
+- `npm run check`: **31 JavaScript modülü** syntax kontrolü geçti.
+- `npm test`: **113/113 geçti**, başarısız veya atlanan test yok.
+- Yeni `test/evidence.test.mjs`: gerçek Node test sürecinden üretilen JUnit
+  raporu (geçen/başarısız/atlanmış vakalar), iç içe suite sayımı, tutarsız
+  toplamlar, yarım/bozuk XML, DTD/entity ve desteklenmeyen sonuçların reddi,
+  test kimliği kümesinin sıra/sonuç değişiminden bağımsızlığı doğrulandı.
+- Proje dışı symlink, eski/gelecek zamanlı dosya, boyut sınırı ve geçersiz
+  UTF-8 reddi; yalnız güvenli rapor özetinin saklanması; istek bağlama ve
+  dosya başına son rapor; aynı kümenin kopyalarında çift sayım olmaması ve
+  başarısızlığın önceliği; boş/atlanmış raporda belirsizlik; 20 dosya sınırı;
+  live/demo ayrımı ve journal replay doğrulandı.
+- Gerçek HTTP testinde JUnit özeti offline kuyruktan yeni istemciye kurtarıldı,
+  state/karşılaştırma/export içinde görüldü. Ham assertion mesajı saklanmadı.
+- Pi adapter testleri: açık komutla gerçek yerel rapor okuma, doğru istek ID'si,
+  çalışan/olmayan istek ve yeni oturumda reddetme, eski dosyayı sonraki isteğe
+  bağlamama, parser/disk hatasını görünür bildirme. Agent'ın plan bildirimi
+  test kanıtı üretmiyor; teknik tamamlanma metriği ayrı kalıyor.
+- `npm run test:pi`: gerçek Pi yükleyicisinde `dashboard-evidence` komutu
+  kaydedildi ve tamamlanmış istek yokken dosya okumayı reddetti. TypeBox,
+  offline kayıt, süreç yeniden başlatma ve HTTP teslimat kontrolleri de geçti.
+  Gerçek Pi'de pozitif import için model çalıştırılmadı; bu yol adapter/disk/HTTP
+  testlerinde ayrı doğrulandı. **Model çağrısı yapılmadı.**
+- `python3 test/browser-smoke.py --network`: gerçek HTTP/SSE ile rapor sonucu
+  sayfa yenilenmeden geldi. Başarısız ve boş rapor etiketleri, dosya özeti,
+  karşılaştırma, görev kümesi filtresi, açılır yürütme ayrıntıları ve önceki
+  model durumu regresyonları geçti. Açık tema, 16 px ana metin, en az 14 px
+  görünür yardımcı metin ve 1440/390 px düzen doğrulandı; yatay sayfa taşması
+  ve JavaScript hatası yok. Görseller ayrıca incelendi; `docs/preview.png`
+  yeni sade görünümle yenilendi. UI raporları açıkça sentetik demo verisidir.
+- `git diff --check` temiz.
+
+Sınırlar: raporun okunması runner/commit doğrulaması veya kalite ölçümü değildir.
+Test adı kümesi aynı test kodu/ortam garantisi vermez. Desteklenen dar JUnit
+yapısı ve güven sınırları [EVIDENCE.md](EVIDENCE.md) içinde. Doğrudan test
+komutu/exit-code ve xcresult adapter'ı sonraki işlerdir.
+
+## Önceki doğrulama: kalıcı offline teslimat — 2026-09-26
+
+Ortam: macOS, Node.js v26.5.0, kurulu Pi 0.87.1.
+
+- `npm run check`: **28 JavaScript modülü** syntax kontrolü geçti.
+- `npm test`: **99/99 geçti**, başarısız veya atlanan test yok.
+- `test/client.test.mjs`: **16 test**. Disk izinleri ve diske yazmadan maskeleme;
+  offline FIFO; normal kapanış ve aynı süreçte reload; ayrı sürecin SIGKILL ile
+  kapanmasından kurtarma; yaşayan üreticilerin ayrılığı; iki gerçek sürecin aynı
+  eski kuyruğu yalnızca bir kez devralması; count/byte kapasitesinde eski kaydın
+  korunması; UTF-8 paket boyutu; bozuk/eksik onay ve 401/503 sonrası saklama;
+  400 reddinde yalnız problemli kaydın karantinaya alınması; bozuk/yarım dosyalar;
+  disk yazma hatası; geç gelen HTTP onayı; heartbeat'in kalıcı olmaması.
+- Gerçek HTTP collector ile yeniden başlatma ve kayıp onay sonrası tekrar
+  teslimatta tokenların çift sayılmadığı doğrulandı. Kurtarılan kayıt orijinal
+  zamanını korur; tamamlanmamış eski istek sonuçsuz ve bağlantı kapalı kalır.
+- `workflow_report`, olay diske kabul edilmediğinde `recorded: false` bildirir;
+  bu davranış `test/monitor.test.mjs` regresyonuyla doğrulandı.
+- `npm run test:pi`: izole dizinde gerçek Pi TypeScript/TypeBox yüklemesi ve
+  komut kaydı geçti. İlk Pi sürecinde dashboard kapalıyken olayların diskte
+  beklediği görüldü; collector yeniden başlatılıp ikinci Pi süreci açıldığında
+  iki eski olayın yeni bağlantıdan önce teslim edildiği doğrulandı. Son durum:
+  4 olay, 2 oturum, 0 istek; kuyruk 0, düşen olay 0. **Model çağrısı yapılmadı.**
+- `git diff --check` temiz. Arayüz değişmediğinden tarayıcı testi bu dilimde
+  yeniden çalıştırılmadı; önceki gerçek HTTP/SSE tarayıcı kontrolü aşağıdadır.
+
+Sınırlar: disk kabulü başarısızsa veya kapasite doluysa yeni olay kaydedilmez;
+bu durum görünürdür. Süreç çökmesi test edildi, güç kaybı/disk arızası test
+edilmedi. Tekrar teslimatta UUID dedup, collector'ın elde tuttuğu journal/UUID
+penceresiyle sınırlıdır. Bağımsız süreçler arasında global olay sırası ve
+sınırsız saklama iddiası yoktur. Bağımsız test kanıtı ve ücret ölçümü hâlâ
+sonraki işlerdir.
+
+## Önceki doğrulama: workflow karşılaştırması — 2026-09-26
+
+Ortam: macOS, Node.js v26.5.0, kurulu Pi 0.87.1, pi-open-agents 0.1.22.
+
+- `npm run check`: **25 JavaScript modülü** syntax kontrolü geçti.
+- `npm test`: **82/82 geçti**, başarısız veya atlanan test yok. Önceki
+  iki SSE hatası giderildi: ilk HTTP parçası yalnızca `retry` çerçevesi
+  içerebiliyor. Test okuyucusu artık tam olay sınırlarını ve UTF-8 karakter
+  sınırlarını bekliyor; birleşik snapshot’ları ayrı okuyor. Ürün sunucusunun
+  geçerli SSE davranışı değiştirilmedi.
+- `npm run test:pi`: kurulu Pi’nin gerçek TypeScript/TypeBox yükleyicisi,
+  `workflow_report` kaydı, `/dashboard-status`, HTTP teslimatı ve temiz kapanış
+  doğrulandı. Geçici Pi/dash veri dizini kullanır; model çağırmaz.
+- Gerçek sağlayıcı testi: mevcut yapılandırmadaki
+  `openai-codex/gpt-6-sol` → `xiaomi-token-plan-sgp/mimo-v2.6-pro` →
+  `deepseek/deepseek-flash` → Sol. İzole geçici projede yalnızca bir aritmetik
+  fixture dosyasını okuyan görev tamamlandı (`SMOKE_OK 42`). İki alt agent’ın
+  araç kayıtları, model kimlikleri, süreleri, tokenları, plan güncellemeleri ve
+  teknik tamamlanma dashboard’da doğrulandı. Workflow profili eklendikten sonra
+  bu kontrol tekrar çalıştırıldı; tek doğru profil/görev kümesi grubuna girdi.
+- Gerçek hata yolu: Sol’un var olmayan bir model override’ıyla başlattığı
+  alt agent hata döndürdü. Pi ana araç zarfında `isError: false`, child
+  `details.status: error/isError: true` gönderdi. Dashboard, ana oturum normal
+  yanıt verse de bunu **başarısız istek / tek çocuk hatası** saydı; hatayı
+  ikinci kez araç hatası olarak saymadı. Geçici test betiğindeki beklenen sonuç
+  literalı `error` yerine `failed` olmalıydı; kaydedilmiş sonuç üzerinde doğru
+  iddia ayrıca doğrulandı, ürün davranışı doğruydu.
+- Bu gerçek başarı/hata olaylarının daraltılmış örnekleri
+  `test/fixtures/pi-open-agents-0.1.22.json` içinde. Çağrı ID’leri normalize;
+  model/status/süre/token alanları gözlenen değerler. Kimlik bilgisi, reasoning,
+  tam oturum ve çalışma dizini kaydedilmedi.
+- Workflow regresyonları: model değişiminde ayrı gruplar; model adı yerine
+  rol kimliği; id/sürüm/görev kümesi ayrımı; aynı istek içi model geçmişi;
+  eski profilin korunması; eksik ölçümün sıfır yapılmaması; kümülatif tokenın
+  tek sayılması; sonuçsuzların oran/ortalama dışında kalması; journal replay;
+  canlı/demo ayrımı; hatalı profilin izlemeyi durdurmaması. Boştayken model
+  seçmek artık önceki isteğin modelini değiştirmiyor.
+- `python3 test/browser-smoke.py --network`: sistem Google Chrome ile gerçek
+  loopback sunucusu, cookie eşleşmesi ve **gerçek HTTP/SSE** geçti. Sayfa
+  yenilenmeden iki ek demo varyantı tabloya geldi; görev kümesi filtresi
+  doğrulandı. 1440 px / 390 px, koyu/açık tema, DeepSeek kartı ve yatay sayfa
+  taşması kontrol edildi; JS hatası yok. Ayrı terminal-durum regresyon sayfası
+  hâlâ açıkça stub’lı fixture replay kullanır. CSP korunur; testte string-eval
+  bekleyicileri yerine locator iddiaları kullanılır.
+- `docs/preview.png` güncel demo görünümüyle yenilendi. Görsel yalnızca
+  simülasyon verisidir; ölçülmüş model karşılaştırması değildir.
+
+Kapsam: gerçek model kontrolü salt okunur küçük bir smoke göreviydi. Gerçek
+bir yazılım uygulama/review kalitesi, bağımsız test kanıtı, uzun kopmalarda
+kalıcı offline teslimat veya ücret hesabı doğrulanmadı. `pi-open-agents` bazı
+olaylarda kısa model ID, bazılarında provider/model döndürüyor; bunlar aynen
+saklanır, sağlayıcı tahmin edilmez. Model isimleri workflow çekirdeğine sabitlenmedi.
+
+Önceki oturumların kayıtları aşağıda tarihsel bağlam olarak korunmuştur;
+buradaki eski SSE engeli ve “gerçek Pi denenmedi” sınırı yukarıdaki kontrollerle
+güncellenmiştir.
+
 Tarih: 2026-09-25
 
 ## Ek dilim: yürütme performansı ölçümü (sonraki geliştirme oturumu)
@@ -229,7 +359,11 @@ Headless UI kontrolü isteğe bağlıdır; Python Playwright ve Chromium gerekti
 
 ```bash
 python test/browser-smoke.py
+# Gerçek tarayıcı HTTP/SSE ve karşılaştırma güncellemeleri:
+python test/browser-smoke.py --network
 ```
 
-Bu Python testi de görüntü/UI davranışını fixture replay ile sınar;
-gerçek browser-network E2E testi olduğunu iddia etmez.
+Python testi varsayılan olarak fixture replay kullanır. `--network` ile ana
+sayfa gerçek HTTP/SSE üzerinden doğrulanır; ayrı regresyon sayfası fixture
+replay kullanmaya devam eder. İzole bir demo sunucusunda çalıştır; bu mod
+aynı demo projesine iki sentetik karşılaştırma varyantı ekler.

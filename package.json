@@ -2,13 +2,14 @@
   "name": "agent-workflow-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first Pi workflow observability for Sol, MiMo, Qwen and other models.",
+  "description": "Local-first, model-independent Pi workflow observability.",
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
     "start": "node src/cli.mjs",
     "demo": "node scripts/demo.mjs",
     "test": "node --test test/*.test.mjs",
+    "test:pi": "node test/pi-smoke.mjs",
     "check": "node scripts/check.mjs",
     "install:pi": "node scripts/install-pi.mjs",
     "open": "node scripts/open.mjs"

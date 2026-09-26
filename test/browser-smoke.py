@@ -1,5 +1,5 @@
-"""Optional UI-only replay smoke test. HTTP/SSE integration lives in Node tests.
-Requires Python Playwright and Chromium; does NOT call a model.
+"""Optional UI smoke test; --network uses real HTTP/SSE for the main page.
+Regression fixtures still replay in a separate page. Does NOT call a model.
 """
 import argparse
 import copy
@@ -7,12 +7,15 @@ import json
 import os
 import shutil
 import urllib.request
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output-dir', default='test-results')
+parser.add_argument('--network', action='store_true', help='Use the real server and verify live SSE comparison updates')
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 state = Path(os.environ.get('AGENT_DASHBOARD_HOME', Path.home() / '.agent-workflow-dashboard'))
@@ -42,25 +45,84 @@ with sync_playwright() as pw:
             'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
         target.add_script_tag(content=(root / 'public/app.js').read_text())
-    replay(page, snapshot)
-    page.wait_for_function("document.querySelector('#connection-label').textContent === 'Dashboard bağlı'")
+    if args.network:
+        page.goto(config['url'] + '/#token=' + config['token'])
+    else:
+        replay(page, snapshot)
+    expect(page.locator('#connection-label')).to_have_text('Dashboard bağlı')
     page.locator('#demo-mode').click()
     page.wait_for_selector('#run-content:not(.hidden)')
     assert page.locator('#demo-banner').is_visible()
     assert page.locator('.model-card').count() == 3
     assert page.locator('.stage').count() == 4
-    page.screenshot(path=str(output / 'preview.png'), full_page=True)
-    page.locator('#event-search').fill('qwen')
+    assert page.locator('#workflow-comparison tbody tr').count() >= 1
+    assert not page.locator('#perf').is_visible()
+    page.locator('.execution-details > summary').click()
+    expect(page.locator('#perf')).to_be_visible()
+    page.locator('.execution-details > summary').click()
+    page.evaluate('() => window.scrollTo(0, 0)')
+    page.screenshot(path=str(output / 'preview.png'))
+    assert page.locator('.model-card').filter(has_text='DeepSeek').count() == 1
+    page.locator('#event-search').fill('deepseek')
     assert page.locator('.event').count() >= 1
     page.locator('#event-search').fill('unmatchable-word')
     assert page.locator('.event-empty').is_visible()
     page.locator('#event-search').fill('')
-    page.locator('#theme').click()
-    assert page.locator('html').get_attribute('data-theme') == 'light'
+    if args.network:
+        # Add explicitly simulated variants through real ingestion; the open
+        # browser must receive them over SSE without a reload or manual fetch.
+        project = next(s for s in snapshot['sessions'] if s.get('demo'))
+        for variant, task_set in [('variant-a', 'demo-streaming-buffer'), ('variant-b', 'another-task-set')]:
+            def record(kind, data):
+                return {'schemaVersion': 1, 'id': str(uuid.uuid4()), 'type': kind,
+                        'time': datetime.now(timezone.utc).isoformat(), 'demo': True,
+                        'sessionId': 'ui-comparison', 'runId': variant,
+                        'projectId': project['projectId'], 'projectName': project['projectName'], 'data': data}
+            batch = [record('prompt.received', {'prompt': 'Simulated comparison fixture'}),
+                     record('workflow.configured', {'workflow': {'schemaVersion': 1, 'id': 'implement-review', 'version': '2', 'label': 'Alternatif workflow', 'taskSet': task_set, 'roles': [{'role': 'review', 'agent': 'reviewer'}]}}),
+                     record('run.started', {'model': 'arbitrary-provider/primary'}),
+                     record('agent.started', {'agentCallId': 'review', 'agent': 'reviewer'}),
+                     record('agent.finished', {'agentCallId': 'review', 'agent': 'reviewer', 'model': 'arbitrary-provider/reviewer', 'source': 'observed', 'isError': False, 'usage': {'input': 10}}),
+                     record('run.ended', {'outcome': 'idle'}),
+                     record('tests.recorded', {'evidence': {
+                         'format': 'junit', 'source': 'imported-report', 'file': 'reports/junit.xml',
+                         'reportKey': '1' * 64, 'sha256': '2' * 64,
+                         'suiteHash': ('3' if variant == 'variant-a' else '4') * 64,
+                         'bytes': 120, 'modifiedAt': datetime.now(timezone.utc).isoformat(),
+                         'tests': 1 if variant == 'variant-a' else 0, 'passed': 0,
+                         'failures': 1 if variant == 'variant-a' else 0, 'errors': 0, 'skipped': 0}})]
+            req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout=3) as response:
+                assert response.status == 200
+        expect(page.locator('#workflow-comparison tbody tr')).to_have_count(3)
+        page.locator('#workflow-task-set').select_option('demo-streaming-buffer')
+        assert page.locator('#workflow-comparison tbody tr').count() == 2
+        page.locator('#workflow-task-set').select_option('another-task-set')
+        assert page.locator('#workflow-comparison tbody tr').count() == 1
+        assert 'arbitrary-provider/reviewer' in page.locator('#workflow-comparison').inner_text()
+        page.locator('#workflow-task-set').select_option('')
+        expect(page.locator('.comparison-evidence').filter(has_text='1 kaldı')).to_have_count(1)
+        expect(page.locator('.comparison-evidence').filter(has_text='1 belirsiz')).to_have_count(1)
+        page.locator('.session-item').filter(has_text='ui-comp').click()
+        page.locator('#run-select').select_option('variant-a')
+        expect(page.locator('#test-evidence .badge')).to_have_text('Raporda başarısız')
+        assert '1 başarısız' in page.locator('#test-evidence').inner_text()
+        page.locator('#test-evidence summary').click()
+        assert '2' * 64 in page.locator('#test-evidence').inner_text()
+        page.locator('#test-evidence summary').click()
+        page.locator('#run-select').select_option('variant-b')
+        expect(page.locator('#test-evidence .badge')).to_have_text('Sonuç belirsiz')
+        page.locator('#run-select').select_option('variant-a')
+        page.screenshot(path=str(output / 'comparison.png'), full_page=True)
+    assert page.evaluate('() => getComputedStyle(document.documentElement).colorScheme') == 'light'
+    assert page.locator('#theme').count() == 0
+    assert page.evaluate('() => parseFloat(getComputedStyle(document.body).fontSize)') >= 16
     page.screenshot(path=str(output / 'light.png'), full_page=True)
-    page.locator('#theme').click()
     page.set_viewport_size({'width': 390, 'height': 844})
-    assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+    assert page.evaluate('() => document.documentElement.scrollWidth <= window.innerWidth')
+    assert page.evaluate('''() => [...document.querySelectorAll('body *')].filter(e =>
+        e.getClientRects().length && [...e.childNodes].some(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim())
+        && parseFloat(getComputedStyle(e).fontSize) < 14).map(e => e.tagName)''') == []
     page.screenshot(path=str(output / 'mobile.png'), full_page=True)
     # Targeted regression: src/store.mjs keeps an agent.progress status literal
     # verbatim with finished=False until an agent.finished mark arrives. The
@@ -86,7 +148,7 @@ with sync_playwright() as pw:
     regression = browser.new_page(viewport={'width': 1440, 'height': 1150})
     regression.on('pageerror', lambda error: errors.append(str(error)))
     replay(regression, regressed)
-    regression.wait_for_function("document.querySelector('#connection-label').textContent === 'Dashboard bağlı'")
+    expect(regression.locator('#connection-label')).to_have_text('Dashboard bağlı')
     regression.locator('#demo-mode').click()
     regression.wait_for_selector('#run-content:not(.hidden)')
     for name in ('ui-literal-done', 'ui-literal-error', 'ui-literal-blocked', 'ui-literal-cancelled'):
@@ -102,4 +164,4 @@ with sync_playwright() as pw:
     regression.close()
     assert not errors, errors
     browser.close()
-print('UI replay passed: models, stages, filters, light/dark, mobile layout and progress-only terminal-literal cards. Browser transport was stubbed.')
+print('UI passed: models, stages, workflow comparisons, JUnit evidence, filters, light theme, readable fonts, mobile layout and terminal-literal regression. Main transport: ' + ('real HTTP/SSE including live comparison updates.' if args.network else 'stubbed replay.'))

@@ -2,11 +2,13 @@
 
 ```text
 Kod projesi / Mac
-  Pi + mevcut orchestrator, Qwen ve MiMo agent’ları
+  Pi + yapılandırılmış ana ve alt agent’lar (örnek: Sol, MiMo, DeepSeek)
     └─ .pi/extensions/agent-dashboard/
          ├─ salt gözlem: session / prompt / model / tool / message
          ├─ pi-open-agents: structured progress / results
          └─ workflow_report: agent’ın bildirdiği plan
+                │
+                ├─ safe-field projection + redaction → private disk spool
                 │
                 │ HTTP POST /api/events + yerel bearer anahtarı
                 ▼
@@ -38,8 +40,9 @@ uyarlanmıştır. Bilinmeyen tools yine normal araç olayı olarak gösterilir; 
 bir paketin sonucuna hayalî agent/model etiketleri takılmaz.
 
 `workflow.updated` kayıtları her zaman `reported` kaynaklıdır. Aşama bildirimi
-ile araç gözlemi birbirinin yerine geçmez. Kullanıcı notu, test kanıtı veya agent
-raporu bağımsız bir doğrulama sonucuymuş gibi yükseltilmez.
+ile araç gözlemi birbirinin yerine geçmez. Kullanıcı notu veya agent raporu
+bağımsız bir doğrulama sonucuymuş gibi yükseltilmez. `tests.recorded` ise açık
+kullanıcı komutuyla okunan JUnit raporu özetidir; yürütme doğrulaması değildir.
 
 ## Ölçüm (yürütme performansı)
 
@@ -80,17 +83,85 @@ Snapshot, her çalışana türetilmiş `performance` alanını ve proje başına
 sayıları, paydası sonuçlanmış istekler olan teknik tamamlanma oranı) ekler.
 Demo olayları canlı toplamdan hariçtir.
 
+## Workflow kimliği ve karşılaştırma
+
+`extensions/agent-dashboard/workflow.mjs`, proje profilini her yeni promptta
+okur ve yalnızca kimlik/sürüm/etiket/görev kümesi/rol eşleşmelerini projekte eder.
+`workflow.configured` olayı bu profili isteğe kopyalar; sonraki çelişen bildirim
+ilk profili değiştirmez. Ana model ve alt agent model geçmişi gözlenen olaylardan
+ayrı tutulur. Boştayken yapılan model seçimi önceki isteğe yazılmaz.
+
+`src/workflows.mjs`, store snapshot’ında mevcut ölçümleri tekrar kullanarak
+workflow sürümü, görev kümesi ve rol başına gözlenen model kimlikleriyle gruplar.
+Canlı/demo ve proje sınırları korunur. Profilsiz/çelişen kayıtlar dışarıda sayılır.
+Journal replay aynı profilleri ve grupları yeniden üretir. Ayrı veritabanı,
+model sağlayıcı adaptörü veya workflow yürütücüsü eklenmez.
+
+Profil tanımı, ölçüm kapsamı ve kullanım: [WORKFLOWS.md](WORKFLOWS.md).
+
+## Test raporu sınırı
+
+`/dashboard-evidence`, en son tamamlanan isteğe, açıkça seçilen proje içi
+JUnit raporunu bağlar. `extensions/agent-dashboard/evidence.mjs` dosyayı en
+fazla 2 MiB olarak okur, güncelliğini ve okuma boyunca değişmediğini denetler;
+DTD/entity yürütmeyen sınırlı parser gerçek testcase'leri sayar ve bildirilen
+toplamlarla karşılaştırır. Desteklenmeyen XML sonuç uzantıları reddedilir.
+
+Ham XML/çıktı/test isimleri saklanmaz. `evidenceRecord()` güvenli sayısal özet,
+maskelenmiş dosya adı, SHA-256 ve zamanları aynı olay projeksiyonunda doğrular.
+`tests.recorded` kalıcı kuyruk ve journal üzerinden geçer. Store dosya kimliği
+başına son raporu tutar; istek başına 20 dosya sınırı aşılırsa eksik kanıtla
+başarı üretmek yerine o isteği test karşılaştırmasının dışında bırakır.
+
+`src/evidence.mjs`, test kimliği kümesi başına istekleri ayrı sayar. Rapor
+olmayan istek, boş rapor ve bütün testleri atlanmış rapor başarı değildir.
+Aynı test kümesinin farklı kopyalarında hata varsa başarı onu örtemez.
+Teknik yürütme ölçümü aynı kalır. Bu yerel rapor kaynağının kimlik doğrulaması
+mevcut bearer sınırıdır; runner imzası, commit bağı veya test çalıştırma kanıtı
+eklenmez. Detaylar ve kullanıcı akışı: [EVIDENCE.md](EVIDENCE.md).
+
 ## Teslimat ve yeniden bağlanma
 
-Pi tarafında ağ çağrıları model/tool callback’lerini bekletmez. En fazla 500
-olaylık kuyruk 350 ms aralıklarla boşaltılır; paket başına 8 olay, 900 ms HTTP
-zaman aşımı, 10 saniyeye kadar artan retry vardır. Kuyruk sınırında en eski
-olay düşer ve bırakılan olay sayısı görünür. Normal çıkışta sınırlı süreyle flush
-denenir; process çökmesinde bellekteki olaylar kaybolur.
+`extensions/agent-dashboard/events.mjs` hem adapter hem collector için ortak
+doğrulama, alan projeksiyonu ve maskeleme sınırıdır; `src/events.mjs` aynı API'yi
+yeniden dışa aktarır. `EventSpool`, doğrulanmış her olayı private geçici dosyaya
+yazar, `fsync` yapar ve atomik rename ile tamamlar. `enqueue` ancak bu işlemden
+sonra başarılıdır. Disk hatasında false döner ve `/dashboard-status` hatayı
+gösterir; `workflow_report` da kaydın başarısız olduğunu bildirir. Yerel dosya
+yazımı senkrondur; ağ çağrıları model/tool callback'lerinde beklenmez.
+
+Her istemci varsayılan 5.000 olay / 20 MiB bekleyen kayıt kapasitesine sahiptir.
+Kapasite dolunca en yeni olay reddedilir, kabul edilmiş backlog korunur.
+Heartbeat yalnızca bellekte tek güncel sinyal olarak tutulur. Teslimat 350 ms
+aralıklarla, paket başına en fazla 8 olay / 240 KiB, 900 ms HTTP zaman aşımı ve
+10 saniyeye kadar artan retry ile denenir. Normal çıkışta en fazla 1.400 ms
+flush denenir, kalan dosyalar sonraki başlangıca bırakılır.
+
+Üretici dizinleri PID ve benzersiz sahiplik kimliği taşır. Yaşayan PID'ye ait
+dizin atlanır; ölmüş süreç veya `/reload`/normal çıkışta serbest bırakılmış
+dizin atomik rename ile yalnızca bir istemci tarafından devralınır. Her
+üreticinin dosyaları FIFO yüklenir; kurtarılan kayıtlar yeni olaylardan önce
+teslim edilir. Bağımsız üreticiler arasında ortak yürütme sırası yoktur.
+Birleşen eski kuyruklar kapasiteyi aşarsa veri silinmez; backlog boşalana kadar
+yeni olay reddedilir. Kuyruk, byte, kurtarma, düşürme ve karantina sayaçları
+`/dashboard-status` çıktısındadır. Kurtarma/düşürme sayaçları istemci ömrüyle
+sınırlıdır; karantina dosyaları yeniden başlatmada da sayılır.
+
+Dosyalar yalnızca geçerli collector onayından sonra silinir. Ağ/kimlik
+doğrulama hataları ve bozuk/eksik onay kaydı kuyrukta bırakır. Kalıcı payload
+reddinde (400/413/415) paket tek olaylara bölünür; yalnızca reddedilen olay
+karantinaya alınır. Bozuk/yarım dosyalar da `spool/quarantine/` altında tutulur;
+otomatik yeniden gönderilmez/silinmez ve pending kapasitesine dahil değildir.
+Süreç kapanması/SIGKILL kurtarması testlidir; güç kaybı veya dosya sistemi
+arızasında kayıpsızlık garantisi verilmez.
 
 Server alımı doğrular, diske ekler, ardından cevap döner. Event UUID tekrarı
 aynı çalışma sürecinde/elde tutulan journal aralığında yeniden sayılmaz; UUID
 seti de sınırlıdır, sonsuz global dedup garantisi değildir.
+Kurtarma olay kimliğini ve zamanını korur; `recovered` işareti collector'a
+geçmiş kaydın güncel bağlantı olmadığını bildirir. Eski kayıt Pi'yi canlı
+göstermez veya teslimat zamanını yeni çalışma zamanı saymaz. Tekrar teslimatın
+çift sayılmaması yukarıdaki elde tutulan UUID/journal sınırı içinde geçerlidir.
 
 SSE istemcilerine incremental log yerine güncel görünüm gönderilir. Yeniden
 bağlanan tarayıcı her seferinde tam güncel görünümü alır. Yavaş istemcinin
