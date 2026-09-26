@@ -106,6 +106,7 @@ gerçek delegasyon mevcut `subagent` aracıyla yapılır.
 | Gelecek görev / aşama | Agent’ın açık `workflow_report` bildirimi |
 | Token kullanımı | Sağlayıcının bildirdiği alanlar; alt agent’ın kümülatif değeri tekrar sayılmaz |
 | Hatalar | Araç/agent hata alanları; test sonucuna dair hayalî yorum yok |
+| Yürütme performansı | Gözlenen olaylardan türetilen sonuç; teknik tamamlanma, kalite/test doğrulaması değildir |
 | Geçmiş | İzleme kurulduktan sonra kaydedilen yerel olaylar |
 
 **Gösterilmeyen veya garanti edilmeyenler:** faturanın gerçek dolar tutarı,
@@ -116,6 +117,61 @@ düşüncesi, önceki Codex konuşmalarının tamamı. Tokenlar ücret değildir
 “Yanıt tamamlandı”, model döngüsünün durduğunu belirtir. **Testlerin geçtiğini
 veya görevin doğru tamamlandığını garanti etmez.** `done` aşamaları da agent’ın
 bildirimidir, bağımsız bir test doğrulayıcısı değildir.
+
+Model kartlarının durum rozetleri de aynı kanıt kuralını izler: bir alt agent
+kartı ancak **gözlenen `agent.finished`** ile terminal (`Bitti`/`Hata`) rozeti
+alır. Yalnızca `agent.progress` içinde bildirilen `done`/`error`/`blocked`/
+`cancelled` gibi terminal görünümlü durumlar sonuç kanıtı değildir; kart
+**“Sonuç bilinmiyor / bitiş bekleniyor”** der ve ana oturum, bitiş işareti
+gözlendiğine kadar bitmemiş çağrıyı beklemeye devam eder.
+
+## Yürütme performansı ölçümü
+
+Seçili istek için **Yürütme performansı** paneli, seçili proje için **Proje
+yürütme geçmişi** görünür. Bu ölçüm yalnızca gözlenen olay durumundan,
+store/snapshot sınırında türetilir ve journal yeniden oynatma/yeniden
+başlatmada korunur. Kapsamı yürütme kanıtıdır; kalite doğrulaması değildir:
+
+- **Teknik tamamlanma**: gözlenen `run.ended` sonucu `idle` olduğunda ve
+  `agent.finished` ile bitmiş, hatasız alt agent çağrıları olduğunda. Etiket her zaman **“kalite/testler
+  doğrulanmadı”** uyarısıyla gelir. Normal bir model yanıtı, `workflow_report`
+  ile bildirilen `done` aşama veya bir subagent araç sonucu görev doğruluğu
+  kanıtı olarak yükseltilmez; bildirilen aşamalar ölçüme girmez, “Görev
+  akışı” bölümünde ayrı gösterilir.
+- **Hata**: `run.ended` sonucu `error` ise; ya da ana oturum yanıtı bitmiş olsa
+  bile en az bir alt agent çağrısı hata döndürdüyse (çocuk hata; bilinen hata
+  durumları `error`/`failed`/`blocked`/`cancelled` veya açık `isError: true` da
+  diğerinin yokluğunda hata sayılır; ana yanıt
+  boşta olsa bile istek başarı sayılmaz); ya da eşleşen bitmiş (hatalı) alt
+  agent kaydı olmadan bir `subagent` araç hatası gözlenmişse (kanıtlanmış hata
+  gizlenmez, bu durum ihtiyaten hata sayılır).
+- **İptal**: `run.ended` sonucu `aborted`.
+- **Sonuçsuz / bilinmiyor**: `run.ended` gözlenmediyse (devam eden istek,
+  kopma, düşen kayıt), `run.ended` sonucu boşsa veya bilinen bir terminal
+  sonuç değilse (yalnızca `idle`/`error`/`aborted` terminal sayılır; örn.
+  `timeout`), yalnızca `run.settled` gözlendiyse veya başlamış ama bitmemiş
+  alt agent çağrısı varsa. `agent.finished` kaydındaki tanınmayan/devam eden
+  durum literalı (örn. `queued`, `timeout`) veya hiç durum içermeyen bitmiş
+  kayıt (açık `isError: false` olmadan) da sonuçsuzdur; başarı kanıtı sayılmaz.
+  `agent.progress` içinde bildirilen `done` veya `error` durumu terminal
+  sayılmaz; yalnızca `agent.finished` bitiştir. Bunlar başarı sayılmaz ve
+  ayrı gösterilir.
+- Aynı agent’ın tekrar (retry) çağrıları ayrı çağrı sayılır. Çağrı bazlı
+  geçen süre (bildirilen `elapsedMs` veya `agent.started` ile gözlenen
+  başlangıç/bitiş) ve varsa bildirilen token gösterilir. Başlangıç olayı
+  olmayan çağrıda süre `—` kalır, 0 ms uydurulmaz. Eksik veri `—` kalır; sıfır
+  token/maliyet uydurulmaz, keyfi kalite puanı üretilmez.
+- Gözlenen araç hataları ayrı sayılır; bir subagent çağrısının hatası, aynı
+  çağrı kimliği bitmiş (hatalı) bir alt agent kaydı olarak sayıldıysa tekrar
+  sayılmaz. Eşleşen bitmiş kayıt yoksa araç hatası görünür kalır ve istek
+  başarı sayılmaz.
+- **Proje geçmişi** yalnızca kayıtlı/elde tutulan isteklerden hesaplanır
+  (oturum başına en fazla 30 istek; journal rotasyonu eskilerini düşürebilir).
+  Oran tanımı açıktır: **payda = sonuçlanmış istekler (tamamlanan + hata +
+  iptal)**; sonuçsuz istekler paydada ve başarıda yer almaz. Demo verileri
+  canlı toplamdan hariçtir; Demo sekmesi kendi örnek toplamını gösterir.
+- Sınırlar: test çıktısı/junit/xcresult kanıtı, görev doğrulama, maliyet/ücret
+  hesabı ve model karşılaştırma bu dilimde değildir.
 
 ## Windows’taki Qwen için
 

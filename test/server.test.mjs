@@ -63,6 +63,16 @@ test('malformed JSON, unknown paths and non-JSON ingestion fail safely', async t
   assert.equal((await f.request('/auth.token')).status, 404);
 });
 
+test('state snapshot exposes derived performance and project history', async t => {
+  const f = await fixture(t);
+  await f.post(event('agent.finished', { agentCallId: 'a1', agent: 'mimo', isError: false }));
+  await f.post(event('run.ended', { outcome: 'idle' }));
+  const state = await (await f.request('/api/state')).json();
+  assert.equal(state.sessions[0].runs[0].performance.verdict, 'completed');
+  assert.equal(state.projects[0].live.completed, 1);
+  assert.equal(state.projects[0].live.technicalCompletionRatio, 1);
+});
+
 test('oversized ingestion is refused without accepting an event', async t => {
   const f = await fixture(t); const huge = JSON.stringify(event('prompt.received', { prompt: 'x'.repeat(300000) }));
   const response = await f.request('/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: huge });

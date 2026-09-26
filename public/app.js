@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', demo = false, eventSource;
-const labels = { running: 'Çalışıyor', starting: 'İstek gönderildi', pending: 'Bekliyor', idle: 'Yanıt tamamlandı', done: 'Bitti', error: 'Hata', blocked: 'Engellendi', cancelled: 'İptal' };
+const labels = { running: 'Çalışıyor', starting: 'İstek gönderildi', pending: 'Bekliyor', idle: 'Yanıt tamamlandı', done: 'Bitti', error: 'Hata', blocked: 'Engellendi', cancelled: 'İptal', unknown: 'Sonuç bilinmiyor' };
 const time = value => value ? new Date(value).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
 const count = n => new Intl.NumberFormat('tr-TR', { notation: n > 99999 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
 function duration(start, end) { if (!start) return '—'; const n = Math.max(0, Math.floor(((end ? Date.parse(end) : Date.now()) - Date.parse(start)) / 1000)); return n < 60 ? `${n} sn` : `${Math.floor(n / 60)} dk ${n % 60} sn`; }
@@ -11,6 +11,20 @@ function modelLabel(model) {
   if (/glm/i.test(model)) return 'GLM'; return model.split('/').slice(-1)[0];
 }
 function badge(status) { return el('span', `badge ${status}`, labels[status] || status); }
+// Only the observed agent.finished mark is terminal proof for an agent card.
+// A progress-only status literal — even a terminal-looking 'done'/'error'/
+// 'blocked'/'cancelled' — is never a result: without the finished mark the card
+// shows the unknown/waiting note, never a green done/red error badge. Live
+// in-progress states keep their labels; the main card keeps the run-level
+// status (terminal only via an observed run.ended).
+const liveCardStatuses = new Set(['running', 'starting', 'pending']);
+function cardBadge(card) {
+  if (card.main || card.finished || liveCardStatuses.has(card.status)) return badge(card.status);
+  return el('span', 'badge unknown', 'Sonuç bilinmiyor / bitiş bekleniyor');
+}
+const invocationLabels = { finished: ['done', 'Bitti'], failed: ['error', 'Hata'], unresolved: ['idle', 'Sonuçsuz'] };
+const msDuration = ms => ms === undefined ? '—' : ms < 1000 ? `${Math.round(ms)} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} sn` : `${Math.floor(ms / 60000)} dk ${Math.round((ms % 60000) / 1000)} sn`;
+const tokenLabel = u => u ? `${count((u.input || 0) + (u.output || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0))} token` : '—';
 function filteredSessions() { return snapshot.sessions.filter(s => Boolean(s.demo) === demo); }
 function selected() {
   const sessions = filteredSessions();
@@ -50,7 +64,10 @@ function renderStages(r) {
 }
 function renderModels(s, r) {
   const agents = Object.values(r.agents);
-  const active = agents.some(a => ['running', 'starting'].includes(a.status));
+  // Only the observed agent.finished mark settles an invocation: an agent
+  // without it keeps the main session waiting, whatever its progress-only
+  // status literal claims.
+  const active = agents.some(a => !a.finished);
   const cards = [{ model: r.model || s.model, agent: 'Ana oturum', status: r.status === 'running' ? (active ? 'pending' : 'running') : r.status,
     task: active ? 'Alt agent sonuçlarını bekliyor.' : 'Ana oturum · planlama, koordinasyon ve yanıt', main: true }];
   // Most recent invocation per agent, without misreporting parallel work as a model switch.
@@ -61,7 +78,7 @@ function renderModels(s, r) {
     const label = modelLabel(card.model); const node = el('article', 'model-card'); const heading = el('div', 'model-card-head');
     const avatar = el('div', `model-avatar ${label.toLowerCase()}`, label[0]);
     const name = el('div'); name.append(el('h3', '', label), el('p', 'model-role', card.agent));
-    heading.append(avatar, name, badge(card.status));
+    heading.append(avatar, name, cardBadge(card));
     node.append(heading, el('span', 'model-id', card.model || 'Alt agent ilerleme olayı bekleniyor'), el('p', 'model-task', card.task || card.summary || 'Görev bilgisi bildirilmedi.'));
     const currentTools = (card.tools || []).filter(t => t.status === 'running');
     node.append(el('p', 'model-source', card.main ? 'Pi ana oturumundan gözlendi' : currentTools.length ? `Aktif: ${currentTools.map(t => t.name + (t.file ? ' · ' + t.file : '')).join(', ')}` : card.modelSource === 'requested' ? 'Talep edilen model; henüz çalıştığı doğrulanmadı' : card.model ? 'Alt agent ilerleme / sonuç kaydından' : 'Model kimliği bekleniyor'));
@@ -76,11 +93,74 @@ function eventPresentation(e) {
     'tool.finished': `${d.toolName || 'Araç'} ${d.isError ? 'hata döndürdü' : 'tamamlandı'}`,
     'agent.started': `${d.agent || 'Alt agent'} için görev gönderildi`, 'agent.finished': `${d.agent || 'Alt agent'} ${d.isError ? 'başarısız oldu' : 'sonuç döndürdü'}`,
     'message.completed': 'Model yanıtı kaydedildi', 'workflow.updated': 'Görev planı güncellendi',
-    'run.ended': d.outcome === 'error' ? 'Ana çalışma hata ile durdu' : d.outcome === 'aborted' ? 'Ana çalışma iptal edildi' : 'Ana model yanıtını bitirdi',
+    'run.ended': d.outcome === 'error' ? 'Ana çalışma hata ile durdu' : d.outcome === 'aborted' ? 'Ana çalışma iptal edildi' : d.outcome === 'idle' ? 'Ana model yanıtını bitirdi' : d.outcome ? `Ana çalışma bilinmeyen bir sonuçla durdu (${d.outcome})` : 'Ana çalışma sonuç bilgisi olmadan durdu',
     'run.settled': 'Pi otomatik devam döngüsü sonlandı', 'monitor.warning': 'İzleme uyarısı', 'session.disconnected': 'Pi bağlantısı kapandı'
   }[e.type] || e.type;
   const detail = (e.type === 'agent.finished' ? [d.model, d.summary].filter(Boolean).join('\n') : '') || d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
   return { title, detail, icon: e.type.startsWith('agent.') ? '↗' : e.type === 'tool.finished' ? (d.isError ? '!' : '✓') : e.type === 'workflow.updated' ? '≡' : '·' };
+}
+function renderPerf(s, r) {
+  const p = r.performance, box = $('perf'); box.replaceChildren();
+  if (!p) return;
+  const verdicts = { completed: ['completed', 'Teknik tamamlanma'], failed: ['error', 'Hata ile sonuçlandı'], cancelled: ['cancelled', 'İptal edildi'], unknown: ['unknown', 'Sonuç bilinmiyor'] };
+  const [tone, title] = verdicts[p.verdict];
+  const head = el('div', 'perf-verdict');
+  head.append(el('span', `perf-dot ${tone}`), el('strong', '', title));
+  if (p.verdict === 'completed') head.append(el('span', 'tag', 'KALİTE / TEST DOĞRULANMADI'));
+  box.append(head);
+  const notes = [];
+  if (p.verdict === 'completed') notes.push('Teknik tamamlanma: gözlenen olaylarda istek sona erdi ve tüm alt agent çağrıları hatasız bitti. Görevin doğru yapıldığı veya testlerin geçtiği anlamına gelmez.');
+  if (p.verdict === 'failed') notes.push(p.outcome === 'error' ? 'Ana çalışma hata ile durdu (run.ended: error gözlendi).' : 'Ana oturum yanıtı sona erdi; ancak en az bir alt agent çağrısı hata döndürdü — istek başarı sayılmaz.');
+  if (p.verdict === 'cancelled') notes.push('Ana çalışma iptal edildi (run.ended: aborted gözlendi).');
+  if (p.verdict === 'unknown') {
+    if (!p.outcome) notes.push(p.settled ? 'Otomatik devam döngüsü sona erdi; ancak run.ended kaydı gözlenmedi, kesin sonuç yok.' : 'run.ended henüz gözlenmedi; istek sonucu bilinmiyor.');
+    else if (p.outcome !== 'idle') notes.push(p.outcome === 'unknown' ? 'run.ended sonucu boş veya eksik geldi; bilinen bir terminal sonuç yok, istek başarı sayılmaz.' : `run.ended sonucu "${p.outcome}" bilinen bir terminal sonuç değil; istek başarı sayılmaz.`);
+    if (p.agents.unresolved) notes.push(`${count(p.agents.unresolved)} alt agent çağrısı başlamış ama bitmemiş; başarı sayılmaz.`);
+    if (!p.fresh) notes.push('Pi sinyali güncel değil; son durum belirsiz.');
+  }
+  for (const note of notes) box.append(el('p', 'perf-note', note));
+  const rows = el('div', 'perf-rows');
+  const row = (label, value) => { const line = el('div', 'perf-row'); line.append(el('span', '', label), el('strong', '', value)); rows.append(line); };
+  row('Alt agent çağrıları', `${count(p.agents.finished)} bitti · ${count(p.agents.failed)} başarısız · ${count(p.agents.unresolved)} sonuçsuz`);
+  row('Araç hataları (gözlenen)', p.toolFailureCount ? count(p.toolFailureCount) : 'Yok');
+  box.append(rows);
+  if (p.toolFailures.length) box.append(el('p', 'perf-note', `Hatalı araçlar: ${p.toolFailures.map(t => t.name + (t.file ? ' · ' + t.file : '')).join(', ')}`));
+  if (p.invocations.length) {
+    box.append(el('p', 'perf-sub', 'Çağrı bazlı geçen süre · bildirilen token'));
+    const list = el('ul', 'perf-list');
+    for (const i of p.invocations) {
+      const item = el('li', 'perf-item'), main = el('div', 'perf-item-main'), meta = el('div', 'perf-item-meta');
+      main.append(el('strong', '', i.agent || 'Bilinmeyen agent'), el('small', '', [modelLabel(i.model), i.task].filter(Boolean).join(' · ') || 'Görev bilgisi yok'));
+      const [statusTone, statusText] = invocationLabels[i.status];
+      meta.append(el('span', `badge ${statusTone}`, statusText), el('span', '', msDuration(i.elapsedMs)), el('span', '', tokenLabel(i.usage)));
+      item.append(main, meta); list.append(item);
+    }
+    box.append(list);
+    if (p.invocationsTotal > p.invocations.length) box.append(el('p', 'perf-note', `Son ${count(p.invocations.length)} çağrı gösteriliyor (toplam ${count(p.invocationsTotal)} kayıt).`));
+  }
+  box.append(el('p', 'perf-note', 'Bildirilen plan aşamaları (workflow_report) bu ölçüme dahil edilmez; “Görev akışı” bölümünde ayrı gösterilir. Araç sonucu, model yanıtı veya agent raporu test/kalite doğrulaması değildir.'));
+}
+function renderHistory(s) {
+  const box = $('history'); box.replaceChildren();
+  const project = (snapshot.projects || []).find(p => p.projectId === s.projectId);
+  const h = project ? project[demo ? 'demo' : 'live'] : null;
+  if (!h || !h.total) {
+    box.append(el('p', 'perf-note', demo ? 'Bu proje için demo istek kaydı yok.' : 'Bu proje için canlı istek kaydı yok. Demo verileri canlı toplamdan hariçtir.'));
+    return;
+  }
+  const rows = el('div', 'perf-rows');
+  const row = (label, value) => { const line = el('div', 'perf-row'); line.append(el('span', '', label), el('strong', '', value)); rows.append(line); };
+  row('Kayıtlı istekler', count(h.total));
+  row('Teknik tamamlanma', count(h.completed));
+  row('Hata', count(h.failed));
+  row('İptal', count(h.cancelled));
+  row('Sonuçsuz / bilinmiyor', count(h.unknown));
+  box.append(rows);
+  const ratio = el('div', 'perf-verdict');
+  ratio.append(el('strong', '', h.terminal ? `Teknik tamamlanma oranı: %${Math.round(h.technicalCompletionRatio * 100)}` : 'Oran için sonuçlanmış istek yok'));
+  box.append(ratio);
+  box.append(el('p', 'perf-note', `Payda: sonuçlanmış istekler = tamamlanan + hata + iptal (${count(h.terminal)}). Sonuçsuz istekler (${count(h.unknown)}) orana dahil edilmez ve başarı sayılmaz.`));
+  box.append(el('p', 'perf-note', demo ? 'Bu sayılar yalnızca demo verisidir.' : 'Demo verileri bu toplama dahil edilmez. Yalnızca kayıtlı son istekler sayılır (oturum başına en fazla 30 istek); eskiyen journal kayıtları toplamdan düşebilir.'));
 }
 function renderTimeline(r) {
   const query = $('event-search').value.toLocaleLowerCase('tr');
@@ -126,7 +206,7 @@ function render() {
   const uses = Object.values(r.usage);
   $('metric-tokens').textContent = uses.length ? count(uses.reduce((sum, u) => sum + (u.input || 0) + (u.output || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0), 0)) : '—';
   $('summary').textContent = r.summary || 'Henüz tamamlanmış bir metin yanıtı yok.';
-  renderStages(r); renderModels(s, r); renderTimeline(r); updateDuration();
+  renderStages(r); renderModels(s, r); renderPerf(s, r); renderHistory(s); renderTimeline(r); updateDuration();
 }
 function connect() {
   eventSource?.close();

@@ -83,7 +83,10 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
   function progress(e, ctx, final = false) {
     const detail = (final ? e.result : e.partialResult)?.details;
     const entry = toolCalls.get(e.toolCallId) || {};
-    const isError = Boolean(e.isError || detail?.isError || (typeof detail?.exitCode === 'number' && detail.exitCode !== 0));
+    // Observed detail status 'error' is failure evidence too: a completed
+    // subagent result may omit isError and exitCode entirely. Progress-only
+    // updates are never terminal here; only the final record marks the finish.
+    const isError = Boolean(e.isError || detail?.isError || detail?.status === 'error' || (typeof detail?.exitCode === 'number' && detail.exitCode !== 0));
     const data = {
       agentCallId: e.toolCallId, agent: detail?.agent || entry.agent || '',
       task: entry.task, model: typeof detail?.model === 'string' ? detail.model : '',

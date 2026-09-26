@@ -45,6 +45,22 @@ test('pi-open-agents structured progress reveals actual child model and error', 
   f.emit('tool_execution_end', { toolCallId: 'child1', toolName: 'subagent', isError: false, result: { details: { ...detail, status: 'error', isError: true, exitCode: 1 } } });
   assert.equal(f.client.queue.find(e => e.type === 'agent.finished').data.isError, true);
 });
+test('completed subagent result with an observed error status is a failure', t => {
+  const f = setup(t); f.emit('before_agent_start', { prompt: 'work' });
+  f.emit('tool_execution_start', { toolCallId: 'child1', toolName: 'subagent', args: { agent: 'mimo', task: 'Implement' } });
+  // isError omitted/false and no exitCode: only details.status says 'error'.
+  f.emit('tool_execution_end', { toolCallId: 'child1', toolName: 'subagent', isError: false, result: { details: { agent: 'mimo', model: 'provider/mimo', status: 'error' } } });
+  const finished = f.client.queue.find(e => e.type === 'agent.finished');
+  assert.equal(finished.data.status, 'error');
+  assert.equal(finished.data.isError, true); // never a done/technical-completion record
+});
+test('a progress-only error status never fabricates a terminal mark', t => {
+  const f = setup(t); f.emit('before_agent_start', { prompt: 'work' });
+  f.emit('tool_execution_start', { toolCallId: 'child1', toolName: 'subagent', args: { agent: 'mimo', task: 'Implement' } });
+  f.emit('tool_execution_update', { toolCallId: 'child1', toolName: 'subagent', partialResult: { details: { agent: 'mimo', status: 'error' } } });
+  assert.equal(f.client.queue.find(e => e.type === 'agent.progress').data.status, 'error'); // observed status passes through
+  assert.equal(f.client.queue.some(e => e.type === 'agent.finished'), false); // only tool_execution_end is terminal
+});
 test('prompt capture can be explicitly disabled', t => {
   const f = setup(t, { capturePrompts: false }); f.emit('before_agent_start', { prompt: 'SENSITIVE PROMPT' });
   f.emit('message_end', { message: { role: 'assistant', content: [{ type: 'text', text: 'SENSITIVE ANSWER' }] } });

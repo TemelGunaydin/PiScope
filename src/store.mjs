@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, appendFileSync, renameSync, rmSync, statSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { validateEvent } from './events.mjs';
+import { aggregateRuns, runPerformance, terminalStatus } from './metrics.mjs';
 
 const MAX_EVENTS = 350, MAX_RUNS = 30, MAX_SESSIONS = 80;
 
@@ -77,12 +78,21 @@ export class EventStore {
     const d = e.data;
     switch (e.type) {
       case 'prompt.received': r.prompt = d.prompt || ''; break;
-      case 'run.started': r.status = 'running'; delete r.endedAt; r.settled = false; r.model = d.model || s.model; break;
+      case 'run.started': r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.model = d.model || s.model; break;
       case 'model.selected': r.model = d.model || ''; break;
       case 'run.ended':
-        r.status = d.outcome === 'error' ? 'error' : d.outcome === 'aborted' ? 'cancelled' : 'idle';
+        // Only known terminal outcomes map to a settled status; an unrecognized
+        // outcome (e.g. 'timeout') or a missing/empty one must not claim 'idle'
+        // completion anywhere. Absent outcome is 'unknown', never invented 'idle'.
+        r.status = d.outcome === 'error' ? 'error' : d.outcome === 'aborted' ? 'cancelled'
+          : d.outcome === 'idle' ? 'idle' : 'unknown';
+        r.outcome = d.outcome || 'unknown';
         r.endedAt = e.time; r.summary = d.summary || r.summary; break;
-      case 'run.settled': if (r.status === 'running') r.status = 'idle'; r.settled = true; r.endedAt ||= e.time; break;
+      case 'run.settled':
+        // Settled without an observed run.ended outcome is not 'idle' completion:
+        // the result is unknown. Known terminal statuses from run.ended survive.
+        if (r.status === 'running') r.status = 'unknown';
+        r.settled = true; r.endedAt ||= e.time; break;
       case 'workflow.updated': r.stages = d.stages; r.stageReason = d.reason || ''; break;
       case 'message.completed':
         if (d.summary) r.summary = d.summary;
@@ -103,12 +113,25 @@ export class EventStore {
       case 'agent.finished': {
         const key = d.agentCallId || e.id;
         const old = r.agents[key] || {};
+        // agent.finished is the only terminal mark; a late progress/status event
+        // must never regress a finished invocation back to running/done.
+        const finished = e.type === 'agent.finished' || Boolean(old.finished);
         r.agents[key] = { ...old, id: key, agent: d.agent || old.agent,
           model: d.model || old.model || '', modelSource: d.source === 'observed' ? 'observed' : old.modelSource || d.source || 'unknown', task: d.task || old.task || '',
-          status: e.type === 'agent.started' ? 'starting' : e.type === 'agent.finished' ? (d.isError ? 'error' : 'done') : d.status || 'running',
+          // agent.finished status is conservatively normalized (metrics
+          // terminalStatus): known failure literals ('error'/'failed'/
+          // 'blocked'/'cancelled') or isError are failure evidence even when
+          // the other is missing (direct authenticated ingestion); only
+          // explicit success ('done', or no status with isError: false) is
+          // 'done'; any unknown/in-progress literal stays 'unknown', never
+          // success. A progress-only status never marks an invocation terminal.
+          status: e.type === 'agent.finished' ? terminalStatus(d.status, d.isError) : finished ? old.status : e.type === 'agent.started' ? 'starting' : d.status || 'running',
           tools: d.tools || old.tools || [], usage: d.usage || old.usage,
           elapsedMs: d.elapsedMs ?? old.elapsedMs, summary: d.summary || old.summary || '',
-          startedAt: old.startedAt || e.time, endedAt: e.type === 'agent.finished' ? e.time : undefined };
+          // Only agent.started establishes a start. A first-seen agent.finished
+          // or progress without one keeps the duration missing (undefined)
+          // instead of inventing a false 0 ms one; reported elapsedMs survives.
+          startedAt: old.startedAt || (e.type === 'agent.started' && !finished ? e.time : undefined), finished, endedAt: e.type === 'agent.finished' ? e.time : old.endedAt };
         // Agent usage is cumulative; one key per invocation avoids double counting.
         if (d.usage) r.usage[`agent:${key}`] = { model: d.model || old.model || 'unknown', ...d.usage };
         break;
@@ -126,7 +149,22 @@ export class EventStore {
     }
   }
   snapshot() {
+    const now = Date.now();
+    // Derived metrics are computed here from reduced state, so journal replay and
+    // restart rebuild identical verdicts. Demo and live history stay separated.
+    const sessions = [...this.sessions.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)).map(s => ({
+      ...s,
+      runs: s.runs.map(r => ({ ...r, performance: runPerformance(r, { now, lastSeen: s.lastSeen, connected: s.connected }) }))
+    }));
+    const projects = new Map();
+    for (const s of this.sessions.values()) {
+      let p = projects.get(s.projectId);
+      if (!p) { p = { projectId: s.projectId, projectName: s.projectName, live: [], demo: [] }; projects.set(s.projectId, p); }
+      p[s.demo ? 'demo' : 'live'].push(...s.runs);
+    }
     return { schemaVersion: 1, sequence: this.sequence, now: new Date().toISOString(),
-      warnings: this.warnings, sessions: [...this.sessions.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen)) };
+      warnings: this.warnings, sessions,
+      projects: [...projects.values()].map(p => ({ projectId: p.projectId, projectName: p.projectName,
+        live: aggregateRuns(p.live), demo: aggregateRuns(p.demo) })) };
   }
 }

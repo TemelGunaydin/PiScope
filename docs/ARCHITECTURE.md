@@ -41,6 +41,45 @@ bir paketin sonucuna hayalî agent/model etiketleri takılmaz.
 ile araç gözlemi birbirinin yerine geçmez. Kullanıcı notu, test kanıtı veya agent
 raporu bağımsız bir doğrulama sonucuymuş gibi yükseltilmez.
 
+## Ölçüm (yürütme performansı)
+
+İstek ve alt agent sonuç metrikleri `src/metrics.mjs` saf fonksiyonlarıyla
+store/snapshot sınırında, azaltılmış gözlenen olay durumundan türetilir; ayrı
+bir ölçüm kaydı tutulmaz. Journal yeniden oynatma ve yeniden başlatmada aynı
+olaylar aynı metrikleri üretir. Sınıflandırma kuralları:
+
+- Yalnızca gözlenen `run.ended` sonucu terminal sayılır (`run.settled` tek
+  başına yeterli değildir) ve bilinen terminal sonuçlar `error`/`aborted`/
+  `idle` ile sınırlıdır: `error` → hata, `aborted` → iptal, `idle` → ancak
+  bütün alt agent çağrıları `agent.finished` ile bitmiş ve hatasızsa “teknik
+  tamamlanma”. Eksik/boş sonuç veya tanınmayan sonuç (örn. `timeout`) sonuçsuzdur;
+  store bu durumda `run.status`/`run.outcome` için `idle` yerine `unknown` yazar.
+  Eşleşen `run.ended` olmadan gelen `run.settled` da sonuçsuzdur (`run.status`:
+  `unknown`); `run.ended` ile yazılmış bilinen terminal durumlar korunur.
+  Bitmemiş/yalnızca ilerleme bildirmiş çağrılar sonuçsuzdur ve başarı sayılmaz;
+  ana oturum boşta olsa bile çocuk hata isteği başarı saymaz. `agent.finished`
+  durumu ihtiyaten normalize edilir: bilinen hata literaları (`error`, `failed`,
+  `blocked`, `cancelled`) veya açık `isError` hata kanıtıdır (diğerinin yokluğunda
+  da); başarı yalnızca açıktır (bilinen adapter başarı literalı `done`, veya
+  durumsuz kayıtta açık `isError: false`). Tanınmayan/devam eden durum literalı
+  içeren bitmiş kayıt asla başarı iddia etmez (sonuçsuz kalır; açık hata varsa
+  hata). Yalnız `agent.progress` içinde görülen durumlar terminal değildir.
+  Çağı sayıları ile `runVerdict` aynı normalizasyon fonksiyonundan türetilir,
+  ayrışmaz.
+- Subagent araç sonucu kendi alt agent çağrısıdır; araç hatası sayacında, aynı
+  çağrı kimliği bitmiş (hatalı) bir alt agent kaydı sayıldıysa tekrar
+  sayılmaz. Eşleşen bitmiş kayıt yoksa araç hatası görünür kalır ve istek
+  ihtiyaten hata sayılır (sessizce tamamlanmış sayılmaz). Aynı agent’ın retry
+  çağrıları ayrı çağrıdır. Eksik süre/token uydurulmaz; süre yalnızca
+  `agent.started` ile gözlenen başlangıçtan türetilir, başlangıcı olmayan
+  çağrıda süre boş kalır (yalnızca bildirilen `elapsedMs` korunur).
+- `workflow.updated` aşamaları bildirildiği gibi kalır, ölçüme girmez.
+
+Snapshot, her çalışana türetilmiş `performance` alanını ve proje başına
+`live`/`demo` ayrılmış bounded geçmiş toplamını (tamamlandı/hata/iptal/sonuçsuz
+sayıları, paydası sonuçlanmış istekler olan teknik tamamlanma oranı) ekler.
+Demo olayları canlı toplamdan hariçtir.
+
 ## Teslimat ve yeniden bağlanma
 
 Pi tarafında ağ çağrıları model/tool callback’lerini bekletmez. En fazla 500

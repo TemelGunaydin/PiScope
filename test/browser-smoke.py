@@ -2,6 +2,7 @@
 Requires Python Playwright and Chromium; does NOT call a model.
 """
 import argparse
+import copy
 import json
 import os
 import shutil
@@ -33,13 +34,15 @@ with sync_playwright() as pw:
     html = (root / 'public/index.html').read_text().replace(
         '<link rel="stylesheet" href="/style.css">', '<style>' + (root / 'public/style.css').read_text() + '</style>'
     ).replace('<script type="module" src="/app.js"></script>', '')
-    page.set_content(html)
     # Deliberately stub only browser transport. Never disguise this as network E2E.
-    page.add_script_tag(content='const fixture=' + json.dumps(snapshot) + ';'
-        'window.fetch=async()=>new Response(JSON.stringify(fixture));'
-        'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
-        'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
-    page.add_script_tag(content=(root / 'public/app.js').read_text())
+    def replay(target, data):
+        target.set_content(html)
+        target.add_script_tag(content='const fixture=' + json.dumps(data) + ';'
+            'window.fetch=async()=>new Response(JSON.stringify(fixture));'
+            'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
+            'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
+        target.add_script_tag(content=(root / 'public/app.js').read_text())
+    replay(page, snapshot)
     page.wait_for_function("document.querySelector('#connection-label').textContent === 'Dashboard bağlı'")
     page.locator('#demo-mode').click()
     page.wait_for_selector('#run-content:not(.hidden)')
@@ -59,6 +62,44 @@ with sync_playwright() as pw:
     page.set_viewport_size({'width': 390, 'height': 844})
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')
     page.screenshot(path=str(output / 'mobile.png'), full_page=True)
+    # Targeted regression: src/store.mjs keeps an agent.progress status literal
+    # verbatim with finished=False until an agent.finished mark arrives. The
+    # model cards must never turn a progress-only terminal-looking literal into
+    # a green 'Bitti'/red 'Hata' result; unknown/waiting is shown instead and the
+    # main session keeps waiting on the unfinished agent. Genuine finished
+    # records and live in-progress states keep their display.
+    def agent_fixture(call_id, name, status, finished):
+        return {'id': call_id, 'agent': name, 'model': 'demo/ui-fixture', 'modelSource': 'observed',
+                'task': f'fixture: agent.progress status={status}', 'status': status, 'tools': [], 'finished': finished}
+    regressed = copy.deepcopy(snapshot)
+    run = next(s for s in regressed['sessions'] if s.get('demo') and s['runs'])['runs'][-1]
+    for call_id, name, status, finished in (
+        ('ui-progress-done', 'ui-literal-done', 'done', False),
+        ('ui-progress-error', 'ui-literal-error', 'error', False),
+        ('ui-progress-blocked', 'ui-literal-blocked', 'blocked', False),
+        ('ui-progress-cancelled', 'ui-literal-cancelled', 'cancelled', False),
+        ('ui-progress-running', 'ui-running', 'running', False),
+        ('ui-finished-ok', 'ui-finished-done', 'done', True),
+        ('ui-finished-fail', 'ui-finished-error', 'error', True),
+    ):
+        run['agents'][call_id] = agent_fixture(call_id, name, status, finished)
+    regression = browser.new_page(viewport={'width': 1440, 'height': 1150})
+    regression.on('pageerror', lambda error: errors.append(str(error)))
+    replay(regression, regressed)
+    regression.wait_for_function("document.querySelector('#connection-label').textContent === 'Dashboard bağlı'")
+    regression.locator('#demo-mode').click()
+    regression.wait_for_selector('#run-content:not(.hidden)')
+    for name in ('ui-literal-done', 'ui-literal-error', 'ui-literal-blocked', 'ui-literal-cancelled'):
+        waiting = regression.locator('.model-card').filter(has_text=name).locator('.badge')
+        assert waiting.text_content().strip() == 'Sonuç bilinmiyor / bitiş bekleniyor', name
+        assert 'done' not in waiting.get_attribute('class') and 'error' not in waiting.get_attribute('class'), name
+    assert regression.locator('.model-card').filter(has_text='ui-running').locator('.badge').text_content().strip() == 'Çalışıyor'
+    assert regression.locator('.model-card').filter(has_text='ui-finished-done').locator('.badge').text_content().strip() == 'Bitti'
+    assert regression.locator('.model-card').filter(has_text='ui-finished-error').locator('.badge').text_content().strip() == 'Hata'
+    main = regression.locator('.model-card').first
+    assert main.locator('.model-role').text_content().strip() == 'Ana oturum'
+    assert main.locator('.model-task').text_content().strip() == 'Alt agent sonuçlarını bekliyor.'
+    regression.close()
     assert not errors, errors
     browser.close()
-print('UI replay passed: models, stages, filters, light/dark, mobile layout. Browser transport was stubbed.')
+print('UI replay passed: models, stages, filters, light/dark, mobile layout and progress-only terminal-literal cards. Browser transport was stubbed.')

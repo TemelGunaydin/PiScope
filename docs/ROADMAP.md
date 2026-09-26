@@ -11,6 +11,9 @@ varsa sağlayıcıya özel değil, harness event şemasına uygun adapter düzel
 
 ## Sonraki işler
 
+Yürütme performansı ölçümünün ilk dilimi eklendi (teknik tamamlanma / sonuçsuz
+ayrımı, çağrı bazlı süre, proje geçmişi toplamı). Sıradaki adımlar:
+
 - Gerçek subagent hatalarında ve custom provider modellerinde uyumluluk fixture’ları.
 - Test komutlarını/junit/xcresult çıktısını açık izinle okuyan kanıt adapter’ı.
 - Kalıcı offline spool, teslimat sırası ve geri basınç metrikleri.
