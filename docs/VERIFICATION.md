@@ -1,5 +1,29 @@
 # Doğrulama kaydı
 
+## Yayın hazırlığı: açık kaynak belgeleri ve kapak — 2026-09-26
+
+- Kullanıcının seçimiyle MIT lisansı ve paket lisans alanı eklendi. İngilizce
+  ana README, korunmuş Türkçe rehber, katkı/güvenlik/topluluk belgeleri,
+  issue/PR şablonları ve yayın rehberi hazırlandı.
+- GitHub Actions CI: Linux/macOS × Node 22/24/26. Resmi checkout v7.0.1 ve
+  setup-node v7.0.0 tag'leri GitHub API'den doğrulandı ve commit SHA'larına
+  sabitlendi. YAML yapısı, salt-okunur izinler, test komutları ve action
+  sabitlemeleri yerelde kontrol edildi. **Hosted CI henüz çalıştırılmadı.**
+- Mevcut Git geçmişindeki 84 metin blob'u, yaygın sağlayıcı anahtarı/private-key
+  kalıpları, kişisel home yolları ve çalışma verisi dosyaları açısından tarandı.
+  Tek private-key eşleşmesi `test/events.test.mjs` içindeki kasıtlı `SECRET`
+  fixture'ıydı. Çalışma verisi yolu bulunmadı. Bu örüntü kontrolü bağımsız bir
+  güvenlik denetimi veya her sırrı tespit etme garantisi değildir.
+- Yerel Markdown bağlantıları, şablon frontmatter'ları, paket metadata'sı,
+  yayın betiğinin Bash syntax'ı, çalışma verisi ignore kuralları ve
+  `git diff --check` geçti.
+- `image_gen` ile özgün kapak üretildi, görsel incelendi ve repository içine
+  kopyalandı. Her iki README aynı yerel görseli kullanır; gerçek demo ekran
+  görüntüsü ayrı tutulur. [Dosya ve prompt kaydı](ARTWORK.md).
+- Ürün/test kodu değişmedi; aşağıdaki **113/113**, gerçek Pi ve tarayıcı
+  sonuçları aynı ürün koduna aittir. GitHub repo oluşturma, push, herkese açık
+  yayın veya npm yayını yapılmadı.
+
 ## Güncel doğrulama: JUnit raporları ve sade arayüz — 2026-09-26
 
 Ortam: macOS, Node.js v26.5.0, kurulu Pi 0.87.1, sistem Google Chrome.

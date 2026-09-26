@@ -9,3 +9,10 @@ coverage/
 .local/
 test-results/
 playwright-report/
+
+# Local dashboard state must never become source or release content.
+.agent-workflow-dashboard/
+connection.json
+events*.jsonl
+server.lock
+spool/

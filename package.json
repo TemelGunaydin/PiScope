@@ -4,7 +4,9 @@
   "private": true,
   "description": "Local-first, model-independent Pi workflow observability.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/cli.mjs",
     "demo": "node scripts/demo.mjs",
@@ -14,5 +16,17 @@
     "install:pi": "node scripts/install-pi.mjs",
     "open": "node scripts/open.mjs"
   },
-  "pi": { "extensions": ["./extensions/agent-dashboard/index.ts"] }
+  "pi": {
+    "extensions": [
+      "./extensions/agent-dashboard/index.ts"
+    ]
+  },
+  "license": "MIT",
+  "keywords": [
+    "pi",
+    "agents",
+    "workflow",
+    "observability",
+    "local-first"
+  ]
 }

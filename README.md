@@ -1,360 +1,213 @@
 # Agent Desk
 
-**Pi için yerel, modelden bağımsız workflow izleme ekranı.**
+**A local, model-independent workflow dashboard for Pi.**
 
-Ana agent’ın planını, alt agent’ların görevlerini ve inceleme sonuçlarını aynı
-HTML ekranında takip et. Güncel örnek akış: **Sol → MiMo → DeepSeek → Sol**.
-Dashboard **izler**; modelleri çağırmaz, model değiştirmez,
-kod yazmaz ve mevcut orchestration/izin sisteminin yerini almaz.
+English · [Türkçe](README.tr.md)
 
-> **Durum: ilk çalışan sürüm / v0.1.0.** Sunucu, olay kaydı ve adapter testleri
-> çalıştırıldı. Mac’te Pi 0.87.1 + pi-open-agents 0.1.22 ile Sol, MiMo ve DeepSeek’in
-> gerçek model çağrıları, izole ve salt okunur bir test görevinde doğrulandı.
-> Bu kontrol tüm kod geliştirme akışlarının doğrulandığı anlamına gelmez.
-> GitHub’da repo oluşturma/push yapılmadı; pakette yerel Git geçmişi ve
-> isteğe bağlı yayınlama betiği var.
+See the current task, subagents, workflow stages, and test reports in a simple
+browser dashboard. Compare workflow versions as models change. Everything is
+stored on the machine running Pi; the dashboard makes no model API calls.
 
-![Demo verisiyle Agent Desk ekranı](docs/preview.png)
+![Agent Desk: a local workspace connecting agent tasks, progress, and reports](docs/agent-desk-cover.png)
 
-*Görüntüdeki görev, model etiketleri ve sayılar demo verisidir; ölçülmüş model
-performansı veya gerçek test sonucu değildir.*
+*Original AI-generated project illustration. [Artwork notes](docs/ARTWORK.md).*
 
-## İlk çalıştırma
+Agent Desk observes your existing workflow. It does not choose models, delegate
+work, execute tests, or write code. The interface is currently in Turkish, with
+a light theme and readable text sizes.
 
-Mac’te **Node.js 22 veya üzeri** ve mevcut Pi kurulumun gerekir. Web sunucusunun
-haricî npm bağımlılığı yok; `npm install` veya bir frontend build adımı gerekmez.
+## Quick start
+
+Requirements: **Node.js 22+**, a browser, and Pi for live monitoring. There are
+no npm runtime dependencies and no frontend build step. Pi is not needed for
+the demo or core tests. macOS has been exercised end to end; Linux core checks
+are configured in CI. Windows is not currently validated.
+
+Download or clone this repository, then run from its directory:
 
 ```bash
-cd agent-workflow-dashboard
-node --version
 npm start
 ```
 
-Sunucu yalnızca `http://127.0.0.1:7331` üzerinde dinler. Terminalde gösterilen
-**özel eşleştirme bağlantısını** aç. Bu bağlantıyı paylaşma. Alternatif olarak
-aynı dashboard klasöründe, ikinci terminalden:
+Open the private pairing URL printed in the terminal, or use another terminal:
 
 ```bash
 npm run open
 ```
 
-Bu komut tarayıcıyı açar. Sunucu ilk terminalde açık kalmalı. Standart adresi
-sonraki ziyaretlerinde eşleştirme çereziyle kullanabilirsin.
-
-## Pi projesine bağla
-
-İkinci terminalde, yine dashboard klasöründen:
+The server listens only on `127.0.0.1:7331`. Treat the pairing URL as a secret.
+To explore without a model or Pi session:
 
 ```bash
-npm run install:pi -- "/tam/yol/kod-projen" --instructions
+npm run demo -- --fast
 ```
 
-Bu komut:
+Select **Demo** in the dashboard. Synthetic events are separate from live data.
 
-- Yalnızca ilgili projeye `.pi/extensions/agent-dashboard/` eklentisini kopyalar.
-- `--instructions` verildiğinde `AGENTS.md` dosyasına küçük bir izleme talimatı
-  ekler; mevcut içeriği korur ve önce dışarıda yedekler.
-- `models.json`, model anahtarları, MCP ayarları ve `.pi/agents/` tanımlarını değiştirmez.
+## Connect a Pi project
 
-`AGENTS.md` değişmesin deniyorsa `--instructions` kullanma. Aynı metin
-[docs/AGENTS-observability.md](docs/AGENTS-observability.md) içinde bulunur;
-orchestrator agent’ının gövdesine de eklenebilir.
+From the dashboard directory:
 
-Projenin içindeki Pi oturumunda:
+```bash
+npm run install:pi -- "/absolute/path/to/your/project"
+```
+
+Then, inside Pi in that project:
 
 ```text
 /reload
 /dashboard-status
 ```
 
-`connected` görünmeli. Kurulu `pi-open-agents` ile çalışıyorsan mevcut
-ana agent’ını kullanmaya devam et (güncel kurulumdaki adı `sol`):
+The installer copies only `.pi/extensions/agent-dashboard/`. It does not change
+providers, credentials, model choices, MCP settings, or agent definitions.
+Use `--instructions` to also append the optional workflow-reporting guidance to
+`AGENTS.md`; existing instructions are preserved and backed up. Install the
+extension once per Pi session, not both globally and in the project.
 
-```text
-/agent sol
+Live compatibility has been checked with Pi **0.87.1** and pi-open-agents
+**0.1.22**. Other subagent packages may require their own adapter. Model names
+are data, not hardcoded workflow identities.
+
+To update a project copy after pulling changes:
+
+```bash
+npm run install:pi -- "/absolute/path/to/your/project" --update
 ```
 
-Ardından normal bir görev ver. Pi olayları otomatik kaydedilir.
+Then use `/reload`. To uninstall, remove that project's extension directory
+and reload Pi. Removing the extension does not delete recorded history.
 
-**Bu izleme eklentisi `pi-open-agents` kurmaz.** Sende çalışan model ve agent
-tanımlarını aynen kullanır. Aynı eklentiyi hem global hem proje
-dizininden iki kez yükleme; çift kayıt oluşabilir.
+## What it tracks
 
-### “Sıradaki görev” nasıl görünür?
+- Pi session, prompt, model, tool, and subagent events.
+- Planned stages through `workflow_report`: pending, running, done, error,
+  blocked, or cancelled. A reported plan is separate from observed execution.
+- Technical completion, unresolved work, durations, and reported token use.
+- Workflow profiles by version, task set, role, and observed model identities.
+- Explicitly imported JUnit results, grouped by test identities.
+- A durable offline queue with ordered recovery within each producer.
 
-Araçlar, model seçimi, alt agent başlangıç/ilerleme/sonuç olayları otomatik
-izlenir. Ancak Pi’nin gelecekte ne yapacağını tahmin etmek doğru olmaz.
+<details>
+<summary>View the dashboard (simulated demo data)</summary>
 
-Eklenti bir `workflow_report` aracı ekler. Orchestrator planı ve aşama geçişlerini
-bu araçla bildirdiğinde görev sırası görünür. `--instructions` bunu talep eden
-kuralları ekler; araç izinlerinde kapalıysa **orchestrator için**
-`workflow_report` izni ayrıca açılmalıdır. Kurallar model davranışını yönlendirir;
-her geçişin bildirileceğine dair yürütme garantisi değildir. Kesin sıra zorunluysa
-ileride ayrı bir deterministik workflow motoru gerekir.
+![Agent Desk with simulated demo data](docs/preview.png)
 
-Hiç bildirim gelmezse ekranda **“Plan henüz bildirilmedi”** yazılır. Yapılmayan
-bir işi yapılmış göstermeyiz. `workflow_report` çağırmak MiMo’yu başlatmaz;
-gerçek delegasyon mevcut `subagent` aracıyla yapılır.
+The screenshot contains demo events, not measured model performance.
 
-## Hangi bilgiler var?
+</details>
 
-| Bilgi | Kaynak / sınır |
-|---|---|
-| Aktif istek | `before_agent_start`; en fazla 12.000 karakter |
-| Ana model | Pi session/model olayları; gerçek provider/model kimliği |
-| Alt agent / model | `pi-open-agents` yapılandırılmış ilerleme ve sonuç kayıtları |
-| Okunan/değiştirilen dosya | Araç adı ve dosya yolu; dosyanın içeriği toplanmaz |
-| Çalışan araç | Ana oturum olayları; alt agent’ın son 50 araç kaydı |
-| Son yanıt / alt agent sonucu | Yalnızca görünen metin; gizli reasoning yok; 4.000 karakter sınırı |
-| Gelecek görev / aşama | Agent’ın açık `workflow_report` bildirimi |
-| Token kullanımı | Sağlayıcının bildirdiği alanlar; alt agent’ın kümülatif değeri tekrar sayılmaz |
-| Hatalar | Araç/agent hata alanları; test sonucuna dair hayalî yorum yok |
-| Yürütme performansı | Gözlenen olaylardan türetilen sonuç; teknik tamamlanma, kalite/test doğrulaması değildir |
-| Geçmiş | İzleme kurulduktan sonra kaydedilen yerel olaylar |
+It does not infer task quality, model rankings, or monetary cost. Incomplete
+runs and missing measurements are not counted as success or zero usage.
 
-**Gösterilmeyen veya garanti edilmeyenler:** faturanın gerçek dolar tutarı,
-abone kotası, GPU sıcaklığı/VRAM, LM Studio bağlantı sağlığı, ayrı child process
-içindeki bütün iç olaylar, tam kaynak kodu, ham terminal çıktısı, modelin gizli
-düşüncesi, önceki Codex konuşmalarının tamamı. Tokenlar ücret değildir.
+### Compare workflows
 
-“Yanıt tamamlandı”, model döngüsünün durduğunu belirtir. **Testlerin geçtiğini
-veya görevin doğru tamamlandığını garanti etmez.** `done` aşamaları da agent’ın
-bildirimidir, bağımsız bir test doğrulayıcısı değildir.
+Add `.pi/agent-dashboard.workflow.json` to the monitored project:
 
-Model kartlarının durum rozetleri de aynı kanıt kuralını izler: bir alt agent
-kartı ancak **gözlenen `agent.finished`** ile terminal (`Bitti`/`Hata`) rozeti
-alır. Yalnızca `agent.progress` içinde bildirilen `done`/`error`/`blocked`/
-`cancelled` gibi terminal görünümlü durumlar sonuç kanıtı değildir; kart
-**“Sonuç bilinmiyor / bitiş bekleniyor”** der ve ana oturum, bitiş işareti
-gözlendiğine kadar bitmemiş çağrıyı beklemeye devam eder.
+```json
+{
+  "schemaVersion": 1,
+  "id": "implement-review",
+  "version": "1",
+  "label": "Implementation and review",
+  "taskSet": "regressions-v1",
+  "roles": [
+    { "role": "implementation", "agent": "builder" },
+    { "role": "review", "agent": "reviewer" }
+  ]
+}
+```
 
-## Yürütme performansı ölçümü
+Use your actual Pi agent names. The profile does not select models. It is read
+for each new request, and past requests retain their own profile and model
+history. Use the same `taskSet` for comparable workloads; change the workflow
+version when its behavior changes. The task-set label is a user assertion,
+not proof of equal inputs. See the [workflow guide](docs/WORKFLOWS.md) (Turkish).
 
-Seçili istek için **Yürütme performansı** paneli, seçili proje için **Proje
-yürütme geçmişi** görünür. Bu ölçüm yalnızca gözlenen olay durumundan,
-store/snapshot sınırında türetilir ve journal yeniden oynatma/yeniden
-başlatmada korunur. Kapsamı yürütme kanıtıdır; kalite doğrulaması değildir:
+### Attach a test report
 
-- **Teknik tamamlanma**: gözlenen `run.ended` sonucu `idle` olduğunda ve
-  `agent.finished` ile bitmiş, hatasız alt agent çağrıları olduğunda. Etiket her zaman **“kalite/testler
-  doğrulanmadı”** uyarısıyla gelir. Normal bir model yanıtı, `workflow_report`
-  ile bildirilen `done` aşama veya bir subagent araç sonucu görev doğruluğu
-  kanıtı olarak yükseltilmez; bildirilen aşamalar ölçüme girmez, “Görev
-  akışı” bölümünde ayrı gösterilir.
-- **Hata**: `run.ended` sonucu `error` ise; ya da ana oturum yanıtı bitmiş olsa
-  bile en az bir alt agent çağrısı hata döndürdüyse (çocuk hata; bilinen hata
-  durumları `error`/`failed`/`blocked`/`cancelled` veya açık `isError: true` da
-  diğerinin yokluğunda hata sayılır; ana yanıt
-  boşta olsa bile istek başarı sayılmaz); ya da eşleşen bitmiş (hatalı) alt
-  agent kaydı olmadan bir `subagent` araç hatası gözlenmişse (kanıtlanmış hata
-  gizlenmez, bu durum ihtiyaten hata sayılır).
-- **İptal**: `run.ended` sonucu `aborted`.
-- **Sonuçsuz / bilinmiyor**: `run.ended` gözlenmediyse (devam eden istek,
-  kopma, düşen kayıt), `run.ended` sonucu boşsa veya bilinen bir terminal
-  sonuç değilse (yalnızca `idle`/`error`/`aborted` terminal sayılır; örn.
-  `timeout`), yalnızca `run.settled` gözlendiyse veya başlamış ama bitmemiş
-  alt agent çağrısı varsa. `agent.finished` kaydındaki tanınmayan/devam eden
-  durum literalı (örn. `queued`, `timeout`) veya hiç durum içermeyen bitmiş
-  kayıt (açık `isError: false` olmadan) da sonuçsuzdur; başarı kanıtı sayılmaz.
-  `agent.progress` içinde bildirilen `done` veya `error` durumu terminal
-  sayılmaz; yalnızca `agent.finished` bitiştir. Bunlar başarı sayılmaz ve
-  ayrı gösterilir.
-- Aynı agent’ın tekrar (retry) çağrıları ayrı çağrı sayılır. Çağrı bazlı
-  geçen süre (bildirilen `elapsedMs` veya `agent.started` ile gözlenen
-  başlangıç/bitiş) ve varsa bildirilen token gösterilir. Başlangıç olayı
-  olmayan çağrıda süre `—` kalır, 0 ms uydurulmaz. Eksik veri `—` kalır; sıfır
-  token/maliyet uydurulmaz, keyfi kalite puanı üretilmez.
-- Gözlenen araç hataları ayrı sayılır; bir subagent çağrısının hatası, aynı
-  çağrı kimliği bitmiş (hatalı) bir alt agent kaydı olarak sayıldıysa tekrar
-  sayılmaz. Eşleşen bitmiş kayıt yoksa araç hatası görünür kalır ve istek
-  başarı sayılmaz.
-- **Proje geçmişi** yalnızca kayıtlı/elde tutulan isteklerden hesaplanır
-  (oturum başına en fazla 30 istek; journal rotasyonu eskilerini düşürebilir).
-  Oran tanımı açıktır: **payda = sonuçlanmış istekler (tamamlanan + hata +
-  iptal)**; sonuçsuz istekler paydada ve başarıda yer almaz. Demo verileri
-  canlı toplamdan hariçtir; Demo sekmesi kendi örnek toplamını gösterir.
-- Sınırlar: görev doğrulama ve maliyet/ücret hesabı yapılmaz. JUnit raporları
-  aşağıdaki ayrı akışla içe aktarılır; teknik tamamlanma oranını değiştirmez.
-
-## Workflow karşılaştırması
-
-Modeller değişebilir; dashboard Sol/MiMo/DeepSeek adlarına bağlı değildir.
-Kod projesindeki `.pi/agent-dashboard.workflow.json` dosyasında workflow
-kimliğini, sürümünü ve rol → agent eşleşmesini tanımla.
-[Örnek profil](examples/workflow-profile.json) ve [kullanım rehberi](docs/WORKFLOWS.md).
-
-Her istek kendi profilini ve gözlenen modellerini saklar. Karşılaştırma tablosu
-aynı projenin workflow sürümlerini/model dağılımlarını ayrı gruplarda gösterir:
-teknik tamamlanma, süre, bildirilen token ve ölçüm sayısı. Ortak görevleri
-karşılaştırmak için `taskSet` etiketi ve görev kümesi filtresi vardır. Model
-değişiklikleri eski sonuçları yeniden etiketlemez. Kalite veya ücret puanı üretilmez.
-
-## Test raporu ekleme
-
-Pi'deki istek bittikten sonra, aynı oturumda proje içindeki güncel JUnit XML
-raporunu seç:
+After a request finishes, before starting the next one, use the same Pi session:
 
 ```text
 /dashboard-evidence reports/junit.xml
 ```
 
-Dashboard, rapordaki geçen/başarısız/hatalı/atlanmış testleri ve dosya özetini
-ilgili isteğe bağlar. Workflow karşılaştırmasında farklı test kümeleri ayrı
-gösterilir. Boş rapor veya “testler geçti” diyen agent mesajı başarı sayılmaz.
-Komut test çalıştırmaz; yalnızca seçilen raporu okur. Eski ve proje dışındaki
-raporlar reddedilir. Kullanım, desteklenen XML yapısı ve güven sınırları:
-[EVIDENCE.md](docs/EVIDENCE.md).
+The command reads an explicitly selected, project-local UTF-8 JUnit report
+created during or after that request. It does not execute tests. Reports are
+limited to 2 MiB and 20 distinct files per request. Unsupported XML, stale
+reports, inconsistent totals, and paths outside the project are rejected.
+Empty or entirely skipped reports are inconclusive. Agent claims do not
+produce test evidence.
 
-Web arayüzü açık temalıdır; ana metin 16 px, yardımcı metinler en az 14 px'tir.
-Görev akışı ve çalışan modeller önde, yürütme ayrıntıları açılır bölümde kalır.
+Only counts, relative file metadata, and hashes are retained, not raw XML,
+assertion messages, or test names. A report is not independent proof that a
+runner executed against the current code. See [report semantics and supported
+JUnit formats](docs/EVIDENCE.md) (Turkish).
 
-## Farklı sağlayıcılar ve yerel modeller
+## Local data and privacy
 
-Dashboard ve izleme eklentisi **Pi’nin çalıştığı Mac’e** kurulur. Belirli bir
-model veya Windows/LM Studio kurulumu gerektirmez. Model kimliklerini Pi ve
-alt agent olaylarından alır; sağlayıcı yönlendirmesini değiştirmez. Başka bir
-cihazdaki yerel modeli kullanıyorsan o cihaza ayrıca dashboard kurman gerekmez.
-Mevcut Pi workflow’unun API/abonelik kullanımı normal şekilde devam eder.
+The default data directory is `~/.agent-workflow-dashboard/`. Set
+`AGENT_DASHBOARD_HOME` in **both** the dashboard and Pi environments to change
+it. Keep that directory outside the repository. Use `PORT=7441 npm start` to
+change the listening port.
 
-## Demo
+Accepted offline events are persisted before delivery, with a default limit
+of 5,000 pending events / 20 MiB per client. At capacity, new events are rejected
+and accepted history is kept. `/dashboard-status` shows queue and storage
+errors. Recovery requires a running dashboard and an installed Pi extension;
+old recovered events do not make a dead session appear live.
 
-Sunucu açıkken ikinci terminalde:
+Delivered events use a rotating journal; the UI retains bounded history.
+Export downloads the retained view, not an unlimited archive. Corrupt or
+rejected queue records remain in `spool/quarantine/` for manual inspection.
 
-```bash
-npm run demo
-```
-
-Tarayıcıda **Demo** sekmesine geç. Varsayılan Canlı görünümü örnek verilerle
-doldurulmaz. Demo bir model çağırmaz, repository dosyalarına dokunmaz.
-
-```bash
-npm run demo -- --hold     # DeepSeek inceleme aşamasında bırak
-npm run demo -- --error    # Başarısız uygulama / engellenen inceleme örneği
-npm run demo -- --fast     # Bekleme olmadan örnek olay gönder
-```
-
-## Günlük kullanım ve kayıtlar
-
-Her gün dashboard klasöründe `npm start`, kod projesinde normal Pi oturumun
-çalışır. Sayfanın kapanması kaydı durdurmaz. Sunucu kapalıyken Pi eklentisi
-olayları yerel diskte bekletir; bağlantı gelince yeniden gönderir. Pi kapanır
-veya çökerse teslim edilmemiş kayıtlar sonraki Pi başlangıcında ya da `/reload`
-ile kurtarılır. Teslimat için dashboard ile izleme eklentisinin yüklü olduğu
-en az bir Pi süreci çalışmalıdır.
-
-Her izleme istemcisinin varsayılan bekleyen kayıt sınırı **5.000 olay / 20 MiB**.
-Sınır dolunca yeni olay reddedilir; kabul edilmiş eski kayıtlar silinmez.
-`/dashboard-status`, bekleyen olay/byte, kurtarılan, reddedilen ve karantinadaki
-kayıt sayılarını ve disk hatalarını gösterir. Disk yazılamazsa olayın kaydedildiği
-iddia edilmez. Bu sınırlar kuyruk içindir; teslim edilmiş journal ayrı tutulur.
-
-Kayıtlar repository’ye değil şu dizine gider:
-
-```text
-~/.agent-workflow-dashboard/
-├── auth.token             # Sadece bu yerel dashboard’a erişim anahtarı
-├── connection.json        # Pi eklentisinin bağlantı bilgisi
-├── events.jsonl           # Güncel kayıt
-├── events.1.jsonl          # Döndürülmüş kayıt
-├── events.2.jsonl          # Döndürülmüş kayıt
-├── spool/                 # Pi'nin henüz teslim edilmemiş olayları
-│   ├── <üretici dizinleri>/ # Sürece ait, sıralı olay dosyaları
-│   └── quarantine/        # Bozuk/yarım veya collector'ın reddettiği kayıtlar
-└── backups/               # İsteğe bağlı kurulum/güncelleme yedekleri
-```
-
-Kuyruk dosyaları diske yazılmadan önce güvenli alanlara indirgenir ve maskelenir;
-dosyalar `0600`, dizinler `0700` izinleriyle tutulur. Her üreticinin olay sırası
-korunur; bağımsız Pi süreçleri arasında ortak yürütme sırası varsayılmaz.
-Yaşayan süreçlerin kuyrukları devralınmaz. Birden fazla eski kuyruk kurtarılırsa
-toplam geçici olarak sınırı aşabilir; yeni kayıtlar ancak yer açılınca kabul edilir.
-Heartbeat'ler kalıcı değildir, kurtarılan geçmiş Pi'yi canlı göstermez.
-Karantina kayıtları otomatik yeniden gönderilmez veya silinmez; bekleyen kuyruk
-sınırına dahil değildir. Ayrıntılar: [teslimat mimarisi](docs/ARCHITECTURE.md#teslimat-ve-yeniden-bağlanma).
-
-Güncel dosya 20 MB sınırında döndürülür; iki eski dosya saklanır. Dashboard
-belleğinde oturum başına son 30 istek ve istek başına son 350 zaman çizelgesi
-olayı tutulur. Dosya kaydı ile ekranda tutulan görünüm aynı sonsuz arşiv değildir.
-Dışa aktarma **ekranda tutulan durumun** JSON çıktısıdır.
-
-Portu değiştirmek için `PORT=7441 npm start`. Kayıt dizinini değiştirmek için
-`AGENT_DASHBOARD_HOME=/güvenli/klasör` kullan; bu değişkeni hem dashboard’a hem
-Pi’ye ver. Kayıt dizinini Git deposunun içine koyma.
-
-### Gizlilik
-
-Sunucu yalnızca IPv4 loopback’e bağlıdır; başka cihazlardan erişim kapalıdır.
-Host/Origin kontrolleri, bearer anahtarlı olay alımı, HttpOnly/SameSite çerezi,
-sıkı Content Security Policy ve payload limitleri vardır. İçerik HTML olarak
-yürütülmez, metin olarak gösterilir. Dış CDN/telemetri kullanılmaz.
-
-Bu bir güvenlik sandbox’ı değildir. Aynı kullanıcı hesabıyla çalışan uygulamalar
-kayıtları okuyabilir. Promptların içinde hassas bilgi bulunabilir; yaygın anahtar
-kalıplarını maskeleme **eksiksiz bir veri sızıntısı önleme sistemi değildir**.
-Model anahtar dosyaları okunmaz; ham araç argümanları ve reasoning kaydedilmez.
-Prompt/yanıt/görev metnini toplamayı kapatmak için Pi’yi şöyle aç:
+Prompt and response excerpts can contain private data. Common secret patterns
+are redacted, but this is not a complete data-loss prevention system. To omit
+prompt, task, and response text, launch Pi with:
 
 ```bash
 AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
 ```
 
-Dosya isimleri, agent adları ve workflow aşamaları yine kaydedilebilir. Anahtarları
-ve sırları `workflow_report` içine koyma. Paylaşmadan önce dışa aktarılan dosyayı
-incele. Eşleştirme bağlantısını da gizli tut.
+File names, model identities, and stage reports may still be recorded. Never
+share pairing URLs, `connection.json`, event journals, exports, or queue files
+without reviewing them. Applications running as the same OS user can read
+local data. There is no cloud telemetry or third-party frontend CDN.
 
-## Güncelleme / kaldırma
-
-Eklenti kodunu geliştirdikten sonra proje kopyasını güncelle:
-
-```bash
-npm run install:pi -- "/tam/yol/kod-projen" --update
-```
-
-Eski eklenti önce `backups/` altına kopyalanır. Sonra Pi’de `/reload` kullan.
-Kaldırmak için yalnızca projedeki `.pi/extensions/agent-dashboard/` klasörünü
-kaldır ve Pi’yi yeniden yükle. Eklediysen işaretli `AGENTS.md` bölümünü de
-kaldırabilirsin. Eski kayıtlar otomatik silinmez.
-
-## Testler
+## Development
 
 ```bash
 npm run check
 npm test
 ```
 
-Kurulu Pi ile model çağrısı yapmadan eklenti/TypeBox yüklemesini, sunucu
-kapalıyken kaydı, süreç yeniden başlatıldıktan sonra sıralı teslimatı ve temiz
-kapanışı izole geçici dizinde doğrulamak için:
+These commands need no credentials, installed Pi, or paid model access. Tests
+use temporary directories and local HTTP servers. Optional installed-Pi check:
 
 ```bash
 npm run test:pi
 ```
 
-Pi `PATH` üzerinde değilse `PI_BIN=/tam/yol/pi npm run test:pi` kullan.
+This also makes no model calls. Set `PI_BIN` if Pi is not on `PATH`. Browser
+checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Geliştirme ortamındaki doğrulama ve test kapsamı:
-[docs/VERIFICATION.md](docs/VERIFICATION.md).
+CI is configured for Node 22, 24, and 26 on Linux and macOS. A workflow file is
+not evidence of a successful hosted run; consult the repository's Actions tab
+once published. See [verification history](docs/VERIFICATION.md) for checks
+actually performed locally.
 
-## GitHub’da yayınlama
+## Contributing
 
-Bu pakette `.git` ve yerel commit’ler bulunur. Henüz uzak repo oluşturulmadı.
-Mac’te GitHub CLI kurulu ve hesabınla giriş yapılmış olmalı (`gh auth login`).
-Aşağıdaki betik mevcut dosya değişikliği, origin veya aynı isimde repo varsa
-durur; hiçbir repository’yi ezmez.
+Bug reports, minimal reproductions, compatibility fixtures, and documentation
+improvements are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md), and use
+[SECURITY.md](SECURITY.md) for vulnerability reporting.
 
-```bash
-bash scripts/publish-github.sh
-```
+[Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) ·
+[Release guide](docs/RELEASING.md) · [Full Turkish guide](README.tr.md)
 
-Kimliği doğrulanmış hesabında **özel** `agent-workflow-dashboard` deposu oluşturur
-ve mevcut commit’leri gönderir. Başka isim için betiğe tek argüman ver.
-Bu işlem otomatik olarak çalıştırılmaz. Sonraki geliştirmelerde normal
-`git add`, `git commit`, `git push` kullanılır.
+## License
 
-## Mimari ve yol haritası
-
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/ROADMAP.md](docs/ROADMAP.md)
-
-Pi ve `pi-open-agents` bağımsız projelerdir. Bu ilk sürümün API referansları
-25 Eylül 2026’da incelendi; ileride event şemaları değişirse adapter güncellemesi
-gerekebilir. Bu proje OpenAI, Pi veya model sağlayıcılarının resmî ürünü değildir.
+[MIT](LICENSE). Pi and pi-open-agents are independent projects; their names do
+not imply endorsement. Agent Desk is not an official product of Pi, OpenAI,
+or any model provider.
