@@ -16,6 +16,7 @@ Kod projesi / Mac
     ├─ event validation + safe-field projection + redaction
     ├─ idempotent event IDs
     ├─ private rotating JSONL journal
+    ├─ private project summaries · survive detailed history retention
     ├─ in-memory bounded session/run view
     └─ authenticated SSE snapshots
                 │
@@ -27,7 +28,7 @@ Kod projesi / Mac
 
 Dashboard bir orchestrator değildir. Kod deposuna shell çalıştırma, model
 seçme, commit/push, task başlatma veya test başlatma API’si yoktur. Bu işlemler
-Pi’de kalır. Web arayüzü yalnızca gözlem, filtreleme, tema ve dışa aktarma yapar.
+Pi’de kalır. Web arayüzü yalnızca gözlem, proje özetleri, filtreleme ve dışa aktarma yapar.
 
 Ana oturum model değişimi ile alt agent delegasyonu farklı olaylardır.
 `agent.started` istek gönderildiğini bildirir; child model ancak yapılandırılmış
@@ -176,6 +177,14 @@ rotasyonu kullanılır. Aynı journal iki server tarafından eşzamanlı yazılm
 Model konuşmasının tam kopyası veya Pi session importer yoktur. Dashboard
 session kimliği, Pi session kimliği ve proje yolundan türetilen kısa SHA-256’dır.
 Tam proje yolu API’ye eklenmez; dosya yolları mümkün olduğunda proje görelidir.
+
+`src/project-memory.mjs`, `projectOverview` görünümünü ayrı `projects.json`
+dosyasında tutar. Her proje/mod için son istek, kısa yanıt, bildirilen plan,
+son çalışma zamanı ve sonuç saklanır. Canlı/demo başına 500 proje sınırı vardır;
+özetler oturum/olay sınırlarından bağımsız yaşar. Olay checkpoint'i yeniden
+oynatmada eski özetlere dönüşü engeller; atomik kayıt journal rotasyonundan
+önce tamamlanır. Başarısız kayıt rotasyonu durdurur. Ayrıntılı metriklerin
+paydası bu özetlerden hesaplanmaz. [Proje hafızası](PROJECTS.md).
 
 ## API
 

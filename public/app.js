@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
-let snapshot = { sessions: [] }, sessionId = '', runId = '', demo = false, eventSource;
+let snapshot = { sessions: [] }, sessionId = '', runId = '', demo = false, overview = true, eventSource, projectRenderKey = '';
 const labels = { running: 'Çalışıyor', starting: 'İstek gönderildi', pending: 'Bekliyor', idle: 'Yanıt tamamlandı', done: 'Bitti', error: 'Hata', blocked: 'Engellendi', cancelled: 'İptal', unknown: 'Sonuç bilinmiyor' };
 const time = value => value ? new Date(value).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
 const count = n => new Intl.NumberFormat('tr-TR', { notation: n > 99999 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
@@ -27,6 +27,77 @@ const invocationLabels = { finished: ['done', 'Bitti'], failed: ['error', 'Hata'
 const msDuration = ms => ms === undefined ? '—' : ms < 1000 ? `${Math.round(ms)} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} sn` : `${Math.floor(ms / 60000)} dk ${Math.round((ms % 60000) / 1000)} sn`;
 const tokenLabel = u => u ? `${count((u.input || 0) + (u.output || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0))} token` : '—';
 function filteredSessions() { return snapshot.sessions.filter(s => Boolean(s.demo) === demo); }
+const projectStates = { running: ['running', 'Çalışıyor'], waiting: ['pending', 'Bekleyen iş'], attention: ['error', 'İlgilenilmeli'], finished: ['idle', 'Son istek bitti'], cancelled: ['cancelled', 'İptal'], unknown: ['unknown', 'Sonuç bilinmiyor'] };
+const fullDate = value => new Date(value).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const excerpt = (text, max) => text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
+function sinceWork(value, now) {
+  if (!value) return 'Henüz çalışma kaydı yok';
+  const minutes = Math.max(0, Math.floor((now - Date.parse(value)) / 60000));
+  return minutes < 1 ? 'Az önce' : minutes < 60 ? `${minutes} dakika önce` : minutes < 1440 ? `${Math.floor(minutes / 60)} saat önce` : `${Math.floor(minutes / 1440)} gün önce`;
+}
+function projectsNow() {
+  const now = Date.now();
+  return (snapshot.projectOverview?.items || []).filter(p => Boolean(p.demo) === demo).map(p => {
+    // Expire the working badge even if the collector or tab stops receiving SSE.
+    const activeSessions = (p.activeUntil || []).filter(until => until > now).length;
+    return { ...p, activeSessions, status: activeSessions ? 'running' : p.idleStatus,
+      stale: Boolean(p.lastWorkedAt && now - Date.parse(p.lastWorkedAt) >= 7 * 86400000), ago: sinceWork(p.lastWorkedAt, now) };
+  });
+}
+function renderProjects() {
+  if (!overview) return;
+  const projects = projectsNow(), query = $('project-search').value.trim().toLocaleLowerCase('tr'), filter = $('project-filter').value;
+  // Heartbeats should not replace focused cards or collapse their saved summaries.
+  const key = JSON.stringify([demo, query, filter, projects.map(({ activeUntil, ...p }) => p)]);
+  if (key === projectRenderKey) return;
+  projectRenderKey = key;
+  $('project-totals').replaceChildren();
+  for (const [label, total] of [['Kayıtlı proje', projects.length], ['Çalışıyor', projects.filter(p => p.status === 'running').length], ['Bekleyen iş', projects.filter(p => p.status === 'waiting').length], ['7+ gündür dokunulmadı', projects.filter(p => p.stale).length]]) {
+    const metric = el('article'); metric.append(el('span', 'metric-label', label), el('strong', '', count(total))); $('project-totals').append(metric);
+  }
+  const matches = projects.filter(p => (!filter || (filter === 'stale' ? p.stale : p.status === filter)) &&
+    `${p.projectName} ${p.latest?.prompt || ''} ${p.latest?.summary || ''} ${p.nextStep?.title || ''}`.toLocaleLowerCase('tr').includes(query));
+  $('project-results').textContent = `${matches.length} proje gösteriliyor · Son çalışmaya göre`;
+  const list = $('project-list'), expanded = new Set([...list.querySelectorAll('details[open]')].map(d => d.dataset.project));
+  const focus = document.activeElement, focusedProject = list.contains(focus) ? focus.closest('[data-project]')?.dataset.project : undefined;
+  const focusedTag = focus?.tagName;
+  list.replaceChildren();
+  if (!matches.length) {
+    const empty = el('div', 'empty-state');
+    empty.append(el('h2', '', projects.length ? 'Eşleşen proje yok.' : 'Projelerin burada birikecek.'),
+      el('p', '', projects.length ? 'Aramayı veya durum filtresini değiştir.' : demo ? 'Örnek projeleri görmek için terminalde npm run demo -- --fast çalıştır.' : 'Pi’de izleme eklentisi kurulu bir projede çalışmaya başla. Geri geldiğinde son istek ve bildirilen plan burada kalır.'));
+    if (!projects.length && !demo) empty.append(el('code', '', 'npm run install:pi -- /tam/yol/projen'));
+    list.append(empty);
+  }
+  for (const p of matches) {
+    const card = el('article', 'project-card'); card.dataset.project = p.projectId;
+    const heading = el('div', 'project-card-head'), [tone, label] = projectStates[p.status] || projectStates.unknown;
+    heading.append(el('h2', '', p.projectName), el('span', `badge ${tone}`, label));
+    const when = el('p', 'project-when');
+    if (p.lastWorkedAt) { const date = el('time', '', `${p.ago} · ${fullDate(p.lastWorkedAt)}`); date.dateTime = p.lastWorkedAt; when.append(date); }
+    else when.textContent = p.ago;
+    if (p.activeSessions) when.append(el('span', '', ` · ${p.activeSessions} çalışan oturum`));
+    card.append(heading, when, el('p', 'project-field-label', 'Son istek'), el('p', 'project-prompt', excerpt(p.latest?.prompt || 'İstek metni kaydedilmedi.', 220)),
+      el('p', 'project-field-label', 'Son yanıt'), el('p', 'project-answer', excerpt(p.latest?.summary || 'Yanıt özeti kaydedilmedi.', 220)));
+    const next = el('div', 'project-next');
+    next.append(el('span', 'project-field-label', 'Devam edilecek · bildirilen plan'), el('p', '', p.nextStep?.title || 'Bekleyen adım bildirilmedi.'));
+    if (p.pendingCount > 1) next.append(el('small', '', `${p.pendingCount} bitmemiş aşama`));
+    card.append(next);
+    if (p.latest?.prompt || p.latest?.summary) {
+      const details = el('details', 'project-saved'); details.dataset.project = p.projectId; details.open = expanded.has(p.projectId);
+      details.append(el('summary', '', 'Kayıtlı özeti oku'), el('p', 'project-field-label', 'Son istek'), el('p', '', p.latest.prompt || 'Metin kaydedilmedi.'),
+        el('p', 'project-field-label', 'Son yanıt'), el('p', '', p.latest.summary || 'Yanıt kaydedilmedi.'));
+      card.append(details);
+    }
+    if (p.detailAvailable) {
+      const button = el('button', 'button project-open', 'Son isteğe git ↗'); button.type = 'button'; button.setAttribute('aria-label', `${p.projectName}: son isteğe git`);
+      button.onclick = () => { sessionId = p.latest.sessionId; runId = p.latest.runId; overview = false; render(); $('detail-heading').focus(); };
+      card.append(button);
+    } else if (p.latest) card.append(el('p', 'project-archive', 'Özet saklanıyor; ayrıntılı olay kaydı artık tutulmuyor.'));
+    list.append(card);
+    if (focusedProject === p.projectId && ['SUMMARY', 'BUTTON'].includes(focusedTag)) card.querySelector(focusedTag.toLowerCase())?.focus({ preventScroll: true });
+  }
+}
 function selected() {
   const sessions = filteredSessions();
   const s = sessions.find(s => s.id === sessionId) || sessions[0];
@@ -38,13 +109,14 @@ function selected() {
 }
 function renderSidebar() {
   const all = filteredSessions();
-  $('project-count').textContent = new Set(all.map(s => s.projectId)).size;
+  $('project-count').textContent = (snapshot.projectOverview?.items || []).filter(p => Boolean(p.demo) === demo).length;
+  $('overview-button').classList.toggle('active', overview); $('overview-button').setAttribute('aria-pressed', String(overview));
   $('sessions').replaceChildren();
   if (!all.length) $('sessions').append(el('p', 'sessions-empty', demo ? 'Demo henüz gönderilmedi.' : 'Henüz oturum bağlanmadı.'));
   for (const s of all) {
-    const button = el('button', `session-item ${s.id === sessionId ? 'active' : ''}`); button.type = 'button';
+    const button = el('button', `session-item ${!overview && s.id === sessionId ? 'active' : ''}`); button.type = 'button';
     button.append(el('strong', '', s.projectName), el('small', '', `${s.id.slice(0, 7)} · ${s.runs.length} istek`));
-    button.addEventListener('click', () => { sessionId = s.id; runId = ''; render(); });
+    button.addEventListener('click', () => { sessionId = s.id; runId = ''; overview = false; render(); });
     $('sessions').append(button);
   }
 }
@@ -247,9 +319,11 @@ function updateDuration() {
 }
 function render() {
   const { s, r } = selected(); renderSidebar();
+  $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview);
+  renderProjects();
   $('demo-banner').classList.toggle('hidden', !demo);
   $('live-mode').classList.toggle('selected', !demo); $('demo-mode').classList.toggle('selected', demo);
-  $('project-name').textContent = s?.projectName || 'Pi oturumları';
+  $('project-name').textContent = overview ? 'Projelerim' : s?.projectName || 'Pi oturumları';
   $('empty').classList.toggle('hidden', Boolean(r)); $('run-content').classList.toggle('hidden', !r);
   const options = s ? [...s.runs].reverse() : [];
   const select = $('run-select'); select.replaceChildren();
@@ -280,10 +354,14 @@ function connect() {
 }
 $('live-mode').onclick = () => { demo = false; sessionId = ''; runId = ''; render(); };
 $('demo-mode').onclick = () => { demo = true; sessionId = ''; runId = ''; render(); };
+$('overview-button').onclick = () => { overview = true; render(); $('overview-heading').focus(); };
+$('project-search').oninput = renderProjects;
+$('project-filter').onchange = renderProjects;
 $('run-select').onchange = e => { runId = e.target.value; render(); };
 $('event-search').oninput = () => { const { r } = selected(); if (r) renderTimeline(r); };
 $('workflow-task-set').onchange = () => { const { s, r } = selected(); if (r) renderWorkflowComparison(s, r); };
 setInterval(updateDuration, 1000);
+setInterval(renderProjects, 1000);
 async function boot() {
   const token = new URLSearchParams(location.hash.slice(1)).get('token');
   if (token) {

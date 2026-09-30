@@ -4,6 +4,7 @@ import { validateEvent } from './events.mjs';
 import { aggregateRuns, runPerformance, terminalStatus } from './metrics.mjs';
 import { compareWorkflows } from './workflows.mjs';
 import { runEvidence } from './evidence.mjs';
+import { ProjectMemory } from './project-memory.mjs';
 
 const MAX_EVENTS = 350, MAX_RUNS = 30, MAX_SESSIONS = 80;
 
@@ -12,6 +13,7 @@ export class EventStore {
     this.dir = dir; this.maxBytes = maxBytes;
     this.sessions = new Map(); this.seen = new Set(); this.sequence = 0; this.warnings = [];
     mkdirSync(dir, { recursive: true, mode: 0o700 });
+    this.projectMemory = new ProjectMemory(dir, message => { if (!this.warnings.includes(message)) this.warnings.push(message); });
     for (const file of ['events.2.jsonl', 'events.1.jsonl', 'events.jsonl']) {
       const path = join(dir, file);
       if (!existsSync(path)) continue;
@@ -27,6 +29,7 @@ export class EventStore {
     this.warnings = [...new Set(this.warnings)];
     // A persisted heartbeat is never proof that a process survived a restart.
     for (const session of this.sessions.values()) session.connected = false;
+    this.projectMemory.finishReplay();
     // Separate an incomplete final record from subsequent valid appends.
     if (existsSync(this.logPath)) {
       const contents = readFileSync(this.logPath, 'utf8');
@@ -41,6 +44,9 @@ export class EventStore {
     if (event.type !== 'session.heartbeat') {
       const line = JSON.stringify(event) + '\n';
       if (this.bytes + Buffer.byteLength(line) > this.maxBytes) {
+        // Preserve summaries before rotating away their recovery events. A disk
+        // failure stops rotation instead of silently losing older projects.
+        this.projectMemory.flush();
         rmSync(join(this.dir, 'events.2.jsonl'), { force: true });
         if (existsSync(join(this.dir, 'events.1.jsonl'))) renameSync(join(this.dir, 'events.1.jsonl'), join(this.dir, 'events.2.jsonl'));
         if (existsSync(this.logPath)) renameSync(this.logPath, join(this.dir, 'events.1.jsonl'));
@@ -72,7 +78,7 @@ export class EventStore {
       const oldest = [...this.sessions.values()].sort((a, b) => a.lastSeen.localeCompare(b.lastSeen))[0];
       this.sessions.delete(oldest.id);
     }
-    if (e.type === 'session.heartbeat' || !e.runId) return;
+    if (e.type === 'session.heartbeat' || !e.runId) { this.projectMemory.observe(e); return; }
     let r = s.runs.find(r => r.id === e.runId);
     if (!r) {
       r = { id: e.runId, prompt: '', model: s.model, startedAt: e.time,
@@ -89,8 +95,8 @@ export class EventStore {
       rememberModel(r.primaryModels ||= [], d.model);
     }
     switch (e.type) {
-      case 'prompt.received': r.prompt = d.prompt || ''; break;
-      case 'run.started': r.observedStartedAt ||= e.time; r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.model = d.model || s.model; break;
+      case 'prompt.received': r.requestStartedAt ||= e.time; r.prompt = d.prompt || ''; break;
+      case 'run.started': r.requestStartedAt ||= e.time; r.observedStartedAt ||= e.time; r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.model = d.model || s.model; break;
       case 'model.selected': r.model = d.model || ''; break;
       case 'run.ended':
         // Only known terminal outcomes map to a settled status; an unrecognized
@@ -168,6 +174,7 @@ export class EventStore {
       const keys = Object.keys(object); for (const k of keys.slice(0, Math.max(0, keys.length - 2000))) delete object[k];
     }
     if (r.files.length > 500) r.files = r.files.slice(-500);
+    this.projectMemory.observe(e, r);
     if (this.sessions.size > MAX_SESSIONS) {
       const oldest = [...this.sessions.values()].sort((a, b) => a.lastSeen.localeCompare(b.lastSeen))[0];
       this.sessions.delete(oldest.id);
@@ -188,9 +195,10 @@ export class EventStore {
       p[s.demo ? 'demo' : 'live'].push(...s.runs);
     }
     return { schemaVersion: 1, sequence: this.sequence, now: new Date().toISOString(),
-      warnings: this.warnings, sessions,
+      warnings: this.warnings, sessions, projectOverview: this.projectMemory.snapshot(this.sessions, now),
       projects: [...projects.values()].map(p => ({ projectId: p.projectId, projectName: p.projectName,
         live: aggregateRuns(p.live), demo: aggregateRuns(p.demo),
         workflows: { live: compareWorkflows(p.live), demo: compareWorkflows(p.demo) } })) };
   }
+  close() { this.projectMemory.flush(); }
 }

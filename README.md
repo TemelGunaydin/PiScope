@@ -87,6 +87,8 @@ and reload Pi. Removing the extension does not delete recorded history.
 - Workflow profiles by version, task set, role, and observed model identities.
 - Explicitly imported JUnit results, grouped by test identities.
 - A durable offline queue with ordered recovery within each producer.
+- A project overview that remembers the last request, response, reported next
+  step, and last work date across tabs and dashboard restarts.
 
 <details>
 <summary>View the dashboard (simulated demo data)</summary>
@@ -99,6 +101,23 @@ The screenshot contains demo events, not measured model performance.
 
 It does not infer task quality, model rankings, or monetary cost. Incomplete
 runs and missing measurements are not counted as success or zero usage.
+
+### Pick up where you left off
+
+The dashboard opens on **Projelerim** (My projects). Multiple Pi sessions in the
+same project share one card. Search by project or saved text, filter by status,
+or find projects untouched for seven days. Open the latest request when its
+details are still retained; the saved summary remains readable after detailed
+history expires.
+
+Statuses distinguish active work, reported unfinished work, attention needed,
+cancelled requests, unknown results, and **last request finished**. Finishing a
+request does not declare the whole project complete. Next steps come from the
+reported plan; no model generates or guesses them.
+
+Only projects recorded by the Pi extension appear. There is no disk scan or
+import of other tools' tabs. Up to **500 project summaries per mode** are kept,
+separately for live and demo data. See [project memory](docs/PROJECTS.md).
 
 ### Compare workflows
 
@@ -158,6 +177,8 @@ errors. Recovery requires a running dashboard and an installed Pi extension;
 old recovered events do not make a dead session appear live.
 
 Delivered events use a rotating journal; the UI retains bounded history.
+Short project summaries in `projects.json` outlive detailed events and are
+included in exports. Removing journals alone does not erase these summaries.
 Export downloads the retained view, not an unlimited archive. Corrupt or
 rejected queue records remain in `spool/quarantine/` for manual inspection.
 
@@ -170,7 +191,7 @@ AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
 ```
 
 File names, model identities, and stage reports may still be recorded. Never
-share pairing URLs, `connection.json`, event journals, exports, or queue files
+share pairing URLs, `connection.json`, event journals, project summaries, exports, or queue files
 without reviewing them. Applications running as the same OS user can read
 local data. There is no cloud telemetry or third-party frontend CDN.
 

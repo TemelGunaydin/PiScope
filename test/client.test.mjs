@@ -6,7 +6,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { MonitorClient } from '../extensions/agent-dashboard/client.mjs';
 import { MAX_BATCH_BYTES } from '../extensions/agent-dashboard/spool.mjs';
 import { createDashboard } from '../src/server.mjs';
-import { directory, event, token } from './helpers.mjs';
+import { directory, event, token, fixture } from './helpers.mjs';
 
 const accepted = (_url, options) => Promise.resolve(Response.json({ accepted: JSON.parse(options.body).length }));
 const offline = async () => { throw new Error('offline'); };
@@ -190,9 +190,7 @@ test('collector restart after lost acknowledgement does not double-count replaye
 });
 
 test('recovery delivers original chronology without fabricating live Pi presence', async t => {
-  const storage = directory(t), sender = directory(t);
-  const app = createDashboard({ dataDir: storage, token }); const url = await app.listen(0);
-  t.after(() => app.close());
+  const { app, url } = await fixture(t), sender = directory(t);
   writeFileSync(join(sender, 'connection.json'), JSON.stringify({ url, token }));
   const a = client(t, { fetchImpl: offline }, sender);
   const old = '2026-01-01T00:00:00.000Z';

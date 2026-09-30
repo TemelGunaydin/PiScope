@@ -10,7 +10,8 @@
     <a class="brand" href="/" aria-label="Agent Desk ana sayfa"><span class="brand-mark">a<span>•</span></span><span>agent<span class="brand-light">desk</span><small>YOUR LOCAL CONTROL ROOM</small></span></a>
     <div class="workspace-label">ÇALIŞMA ALANI <span>01</span></div>
     <div class="mode-switch" role="group" aria-label="Veri kaynağı"><button id="live-mode" class="selected" type="button">Canlı</button><button id="demo-mode" type="button">Demo</button></div>
-    <div class="section-caption">PROJELER <span id="project-count">0</span></div>
+    <button id="overview-button" class="overview-button active" type="button" aria-pressed="true">Projelerim <span id="project-count">0</span></button>
+    <div class="section-caption">SON OTURUMLAR</div>
     <nav id="sessions" aria-label="Proje ve oturumlar"></nav>
     <div class="sidebar-bottom"><span class="shield">◇</span><strong>Verilerin bu Mac’te.</strong><p>Model API anahtarları okunmaz.<br>Bulut senkronizasyonu yok.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Bağlanıyor</span><span class="local-tag">LOCAL</span></div></div>
   </aside>
@@ -20,7 +21,16 @@
       <div id="pairing" class="notice hidden"><strong>Bu tarayıcı henüz eşleşmedi.</strong><p><code>npm start</code> çıktısındaki özel bağlantıyı aç veya <code>npm run open</code> çalıştır. Bu bağlantıyı paylaşma.</p></div>
       <div id="demo-banner" class="notice demo-banner hidden">DEMO MODU <span>Aşağıdaki olaylar simülasyondur. Hiçbir model çağrılmadı veya proje değiştirilmedi.</span></div>
       <div id="storage-warning" class="notice hidden"></div>
-      <section class="page-heading"><div><div class="eyebrow">GÖRÜNÜR İŞ AKIŞI</div><h1>Workflow takibi</h1><p>İstekler, modeller ve test sonuçları.</p></div><div class="run-select-wrap"><label for="run-select">İstek geçmişi</label><select id="run-select"><option>Henüz istek yok</option></select></div></section>
+      <section id="project-overview" aria-labelledby="overview-heading">
+        <div class="page-heading"><div><h1 id="overview-heading" tabindex="-1">Nerede kalmıştım?</h1><p>Projelerin, son çalışmaların ve devam edilecek işler.</p></div></div>
+        <div id="project-totals" class="metrics" aria-label="Proje özeti"></div>
+        <div class="project-filters"><div><label for="project-search">Projelerde ara</label><input id="project-search" type="search" placeholder="Proje, istek veya sonraki adım…"></div><div><label for="project-filter">Durum</label><select id="project-filter"><option value="">Tüm projeler</option><option value="running">Çalışıyor</option><option value="waiting">Bekleyen iş</option><option value="attention">İlgilenilmeli</option><option value="finished">Son istek bitti</option><option value="cancelled">İptal</option><option value="unknown">Sonuç bilinmiyor</option><option value="stale">7+ gündür dokunulmadı</option></select></div></div>
+        <p id="project-results" class="project-results" role="status"></p>
+        <div id="project-list" class="project-list"></div>
+        <p class="project-scope">Durum ve bekleyen adım, son isteğin kayıtlarına dayanır. “Son istek bitti” projenin tamamlandığı anlamına gelmez. Yalnızca izleme eklentisiyle kaydedilen projeler görünür.</p>
+      </section>
+      <div id="workspace-details" class="hidden">
+      <section class="page-heading"><div><div class="eyebrow">GÖRÜNÜR İŞ AKIŞI</div><h1 id="detail-heading" tabindex="-1">Workflow takibi</h1><p>İstekler, modeller ve test sonuçları.</p></div><div class="run-select-wrap"><label for="run-select">İstek geçmişi</label><select id="run-select"><option>Henüz istek yok</option></select></div></section>
       <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>İlk Pi sinyalini bekliyor.</h2><p>Dashboard’u açık tut. Projene izleme eklentisini yükle ve Pi’de bir görev başlat.</p><code>npm run install:pi -- /tam/yol/projen</code><p class="small">Ardından Pi’de <code>/reload</code> ve <code>/dashboard-status</code> kullan.<br>Arayüzü denemek için başka terminalde <code>npm run demo</code> çalıştırıp Demo sekmesini seç.</p></section>
       <div id="run-content" class="hidden">
         <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">AKTİF İSTEK</span><span id="run-status" class="badge">Bekliyor</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div></section>
@@ -39,6 +49,7 @@
           <section class="panel timeline-panel"><div class="panel-header"><div><h2>Aktivite akışı</h2><p>Araçlar, devirler ve sonuçlar</p></div><input id="event-search" type="search" aria-label="Olaylarda ara" placeholder="Olaylarda ara…"></div><div id="timeline" class="timeline" aria-live="off"></div></section>
           <div class="right-column"><section class="panel next-panel"><div class="panel-header"><h2>Sıradaki görev</h2><span class="tag">PLAN</span></div><div id="next-task"></div></section><section class="panel"><div class="panel-header"><h2>Son yanıt</h2><span class="tag">METİN</span></div><p id="summary" class="summary"></p></section><section class="privacy-note"><span>◎</span><p>“Araç bitti” başarılı test anlamına gelmez. Gelecek görevler yalnızca workflow bildirildiğinde görünür. Gizli model düşünceleri toplanmaz.</p></section></div>
         </div>
+      </div>
       </div>
       <footer><span>AGENT DESK</span><span>Yerel kayıt · SSE canlı akış · Pi izleme eklentisi</span><span id="last-update">Henüz veri yok</span></footer>
     </div>

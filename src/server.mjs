@@ -124,6 +124,7 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 
       clearTimeout(updateTimer); for (const client of clients) client.destroy();
       server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
+      store.close();
     }
   };
 }

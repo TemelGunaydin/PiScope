@@ -1,5 +1,38 @@
 # Doğrulama kaydı
 
+## Projelerim ve kalıcı proje hafızası — 2026-09-26
+
+Ortam: macOS, Node.js v26.5.0, kurulu Pi 0.87.1, sistem Google Chrome.
+
+- `npm test`: **124/124 geçti**. Yeni proje hafızası testleri sekme birleştirme,
+  canlı/demo ayrımı ve bağımsız kapasite, 30 saniyelik canlılık, hata/iptal/
+  bekleyen plan ayrımı, eski olay zamanını koruma, bağlantıda çalışma tarihini
+  yenilememe, oturum düşürme ve journal rotasyonu sonrası özet erişimini kapsar.
+- Aynı zaman damgalı replay, kaydedilmemiş son journal bölümünden kurtarma,
+  geç gelen eski isteğin yeni görevi ezmemesi, eksilen olayların hatayı başarıya
+  çevirmemesi, bozuk özetin korunup yeniden kurulması, başarısız disk yazımında
+  rotasyonun durması ve tekrar deneme doğrulandı. Dosya izni, redaction, 500
+  proje/mod sınırı ve JSON export içinde özetler kontrol edildi.
+- `npm run check`: **33 JavaScript modülü** syntax kontrolü geçti.
+- `npm run test:pi`: gerçek Pi'de yükleme, komut kaydı, offline teslimat ve
+  yeniden başlatma kontrolü geçti. **Model çağrısı yapılmadı.**
+- `test/browser-smoke.py --network`: gerçek HTTP/SSE üzerinden yeni projeler
+  sayfa yenilenmeden geldi. İki oturum tek kartta toplandı; sekiz gün eski
+  sentetik kayıt son istek, yanıt ve bekleyen adımla gösterildi. Arama, durum/
+  7+ gün filtresi, canlı/demo ayrımı ve ayrıntıya gidip dönüş kontrol edildi.
+- Ayrı fixture replay sayfasında, ayrıntıları olmayan arşiv kartının özeti
+  okundu; tarayıcı saati ileri alınarak yeni snapshot olmadan çalışan rozetinin
+  belirsiz duruma düşmesi doğrulandı. Açık özet durumu korundu. Önceki model
+  durumu regresyonları ve JUnit/karşılaştırma kontrolleri de geçti.
+- 1440/390 px arayüz ve ekran görüntüleri incelendi. Açık tema, 16 px ana
+  metin, en az 14 px yardımcı metin; yatay sayfa taşması veya JavaScript
+  hatası yok. Veriler simülasyondur; gerçek bir haftalık bekleme veya yeni
+  sağlayıcı/model uyumluluk iddiası değildir.
+
+Yalnız Pi eklentisiyle kaydedilen projeler görünür. Proje hafızası sınırlı bir
+özet görünümüdür; bütün geçmiş görevleri birleştiren TODO sistemi veya diskteki
+projeleri bulan bir tarayıcı değildir. [Kapsam](PROJECTS.md).
+
 ## Yayın hazırlığı: açık kaynak belgeleri ve kapak — 2026-09-26
 
 - Kullanıcının seçimiyle MIT lisansı ve paket lisans alanı eklendi. İngilizce

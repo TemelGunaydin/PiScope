@@ -14,5 +14,7 @@ playwright-report/
 .agent-workflow-dashboard/
 connection.json
 events*.jsonl
+projects.json
+projects.json.*
 server.lock
 spool/

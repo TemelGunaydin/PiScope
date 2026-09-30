@@ -8,7 +8,7 @@ open-source GitHub repository. No npm package or hosted dashboard is required.
 
 1. Review the diff and Git history, including authorship metadata and assets.
    Exclude private prompts, credentials, connection files, journals, exports,
-   and pending queues. `.gitignore` does not remove files already tracked.
+   project summaries, and pending queues. `.gitignore` does not remove files already tracked.
 2. Confirm [LICENSE](../LICENSE), [README](../README.md),
    [Turkish guide](../README.tr.md), and [CHANGELOG](../CHANGELOG.md) match the
    intended release. The cover is generated artwork with a documented

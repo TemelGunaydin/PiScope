@@ -88,6 +88,9 @@ test('state snapshot exposes derived performance and project history', async t =
   assert.equal(state.sessions[0].runs[0].performance.verdict, 'completed');
   assert.equal(state.projects[0].live.completed, 1);
   assert.equal(state.projects[0].live.technicalCompletionRatio, 1);
+  assert.equal(state.projectOverview.items[0].status, 'finished');
+  const exported = await (await f.request('/api/export')).json();
+  assert.deepEqual(exported.projectOverview, state.projectOverview);
 });
 
 test('oversized ingestion is refused without accepting an event', async t => {

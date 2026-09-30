@@ -8,7 +8,7 @@ import os
 import shutil
 import urllib.request
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, expect
@@ -50,7 +50,10 @@ with sync_playwright() as pw:
     else:
         replay(page, snapshot)
     expect(page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(page.locator('#project-overview')).to_be_visible()
     page.locator('#demo-mode').click()
+    expect(page.locator('.project-card')).to_have_count(1)
+    page.locator('.project-open').click()
     page.wait_for_selector('#run-content:not(.hidden)')
     assert page.locator('#demo-banner').is_visible()
     assert page.locator('.model-card').count() == 3
@@ -114,6 +117,61 @@ with sync_playwright() as pw:
         expect(page.locator('#test-evidence .badge')).to_have_text('Sonuç belirsiz')
         page.locator('#run-select').select_option('variant-a')
         page.screenshot(path=str(output / 'comparison.png'), full_page=True)
+        # A returning user sees each project once, even across multiple tabs.
+        # Old work uses its event time, not the recent ingestion time.
+        old_time = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+        # End the held demo signal before checking the new running fixtures.
+        batch = [{'schemaVersion': 1, 'id': str(uuid.uuid4()), 'type': 'session.disconnected',
+            'time': datetime.now(timezone.utc).isoformat(), 'demo': True,
+            'sessionId': project['id'], 'projectId': project['projectId'],
+            'projectName': project['projectName'], 'data': {}}]
+        def project_event(project_id, name, session, kind, data, old=False):
+            batch.append({'schemaVersion': 1, 'id': str(uuid.uuid4()), 'type': kind,
+                'time': old_time if old else datetime.now(timezone.utc).isoformat(),
+                'demo': True, 'recovered': old, 'sessionId': session, 'runId': 'overview-run',
+                'projectId': project_id, 'projectName': name, 'data': data})
+        project_event('ui-return', 'Mağaza', 'ui-return-tab', 'prompt.received', {'prompt': 'Ödeme ekranını tamamla'}, True)
+        project_event('ui-return', 'Mağaza', 'ui-return-tab', 'workflow.updated', {'stages': [{'id': 'verify', 'title': 'Ödeme akışını doğrula', 'status': 'pending'}]}, True)
+        project_event('ui-return', 'Mağaza', 'ui-return-tab', 'run.ended', {'outcome': 'idle', 'summary': 'Ekran hazır, doğrulama bekliyor.'}, True)
+        for session in ['ui-active-one', 'ui-active-two']:
+            project_event('ui-active', 'Not Defteri', session, 'prompt.received', {'prompt': 'Arama ekranını geliştir'})
+        project_event('ui-cancelled', 'Takvim', 'ui-cancelled-tab', 'prompt.received', {'prompt': '<img src=x onerror=alert(1)> metnini güvenle göster'})
+        project_event('ui-cancelled', 'Takvim', 'ui-cancelled-tab', 'run.ended', {'outcome': 'aborted'})
+        req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            assert response.status == 200
+        page.locator('#overview-button').click()
+        expect(page.locator('.project-card')).to_have_count(4)
+        expect(page.locator('#project-count')).to_have_text('4')
+        expect(page.locator('.project-card[data-project="ui-active"]')).to_contain_text('2 çalışan oturum')
+        expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('8 gün önce')
+        assert page.locator('#project-list img').count() == 0
+        page.locator('#project-filter').select_option('stale')
+        expect(page.locator('.project-card')).to_have_count(1)
+        expect(page.locator('.project-card .badge')).to_have_text('Bekleyen iş')
+        page.locator('.project-open').click()
+        expect(page.locator('#workspace-details')).to_be_visible()
+        expect(page.locator('#prompt')).to_have_text('Ödeme ekranını tamamla')
+        page.locator('#overview-button').click()
+        page.locator('#project-filter').select_option('running')
+        expect(page.locator('.project-card')).to_have_count(1)
+        expect(page.locator('.project-card h2')).to_have_text('Not Defteri')
+        page.locator('#project-filter').select_option('cancelled')
+        expect(page.locator('.project-card .badge')).to_have_text('İptal')
+        page.locator('#project-filter').select_option('')
+        page.locator('#project-search').fill('doğrula')
+        expect(page.locator('.project-card h2')).to_have_text('Mağaza')
+        page.locator('.project-saved summary').click()
+        expect(page.locator('.project-saved')).to_have_attribute('open', '')
+        page.locator('#project-search').fill('unmatchable-word')
+        expect(page.locator('#project-list')).to_contain_text('Eşleşen proje yok.')
+        page.locator('#project-search').fill('')
+        page.locator('#live-mode').click()
+        expect(page.locator('.project-card')).to_have_count(0)
+        page.locator('#demo-mode').click()
+        expect(page.locator('.project-card')).to_have_count(4)
+        page.evaluate('() => window.scrollTo(0, 0)')
+        page.screenshot(path=str(output / 'projects.png'), full_page=True)
     assert page.evaluate('() => getComputedStyle(document.documentElement).colorScheme') == 'light'
     assert page.locator('#theme').count() == 0
     assert page.evaluate('() => parseFloat(getComputedStyle(document.body).fontSize)') >= 16
@@ -150,6 +208,7 @@ with sync_playwright() as pw:
     replay(regression, regressed)
     expect(regression.locator('#connection-label')).to_have_text('Dashboard bağlı')
     regression.locator('#demo-mode').click()
+    regression.locator('.session-item').first.click()
     regression.wait_for_selector('#run-content:not(.hidden)')
     for name in ('ui-literal-done', 'ui-literal-error', 'ui-literal-blocked', 'ui-literal-cancelled'):
         waiting = regression.locator('.model-card').filter(has_text=name).locator('.badge')
@@ -162,6 +221,34 @@ with sync_playwright() as pw:
     assert main.locator('.model-role').text_content().strip() == 'Ana oturum'
     assert main.locator('.model-task').text_content().strip() == 'Alt agent sonuçlarını bekliyor.'
     regression.close()
+    # No network snapshots are needed to expire a working badge. Archived
+    # summaries remain readable even when their source sessions no longer exist.
+    remembered = copy.deepcopy(snapshot)
+    remembered['sessions'] = []
+    base = next(p for p in remembered['projectOverview']['items'] if p.get('demo'))
+    archived = copy.deepcopy(base)
+    archived.update(projectId='archived-project', projectName='Arşiv Projesi',
+        detailAvailable=False, status='waiting', idleStatus='waiting', activeUntil=[],
+        nextStep={'id': 'next', 'title': 'Son kontrolü yap', 'status': 'pending'}, pendingCount=1)
+    base.update(projectId='stale-project', projectName='Sinyali Kesilen Proje', detailAvailable=False,
+        status='running', idleStatus='unknown', activeUntil=[datetime.now(timezone.utc).timestamp() * 1000 + 30000])
+    remembered['projectOverview']['items'] = [base, archived]
+    archive_page = browser.new_page()
+    archive_page.on('pageerror', lambda error: errors.append(str(error)))
+    archive_page.clock.install()
+    replay(archive_page, remembered)
+    expect(archive_page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    archive_page.locator('#demo-mode').click()
+    archived_card = archive_page.locator('[data-project="archived-project"]').filter(has=archive_page.locator('h2'))
+    expect(archived_card).to_contain_text('ayrıntılı olay kaydı artık tutulmuyor')
+    assert archived_card.locator('.project-open').count() == 0
+    archived_card.locator('summary').click()
+    expect(archived_card.locator('details')).to_contain_text(archived['latest']['prompt'])
+    expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Çalışıyor')
+    archive_page.clock.fast_forward(31000)
+    expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Sonuç bilinmiyor')
+    expect(archived_card.locator('details')).to_have_attribute('open', '')
+    archive_page.close()
     assert not errors, errors
     browser.close()
-print('UI passed: models, stages, workflow comparisons, JUnit evidence, filters, light theme, readable fonts, mobile layout and terminal-literal regression. Main transport: ' + ('real HTTP/SSE including live comparison updates.' if args.network else 'stubbed replay.'))
+print('UI passed: project overview, grouped tabs, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, light theme, readable fonts, mobile layout and terminal-literal regression. Main transport: ' + ('real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))

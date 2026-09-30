@@ -25,7 +25,8 @@ publicly while arranging that channel. No response-time guarantee is offered.
 - The dashboard observes Pi; it does not enforce Pi's tool permissions.
 - Imported JUnit summaries are report observations, not signed runner evidence
   or proof that a specific commit passed tests.
-- Event history, pending queues, quarantine files, and exports may be private.
+- Event history, persistent project summaries, pending queues, quarantine files,
+  and exports may be private.
   Keep them outside the repository and review anything you intend to share.
 
 Maintainers should enable GitHub private vulnerability reporting before a

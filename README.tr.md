@@ -105,6 +105,26 @@ Hiç bildirim gelmezse ekranda **“Plan henüz bildirilmedi”** yazılır. Yap
 bir işi yapılmış göstermeyiz. `workflow_report` çağırmak MiMo’yu başlatmaz;
 gerçek delegasyon mevcut `subagent` aracıyla yapılır.
 
+## Nerede kalmıştım? — Projelerim
+
+Dashboard **Projelerim** görünümüyle açılır. Aynı projede birden fazla Pi
+sekmesinde çalışsan da tek proje kartı görünür. Her kartta son istek, son yanıt
+özeti, bildirilen plandaki ilk bitmemiş adım ve son çalışma tarihi bulunur.
+Proje/metin araması, durum filtresi ve **7+ gündür dokunulmadı** görünümü vardır.
+
+Durumlar: **Çalışıyor**, **Bekleyen iş**, **İlgilenilmeli**, **Son istek bitti**,
+**İptal**, **Sonuç bilinmiyor**. Son isteğin bitmesi bütün projenin tamamlandığı
+anlamına gelmez. Bekleyen adım yalnızca bildirilen plandan alınır; tahmin
+edilmez. Güncel Pi sinyali kesilince çalışıyor rozeti kaldırılır. Heartbeat veya
+boşta bir sekmeyi yeniden açmak son çalışma tarihini yenilemez.
+
+**Son isteğe git** ile ayrıntılara, soldaki **Projelerim** ile listeye dön.
+Ayrıntılı olaylar saklama sınırından düşse de **Kayıtlı özeti oku** erişilebilir
+kalır. Canlı ve demo için ayrı ayrı en fazla **500 proje özeti** saklanır.
+Yalnızca Pi izleme eklentisinin kaydettiği projeler görünür; diskteki bütün
+projeler veya diğer araçlardaki sekmeler otomatik taranmaz.
+[Saklama ve durum kuralları](docs/PROJECTS.md).
+
 ## Hangi bilgiler var?
 
 | Bilgi | Kaynak / sınır |
@@ -266,6 +286,7 @@ Kayıtlar repository’ye değil şu dizine gider:
 ├── events.jsonl           # Güncel kayıt
 ├── events.1.jsonl          # Döndürülmüş kayıt
 ├── events.2.jsonl          # Döndürülmüş kayıt
+├── projects.json          # Ayrıntılı geçmişten bağımsız kısa proje özetleri
 ├── spool/                 # Pi'nin henüz teslim edilmemiş olayları
 │   ├── <üretici dizinleri>/ # Sürece ait, sıralı olay dosyaları
 │   └── quarantine/        # Bozuk/yarım veya collector'ın reddettiği kayıtlar
@@ -284,7 +305,9 @@ sınırına dahil değildir. Ayrıntılar: [teslimat mimarisi](docs/ARCHITECTURE
 Güncel dosya 20 MB sınırında döndürülür; iki eski dosya saklanır. Dashboard
 belleğinde oturum başına son 30 istek ve istek başına son 350 zaman çizelgesi
 olayı tutulur. Dosya kaydı ile ekranda tutulan görünüm aynı sonsuz arşiv değildir.
-Dışa aktarma **ekranda tutulan durumun** JSON çıktısıdır.
+Dışa aktarma **ekranda tutulan durumun** JSON çıktısıdır; proje özetlerini de
+içerir. `projects.json` içindeki özetler ayrıntılı olaylardan daha uzun tutulur;
+yalnızca journal dosyalarını silmek bu özetleri silmez.
 
 Portu değiştirmek için `PORT=7441 npm start`. Kayıt dizinini değiştirmek için
 `AGENT_DASHBOARD_HOME=/güvenli/klasör` kullan; bu değişkeni hem dashboard’a hem
