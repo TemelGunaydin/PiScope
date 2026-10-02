@@ -15,10 +15,10 @@ const sessionId = `demo-${randomUUID()}`, runId = randomUUID();
 // Labels, tokens, elapsed times and results below are explicitly simulated, not model claims.
 const sol = 'demo/sol', mimo = 'demo/mimo', deepseek = 'demo/deepseek';
 const stages = [
-  { id: 'plan', title: 'Planı oluştur', agent: 'Sol', model: sol, status: 'running' },
-  { id: 'implement', title: 'Düzeltmeyi uygula', agent: 'MiMo', model: mimo, status: 'pending' },
-  { id: 'review', title: 'İlk incelemeyi yap', agent: 'DeepSeek', model: deepseek, status: 'pending' },
-  { id: 'verify', title: 'Son doğrulamayı yap', agent: 'Sol', model: sol, status: 'pending' }
+  { id: 'plan', title: 'Create the plan', agent: 'Sol', model: sol, status: 'running' },
+  { id: 'implement', title: 'Implement the fix', agent: 'MiMo', model: mimo, status: 'pending' },
+  { id: 'review', title: 'Review the changes', agent: 'DeepSeek', model: deepseek, status: 'pending' },
+  { id: 'verify', title: 'Verify the result', agent: 'Sol', model: sol, status: 'pending' }
 ];
 async function send(type, data = {}, hasRun = true) {
   const response = await fetch(new URL('/api/events', endpoint), {
@@ -30,35 +30,35 @@ async function send(type, data = {}, hasRun = true) {
   if (speed) await new Promise(r => setTimeout(r, speed));
 }
 await send('session.connected', { model: sol }, false);
-await send('prompt.received', { prompt: 'Streaming buffer’daki yarış durumunu bul. Mevcut mimariyi koruyarak düzelt, testleri çalıştır ve değişiklikleri incele.' });
-await send('workflow.configured', { workflow: { schemaVersion: 1, id: 'implement-review', version: '1', label: 'Uygulama ve bağımsız inceleme', taskSet: 'demo-streaming-buffer', roles: [{ role: 'implementation', agent: 'mimo' }, { role: 'review', agent: 'deepseek' }] } });
+await send('prompt.received', { prompt: 'Find the race condition in the streaming buffer. Fix it without changing the architecture, run tests and review the changes.' });
+await send('workflow.configured', { workflow: { schemaVersion: 1, id: 'implement-review', version: '1', label: 'Implementation and independent review', taskSet: 'demo-streaming-buffer', roles: [{ role: 'implementation', agent: 'mimo' }, { role: 'review', agent: 'deepseek' }] } });
 await send('run.started', { model: sol });
-await send('workflow.updated', { stages, reason: 'Sol kapsamı belirler; MiMo uygular, DeepSeek ilk incelemeyi yapar, Sol doğrular.' });
-await send('message.completed', { model: sol, summary: 'Plan hazır. MiMo buffer erişimini ve ilgili testleri güncelleyecek.', usage: { input: 2600, output: 720 } });
+await send('workflow.updated', { stages, reason: 'Sol defines the scope; MiMo implements, DeepSeek reviews, and Sol verifies.' });
+await send('message.completed', { model: sol, summary: 'Plan ready. MiMo will update buffer access and the related tests.', usage: { input: 2600, output: 720 } });
 stages[0].status = 'done'; stages[1].status = 'running';
-await send('workflow.updated', { stages, reason: 'MiMo, onaylanan kapsamda düzeltmeyi uyguluyor.' });
-await send('agent.started', { agentCallId: 'demo-code', agent: 'mimo', task: 'Buffer erişimini seri hale getir. Eşzamanlı erişim için regresyon testi ekle.' });
+await send('workflow.updated', { stages, reason: 'MiMo is implementing the fix within the approved scope.' });
+await send('agent.started', { agentCallId: 'demo-code', agent: 'mimo', task: 'Serialize buffer access. Add a regression test for concurrent access.' });
 await send('agent.progress', { agentCallId: 'demo-code', agent: 'mimo', model: mimo, source: 'observed', status: 'running', elapsedMs: 18200, usage: { input: 12300, output: 2100 }, tools: [{ id: 'c1', name: 'read', file: 'Sources/StreamingBuffer.swift', status: 'done' }, { id: 'c2', name: 'edit', file: 'Sources/StreamingBuffer.swift', status: 'running' }] });
 await send('agent.finished', { agentCallId: 'demo-code', agent: 'mimo', model: mimo, isError: fail, source: 'observed', elapsedMs: 41200,
-    summary: fail ? 'ÖRNEK: Derleme hatası alındı; görev tamamlanmadı.' : 'ÖRNEK: İki dosya güncellendi. Test komutu çalıştırıldı; sonuç son kontrolde değerlendirilmeli.',
+    summary: fail ? 'SIMULATED: Build error; task not completed.' : 'SIMULATED: Two files updated. Test command finished; evaluate the result during final verification.',
     usage: { input: 16600, output: 3100 }, tools: [{ id: 'c1', name: 'read', status: 'done' }, { id: 'c2', name: 'edit', file: 'Sources/StreamingBuffer.swift', status: 'done' }, { id: 'c3', name: 'bash', status: 'done' }] });
 stages[1].status = fail ? 'error' : 'done'; stages[2].status = fail ? 'blocked' : 'running';
 if (fail) stages[3].status = 'blocked';
-await send('workflow.updated', { stages, reason: fail ? 'Uygulama başarısız. İnceleme başlamadı.' : 'MiMo sonuç döndürdü. DeepSeek ilk incelemeyi yapıyor.' });
+await send('workflow.updated', { stages, reason: fail ? 'Implementation failed. Review did not start.' : 'MiMo returned a result. DeepSeek is reviewing the changes.' });
 if (!fail) {
-  await send('agent.started', { agentCallId: 'demo-review', agent: 'deepseek', task: 'MiMo değişikliklerini somut hata ve regresyonlar için incele.' });
+  await send('agent.started', { agentCallId: 'demo-review', agent: 'deepseek', task: 'Review MiMo changes for concrete bugs and regressions.' });
   await send('agent.progress', { agentCallId: 'demo-review', agent: 'deepseek', model: deepseek, source: 'observed', status: 'running', elapsedMs: 4200, tools: [{ id: 'r1', name: 'read', file: 'Sources/StreamingBuffer.swift', status: 'running' }] });
 }
 if (!hold || fail) {
   if (!fail) {
-    await send('agent.finished', { agentCallId: 'demo-review', agent: 'deepseek', model: deepseek, source: 'observed', isError: false, elapsedMs: 8400, summary: 'ÖRNEK: İlk inceleme tamamlandı; Sol bağımsız doğrulama yapacak.', usage: { input: 8400, output: 1320 }, tools: [{ id: 'r1', name: 'read', file: 'Sources/StreamingBuffer.swift', status: 'done' }] });
+    await send('agent.finished', { agentCallId: 'demo-review', agent: 'deepseek', model: deepseek, source: 'observed', isError: false, elapsedMs: 8400, summary: 'SIMULATED: Review complete; Sol will independently verify the result.', usage: { input: 8400, output: 1320 }, tools: [{ id: 'r1', name: 'read', file: 'Sources/StreamingBuffer.swift', status: 'done' }] });
     stages[2].status = 'done'; stages[3].status = 'running';
-    await send('workflow.updated', { stages, reason: 'DeepSeek sonuç döndürdü. Sol bağımsız doğrulama yapıyor.' });
+    await send('workflow.updated', { stages, reason: 'DeepSeek returned a result. Sol is independently verifying it.' });
     await send('tool.started', { toolCallId: 'demo-diff', toolName: 'read', model: sol, file: 'Tests/StreamingBufferTests.swift' });
     await send('tool.finished', { toolCallId: 'demo-diff', toolName: 'read', model: sol, file: 'Tests/StreamingBufferTests.swift', isError: false });
-    stages[3].status = 'done'; await send('workflow.updated', { stages, reason: 'Demo akışında inceleme tamamlandı. Bunlar gerçek doğrulama sonuçları değildir.' });
+    stages[3].status = 'done'; await send('workflow.updated', { stages, reason: 'Simulated workflow complete. These are not real verification results.' });
   }
-  await send('run.ended', { outcome: fail ? 'error' : 'idle', summary: fail ? 'Demo: İş başarısız senaryoyla durduruldu.' : 'Demo akışı tamamlandı. Gerçek görev, kod değişikliği veya model API çağrısı yapılmadı.' });
+  await send('run.ended', { outcome: fail ? 'error' : 'idle', summary: fail ? 'Demo: Run stopped in a failure scenario.' : 'Demo workflow complete. No real task, code change or model API call occurred.' });
   await send('run.settled');
 }
 console.log('Simulated events sent for collector testing (hidden from the live dashboard). No model was called.');

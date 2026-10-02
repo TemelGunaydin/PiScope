@@ -1,18 +1,18 @@
 # Project memory
 
-**Projelerim** is the dashboard's starting view. It answers “what was I working
+**My projects** is PiScope's starting view. It answers “what was I working
 on?” using recorded Pi events, without model calls or a new task runner.
 
 Each project has one card with its last work time, latest request excerpt,
 latest visible response excerpt, and first unfinished reported stage. Cards
-are ordered by project name (Turkish locale, with project ID as a tie-breaker),
+are ordered by project name (English locale, with project ID as a tie-breaker),
 so activity updates do not move them. Search covers the saved name, request,
 response, and next step. A status filter includes projects untouched for at
 least seven days. Request and response text are shown directly on the card.
-Only fields longer than 220 characters have **Devamını göster** underneath;
-it expands that field in place, without a duplicate summary. **Daha az göster**
+Only fields longer than 220 characters have **Show more** underneath;
+it expands that field in place, without a duplicate summary. **Show less**
 collapses it again. Each field keeps its expansion state across live updates.
-**Son isteğe git** opens the source request if it is still retained. **← Projelere dön** restores
+**Open last request** opens the source request if it is still retained. **← Back to projects** restores
 the overview's filters, scroll position, and focus on the originating card when
 it is still visible. The sidebar lists sessions by project name and session ID.
 The UI only shows live records; there is no Live/Demo or overview selector.
@@ -40,18 +40,18 @@ and monitor warnings do not refresh it.
 
 | Label | Meaning |
 |---|---|
-| Çalışıyor | At least one retained session has an observed request start, an unfinished current run, and a Pi signal less than 30 seconds old. |
-| İptal | The latest request was cancelled. |
-| İlgilenilmeli | The latest request failed, or its reported plan contains an error/blocked stage. |
-| Bekleyen iş | The latest reported plan contains an unfinished stage, with no fresh active session. |
-| Son istek bitti | The latest request technically completed, with no reported unfinished stage. The project is not declared complete. |
-| Sonuç bilinmiyor | No sufficient result or unfinished plan is available. Missing data never proves completion. |
+| Running | At least one retained session has an observed request start, an unfinished current run, and a Pi signal less than 30 seconds old. |
+| Cancelled | The latest request was cancelled. |
+| Needs attention | The latest request failed, or its reported plan contains an error/blocked stage. |
+| Unfinished work | The latest reported plan contains an unfinished stage, with no fresh active session. |
+| Last request finished | The latest request technically completed, with no reported unfinished stage. The project is not declared complete. |
+| Outcome unknown | No sufficient result or unfinished plan is available. Missing data never proves completion. |
 
 Active work takes precedence; otherwise the table is evaluated from cancellation
 downwards. Pending, running, blocked, and error stages count as unfinished.
 The displayed step is the first such stage in plan order. Its label distinguishes
-**Plan: Devam eden adım** (running), **Plan: Sıradaki adım** (pending),
-**Plan: Engellenen adım** (blocked), and **Plan: Hata bildirilen adım** (error).
+**Plan: Step in progress** (running), **Plan: Next step** (pending),
+**Plan: Blocked step** (blocked), and **Plan: Step with a reported error** (error).
 This is an agent report, not proof of current execution, an inferred next action,
 or a manual “paused” setting. A cancelled request can still show the plan it left behind.
 

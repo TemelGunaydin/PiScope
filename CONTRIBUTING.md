@@ -1,4 +1,4 @@
-# Contributing to Agent Desk
+# Contributing to PiScope
 
 English and Turkish issues and pull requests are welcome. For a substantial
 feature, describe the problem and a small proposed scope in an issue first.
@@ -15,28 +15,30 @@ npm test
 npm start
 ```
 
-In another terminal, `npm run demo -- --fast` sends synthetic events. Open the
-private pairing URL shown by the server and select **Demo**. Never post this
-URL in an issue or screenshot. All model use is optional; core tests do not
-need Pi, credentials, or an account.
+In another terminal, `npm run open` pairs the local browser. Never post the
+private pairing URL in an issue or screenshot. Connect a real Pi project as
+described in the README, or use the isolated browser tests below for synthetic
+data. Demo records are hidden from the live UI. Core tests do not need Pi,
+credentials, or an account.
 
 ## Tests
 
 - Run `npm run check` and `npm test` for code changes.
 - Run `npm run test:pi` for extension-loader or command changes when Pi is
   installed. It uses isolated directories and makes no model calls.
-- For UI changes, install Python Playwright in your own environment, start an
-  isolated dashboard with demo events, and run:
+- For UI changes, install Python Playwright and Chromium in your own environment:
 
   ```bash
   python3 test/browser-smoke.py --network
+  # Simulated Tailscale Serve HTTPS proxy; also requires openssl:
+  python3 test/browser-smoke.py --tailscale
   ```
 
-  Use the same `AGENT_DASHBOARD_HOME` for the server, demo, and browser test.
-  Set `BROWSER_EXECUTABLE` to a Chromium-compatible browser executable if
-  needed. `--network` checks real HTTP/SSE and adds synthetic comparison
-  events. The separate regression page uses fixture replay. Do not run it
-  against a personal history directory.
+  Tests start their own disposable collector and use synthetic records, not
+  your personal history or Tailscale routes. Set `BROWSER_EXECUTABLE` to a
+  Chromium-compatible browser executable if needed. `--network` exercises
+  real HTTP/SSE; separate regression pages use fixture replay. `--tailscale`
+  simulates HTTPS termination, not real device-to-device tailnet access.
 
 Use targeted regressions for behavior changes. Keep generated screenshots
 and test data out of the commit unless an intentional documentation artifact
@@ -53,8 +55,9 @@ needs updating. State which checks you ran and any unavailable checks.
   tool arguments, credentials, reasoning, or source code to event records.
 - Keep queues, payloads, retained state, and parser work bounded. Test recovery
   and duplicate delivery when changing persistence.
-- Keep the UI light, minimal, and readable: 16 px body text and at least 14 px
-  visible supporting text. Preserve keyboard controls and narrow-screen layout.
+- Keep the UI in English, light, minimal, and readable: 18 px body text and
+  at least 16 px visible supporting text. Preserve user content in its original
+  language, keyboard controls and narrow-screen layout.
 - Avoid adding runtime dependencies unless the benefit justifies shipping
   them in the standalone Pi extension as well as the collector.
 

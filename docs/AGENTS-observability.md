@@ -1,5 +1,5 @@
 <!-- agent-desk-observability -->
-## Agent Desk workflow observability
+## PiScope workflow observability
 
 When the `workflow_report` tool is available, use it to publish the full stage
 list before multi-step work and whenever a stage changes. Use stable stage IDs;

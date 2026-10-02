@@ -1,6 +1,6 @@
 # Security policy
 
-Agent Desk is early software. Security fixes target the latest code on the
+PiScope is early software. Security fixes target the latest code on the
 default branch; older versions do not have a separate maintenance commitment.
 
 ## Report a vulnerability

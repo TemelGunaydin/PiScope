@@ -44,8 +44,8 @@ assert any(s['demo'] for s in snapshot['sessions']), 'Fixture must include hidde
 assert any(not s['demo'] for s in snapshot['sessions']), 'Fixture must include live records'
 output = Path(args.output_dir).resolve()
 output.mkdir(parents=True, exist_ok=True)
-long_prompt = '<img src=x onerror=alert(1)> metnini güvenle göster. ' + 'Takvim akışını kontrol et. ' * 10
-long_summary = 'Kaydedilmiş yanıtın ilk satırı.\n' + 'Sonraki adım için kontrol bekleniyor. ' * 9
+long_prompt = 'Display <img src=x onerror=alert(1)> safely as text. ' + 'Check the calendar workflow. ' * 10
+long_summary = 'First line of the saved response.\n' + 'The next step is waiting for a check. ' * 9
 
 def assert_readable(target):
     assert target.evaluate('() => document.documentElement.scrollWidth <= window.innerWidth'), 'Page overflow'
@@ -97,20 +97,28 @@ with sync_playwright() as pw:
         browser_url = config['tailscaleUrl'] if args.tailscale else config['url']
         if args.tailscale:
             page.goto(browser_url)
-            expect(page.locator('#connection-label')).to_have_text('Eşleştirme gerekli')
+            expect(page.locator('#connection-label')).to_have_text('Pairing required')
             page.goto('about:blank')  # Pairing link is opened as a fresh document, not just a hash change.
         page.goto(browser_url + '/#token=' + config['token'])
     else:
         replay(page, snapshot)
-    expect(page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(page.locator('#connection-label')).to_have_text('Dashboard connected')
     expect(page.locator('#project-overview')).to_be_visible()
+    assert page.locator('html').get_attribute('lang') == 'en'
+    expect(page).to_have_title('PiScope · Pi Workflow Dashboard')
+    expect(page.get_by_role('link', name='PiScope home')).to_be_visible()
+    expect(page.locator('#overview-heading')).to_have_text('Where did I leave off?')
+    expect(page.locator('#project-filter option[value="running"]')).to_have_text('Running')
+    # Built-in UI copy is English; recorded user text is never translated.
+    assert not any(c in (root / 'public/app.js').read_text() + (root / 'public/index.html').read_text()
+                   for c in 'çğıöşüÇĞİÖŞÜ')
     if args.tailscale:
         cookie = next(c for c in page.context.cookies() if c['name'] == 'agentdesk')
         assert cookie['secure'] and cookie['httpOnly'] and cookie['sameSite'] == 'Strict'
         assert not cookie['domain'].startswith('.')
         assert '#token' not in page.url
         page.reload()
-        expect(page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+        expect(page.locator('#connection-label')).to_have_text('Dashboard connected')
     assert page.locator('#demo-mode, #live-mode, #overview-button, #demo-banner').count() == 0
     expect(page.locator('.project-card')).to_have_count(1)
     # Short saved text is already visible; no duplicate summary or expand action.
@@ -123,6 +131,7 @@ with sync_playwright() as pw:
     page.locator('.project-open').click()
     page.wait_for_selector('#run-content:not(.hidden)')
     expect(page.locator('#back-to-projects')).to_be_visible()
+    expect(page.locator('#back-to-projects')).to_have_text('← Back to projects')
     page.locator('#back-to-projects').focus()
     page.keyboard.press('Enter')
     expect(page.locator('#project-overview')).to_be_visible()
@@ -156,7 +165,7 @@ with sync_playwright() as pw:
                         'sessionId': 'ui-comparison', 'runId': variant,
                         'projectId': project['projectId'], 'projectName': project['projectName'], 'data': data}
             batch = [record('prompt.received', {'prompt': 'Simulated comparison fixture'}),
-                     record('workflow.configured', {'workflow': {'schemaVersion': 1, 'id': 'implement-review', 'version': '2', 'label': 'Alternatif workflow', 'taskSet': task_set, 'roles': [{'role': 'review', 'agent': 'reviewer'}]}}),
+                     record('workflow.configured', {'workflow': {'schemaVersion': 1, 'id': 'implement-review', 'version': '2', 'label': 'Alternative workflow', 'taskSet': task_set, 'roles': [{'role': 'review', 'agent': 'reviewer'}]}}),
                      record('run.started', {'model': 'arbitrary-provider/primary'}),
                      record('agent.started', {'agentCallId': 'review', 'agent': 'reviewer'}),
                      record('agent.finished', {'agentCallId': 'review', 'agent': 'reviewer', 'model': 'arbitrary-provider/reviewer', 'source': 'observed', 'isError': False, 'usage': {'input': 10}}),
@@ -178,17 +187,17 @@ with sync_playwright() as pw:
         assert page.locator('#workflow-comparison tbody tr').count() == 1
         assert 'arbitrary-provider/reviewer' in page.locator('#workflow-comparison').inner_text()
         page.locator('#workflow-task-set').select_option('')
-        expect(page.locator('.comparison-evidence').filter(has_text='1 kaldı')).to_have_count(1)
-        expect(page.locator('.comparison-evidence').filter(has_text='1 belirsiz')).to_have_count(1)
+        expect(page.locator('.comparison-evidence').filter(has_text='1 failed')).to_have_count(1)
+        expect(page.locator('.comparison-evidence').filter(has_text='1 inconclusive')).to_have_count(1)
         page.locator('.session-item').filter(has_text='ui-comp').click()
         page.locator('#run-select').select_option('variant-a')
-        expect(page.locator('#test-evidence .badge')).to_have_text('Raporda başarısız')
-        assert '1 başarısız' in page.locator('#test-evidence').inner_text()
+        expect(page.locator('#test-evidence .badge')).to_have_text('Failed in report')
+        assert '1 failed' in page.locator('#test-evidence').inner_text()
         page.locator('#test-evidence summary').click()
         assert '2' * 64 in page.locator('#test-evidence').inner_text()
         page.locator('#test-evidence summary').click()
         page.locator('#run-select').select_option('variant-b')
-        expect(page.locator('#test-evidence .badge')).to_have_text('Sonuç belirsiz')
+        expect(page.locator('#test-evidence .badge')).to_have_text('Inconclusive')
         page.locator('#run-select').select_option('variant-a')
         page.screenshot(path=str(output / 'comparison.png'), full_page=True)
         # A returning user sees each project once, even across multiple tabs.
@@ -204,48 +213,48 @@ with sync_playwright() as pw:
                 'time': old_time if old else datetime.now(timezone.utc).isoformat(),
                 'demo': False, 'recovered': old, 'sessionId': session, 'runId': 'overview-run',
                 'projectId': project_id, 'projectName': name, 'data': data})
-        project_event('ui-return', 'Mağaza', 'ui-return-tab', 'prompt.received', {'prompt': 'Ödeme ekranını tamamla'}, True)
-        project_event('ui-return', 'Mağaza', 'ui-return-tab', 'workflow.updated', {'stages': [{'id': 'verify', 'title': 'Ödeme akışını doğrula', 'status': 'pending'}]}, True)
-        project_event('ui-return', 'Mağaza', 'ui-return-tab', 'run.ended', {'outcome': 'idle', 'summary': 'Ekran hazır, doğrulama bekliyor.'}, True)
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'prompt.received', {'prompt': 'Finish the checkout screen'}, True)
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'workflow.updated', {'stages': [{'id': 'verify', 'title': 'Verify the checkout flow', 'status': 'pending'}]}, True)
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'run.ended', {'outcome': 'idle', 'summary': 'Screen ready; verification is pending.'}, True)
         for session in ['ui-active-one', 'ui-active-two']:
-            project_event('ui-active', 'Not Defteri', session, 'prompt.received', {'prompt': 'Arama ekranını geliştir'})
-        project_event('ui-cancelled', 'Takvim', 'ui-cancelled-tab', 'prompt.received', {'prompt': long_prompt})
-        project_event('ui-cancelled', 'Takvim', 'ui-cancelled-tab', 'run.ended', {'outcome': 'aborted', 'summary': long_summary})
+            project_event('ui-active', 'Notebook', session, 'prompt.received', {'prompt': 'Improve the search screen'})
+        project_event('ui-cancelled', 'Planner', 'ui-cancelled-tab', 'prompt.received', {'prompt': long_prompt})
+        project_event('ui-cancelled', 'Planner', 'ui-cancelled-tab', 'run.ended', {'outcome': 'aborted', 'summary': long_summary})
         req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
         with urllib.request.urlopen(req, timeout=3) as response:
             assert response.status == 200
         page.locator('#back-to-projects').click()
         expect(page.locator('.project-card')).to_have_count(4)
         expect(page.locator('#project-count')).to_have_text('4')
-        expect(page.locator('.project-card[data-project="ui-active"]')).to_contain_text('2 çalışan oturum')
-        expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('8 gün önce')
+        expect(page.locator('.project-card[data-project="ui-active"]')).to_contain_text('2 active sessions')
+        expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('8 days ago')
         assert page.locator('#project-list img').count() == 0
         page.locator('#project-filter').select_option('stale')
         expect(page.locator('.project-card')).to_have_count(1)
-        expect(page.locator('.project-card .badge')).to_have_text('Bekleyen iş')
+        expect(page.locator('.project-card .badge')).to_have_text('Unfinished work')
         page.locator('.project-open').click()
         expect(page.locator('#workspace-details')).to_be_visible()
-        expect(page.locator('#prompt')).to_have_text('Ödeme ekranını tamamla')
+        expect(page.locator('#prompt')).to_have_text('Finish the checkout screen')
         page.locator('#back-to-projects').click()
         expect(page.locator('#project-filter')).to_have_value('stale')
         expect(page.locator('.project-open')).to_be_focused()
         page.locator('#project-filter').select_option('running')
         expect(page.locator('.project-card')).to_have_count(1)
-        expect(page.locator('.project-card h2')).to_have_text('Not Defteri')
+        expect(page.locator('.project-card h2')).to_have_text('Notebook')
         page.locator('#project-filter').select_option('cancelled')
-        expect(page.locator('.project-card .badge')).to_have_text('İptal')
+        expect(page.locator('.project-card .badge')).to_have_text('Cancelled')
         page.locator('#project-filter').select_option('')
-        page.locator('#project-search').fill('doğrula')
-        expect(page.locator('.project-card h2')).to_have_text('Mağaza')
+        page.locator('#project-search').fill('verify')
+        expect(page.locator('.project-card h2')).to_have_text('Marketplace')
         expect(page.locator('.project-saved, .project-expand')).to_have_count(0)
         page.locator('#project-search').fill('unmatchable-word')
-        expect(page.locator('#project-list')).to_contain_text('Eşleşen proje yok.')
+        expect(page.locator('#project-list')).to_contain_text('No matching projects.')
         page.locator('#project-search').fill('')
         expect(page.locator('.project-card')).to_have_count(4)
         # Fresh work must update the existing card, not move it to the front.
         project_order = page.locator('.project-card').evaluate_all('(cards) => cards.map(c => c.dataset.project)')
         session_order = page.locator('.session-item').all_text_contents()
-        assert page.locator('.project-card h2').all_text_contents() == ['Fixture Playground', 'Mağaza', 'Not Defteri', 'Takvim']
+        assert page.locator('.project-card h2').all_text_contents() == ['Fixture Playground', 'Marketplace', 'Notebook', 'Planner']
         last = page.locator('.project-card[data-project="ui-cancelled"]')
         summary_toggle = last.locator('.project-expand[data-field="summary"]')
         summary_toggle.click()
@@ -254,8 +263,8 @@ with sync_playwright() as pw:
         expect(last.locator('.project-answer')).to_have_text(long_summary)
         summary_toggle.focus()
         batch = []
-        updated_summary = 'SSE ile güncellenen yanıt. ' + long_summary
-        project_event('ui-cancelled', 'Takvim', 'ui-cancelled-tab', 'message.completed', {'summary': updated_summary})
+        updated_summary = 'Response updated over SSE. ' + long_summary
+        project_event('ui-cancelled', 'Planner', 'ui-cancelled-tab', 'message.completed', {'summary': updated_summary})
         req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
         with urllib.request.urlopen(req, timeout=3) as response:
             assert response.status == 200
@@ -276,11 +285,11 @@ with sync_playwright() as pw:
         # A shorter replacement no longer needs a toggle; keep focus on its text.
         summary_toggle.focus()
         batch = []
-        project_event('ui-cancelled', 'Takvim', 'ui-cancelled-tab', 'message.completed', {'summary': 'Kısa güncel yanıt.'})
+        project_event('ui-cancelled', 'Planner', 'ui-cancelled-tab', 'message.completed', {'summary': 'Short updated response.'})
         req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
         with urllib.request.urlopen(req, timeout=3) as response:
             assert response.status == 200
-        expect(last.locator('.project-answer')).to_have_text('Kısa güncel yanıt.')
+        expect(last.locator('.project-answer')).to_have_text('Short updated response.')
         expect(summary_toggle).to_have_count(0)
         expect(last.locator('.project-answer')).to_be_focused()
         page.evaluate('() => window.scrollTo(0, 0)')
@@ -310,7 +319,7 @@ with sync_playwright() as pw:
     # Targeted regression: src/store.mjs keeps an agent.progress status literal
     # verbatim with finished=False until an agent.finished mark arrives. The
     # model cards must never turn a progress-only terminal-looking literal into
-    # a green 'Bitti'/red 'Hata' result; unknown/waiting is shown instead and the
+    # a green 'Done'/red 'Error' result; unknown/waiting is shown instead and the
     # main session keeps waiting on the unfinished agent. Genuine finished
     # records and live in-progress states keep their display.
     def agent_fixture(call_id, name, status, finished):
@@ -331,19 +340,19 @@ with sync_playwright() as pw:
     regression = browser.new_page(viewport={'width': 1440, 'height': 1150})
     regression.on('pageerror', lambda error: errors.append(str(error)))
     replay(regression, regressed)
-    expect(regression.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(regression.locator('#connection-label')).to_have_text('Dashboard connected')
     regression.locator('.session-item').first.click()
     regression.wait_for_selector('#run-content:not(.hidden)')
     for name in ('ui-literal-done', 'ui-literal-error', 'ui-literal-blocked', 'ui-literal-cancelled'):
         waiting = regression.locator('.model-card').filter(has_text=name).locator('.badge')
-        assert waiting.text_content().strip() == 'Sonuç bilinmiyor / bitiş bekleniyor', name
+        assert waiting.text_content().strip() == 'Outcome unknown / awaiting completion', name
         assert 'done' not in waiting.get_attribute('class') and 'error' not in waiting.get_attribute('class'), name
-    assert regression.locator('.model-card').filter(has_text='ui-running').locator('.badge').text_content().strip() == 'Çalışıyor'
-    assert regression.locator('.model-card').filter(has_text='ui-finished-done').locator('.badge').text_content().strip() == 'Bitti'
-    assert regression.locator('.model-card').filter(has_text='ui-finished-error').locator('.badge').text_content().strip() == 'Hata'
+    assert regression.locator('.model-card').filter(has_text='ui-running').locator('.badge').text_content().strip() == 'Running'
+    assert regression.locator('.model-card').filter(has_text='ui-finished-done').locator('.badge').text_content().strip() == 'Done'
+    assert regression.locator('.model-card').filter(has_text='ui-finished-error').locator('.badge').text_content().strip() == 'Error'
     main = regression.locator('.model-card').first
-    assert main.locator('.model-role').text_content().strip() == 'Ana oturum'
-    assert main.locator('.model-task').text_content().strip() == 'Alt agent sonuçlarını bekliyor.'
+    assert main.locator('.model-role').text_content().strip() == 'Main session'
+    assert main.locator('.model-task').text_content().strip() == 'Waiting for subagent results.'
     regression.close()
     # No network snapshots are needed to expire a working badge. Archived
     # summaries remain readable even when their source sessions no longer exist.
@@ -351,20 +360,20 @@ with sync_playwright() as pw:
     remembered['sessions'] = []
     base = next(p for p in remembered['projectOverview']['items'] if not p.get('demo'))
     archived = copy.deepcopy(base)
-    archived.update(projectId='archived-project', projectName='Arşiv Projesi',
+    archived.update(projectId='archived-project', projectName='Archived Project',
         detailAvailable=False, status='waiting', idleStatus='waiting', activeUntil=[],
-        nextStep={'id': 'next', 'title': 'Son kontrolü yap', 'status': 'pending'}, pendingCount=1)
+        nextStep={'id': 'next', 'title': 'Run the final check', 'status': 'pending'}, pendingCount=1)
     archived['latest'].update(prompt=long_prompt, summary=long_summary)
-    base.update(projectId='stale-project', projectName='Sinyali Kesilen Proje', detailAvailable=False,
+    base.update(projectId='stale-project', projectName='Disconnected Project', detailAvailable=False,
         status='running', idleStatus='unknown', activeUntil=[datetime.now(timezone.utc).timestamp() * 1000 + 30000])
     remembered['projectOverview']['items'] = [base, archived]
     archive_page = browser.new_page()
     archive_page.on('pageerror', lambda error: errors.append(str(error)))
     archive_page.clock.install()
     replay(archive_page, remembered)
-    expect(archive_page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(archive_page.locator('#connection-label')).to_have_text('Dashboard connected')
     archived_card = archive_page.locator('[data-project="archived-project"]').filter(has=archive_page.locator('h2'))
-    expect(archived_card).to_contain_text('ayrıntılı olay kaydı artık tutulmuyor')
+    expect(archived_card).to_contain_text('detailed event history is no longer retained')
     assert archived_card.locator('.project-open').count() == 0
     archived_toggle = archived_card.locator('.project-expand[data-field="prompt"]')
     archived_toggle.focus()
@@ -372,10 +381,10 @@ with sync_playwright() as pw:
     expect(archived_card.locator('.project-prompt')).to_have_text(long_prompt)
     expect(archived_card.locator('.project-expand[data-field="summary"]')).to_have_attribute('aria-expanded', 'false')
     assert archived_card.locator('img').count() == 0
-    expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Çalışıyor')
+    expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Running')
     expect(archive_page.locator('.project-card[data-project="stale-project"]')).to_have_attribute('data-status', 'running')
     archive_page.clock.fast_forward(31000)
-    expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Sonuç bilinmiyor')
+    expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Outcome unknown')
     expect(archive_page.locator('.project-card[data-project="stale-project"]')).to_have_attribute('data-status', 'unknown')
     expect(archived_toggle).to_have_attribute('aria-expanded', 'true')
     expect(archived_toggle).to_be_focused()
@@ -383,6 +392,7 @@ with sync_playwright() as pw:
     # Thresholds are per field; opening replaces the excerpt instead of repeating it.
     excerpts = copy.deepcopy(remembered)
     excerpts['projectOverview']['items'] = []
+    # Non-English user content must still be preserved verbatim in the English UI.
     text_cases = [('empty', '', ''), ('short', 'Kısa istek', 'Kısa yanıt'),
                   ('limit', 'a' * 220, 'b' * 220), ('prompt-only', 'a' * 221, 'Kısa yanıt'),
                   ('summary-only', 'Kısa istek', 'b' * 221), ('both', long_prompt, long_summary)]
@@ -394,13 +404,13 @@ with sync_playwright() as pw:
     text_page = browser.new_page(viewport={'width': 1440, 'height': 1100})
     text_page.on('pageerror', lambda error: errors.append(str(error)))
     replay(text_page, excerpts)
-    expect(text_page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(text_page.locator('#connection-label')).to_have_text('Dashboard connected')
     expect(text_page.locator('.project-saved')).to_have_count(0)
     for name, prompt, summary in text_cases:
         card = text_page.locator(f'.project-card[data-project="{name}"]')
         for field, css_class, label, text, fallback in (
-            ('prompt', 'project-prompt', 'Son istek', prompt, 'İstek metni kaydedilmedi.'),
-            ('summary', 'project-answer', 'Son yanıt', summary, 'Yanıt özeti kaydedilmedi.')
+            ('prompt', 'project-prompt', 'Last request', prompt, 'Request text not recorded.'),
+            ('summary', 'project-answer', 'Last response', summary, 'Response summary not recorded.')
         ):
             paragraph = card.locator('.' + css_class)
             toggle = card.locator(f'.project-expand[data-field="{field}"]')
@@ -410,18 +420,18 @@ with sync_playwright() as pw:
                 expect(toggle).to_have_count(0)
                 expect(paragraph).to_have_text(text or fallback)
                 continue
-            expect(toggle).to_have_text('Devamını göster')
+            expect(toggle).to_have_text('Show more')
             expect(toggle).to_have_attribute('aria-expanded', 'false')
             expect(paragraph).to_have_text(text[:220].rstrip() + '…')
             assert toggle.get_attribute('aria-controls') == paragraph.get_attribute('id')
             assert toggle.evaluate('(e) => e.previousElementSibling.id === e.getAttribute("aria-controls")')
             toggle.focus()
             text_page.keyboard.press('Enter')
-            expect(toggle).to_have_text('Daha az göster')
+            expect(toggle).to_have_text('Show less')
             expect(toggle).to_have_attribute('aria-expanded', 'true')
             assert paragraph.text_content() == text
             text_page.keyboard.press('Space')
-            expect(toggle).to_have_text('Devamını göster')
+            expect(toggle).to_have_text('Show more')
             expect(toggle).to_have_attribute('aria-expanded', 'false')
             expect(paragraph).to_have_text(text[:220].rstrip() + '…')
     both = text_page.locator('.project-card[data-project="both"]')
@@ -434,40 +444,40 @@ with sync_playwright() as pw:
     both.screenshot(path=str(output / 'expanded-project.png'))
     text_page.close()
     # A reported running step is different from a future or blocked step.
-    plan_labels = [('pending', 'Plan: Sıradaki adım'), ('running', 'Plan: Devam eden adım'),
-                   ('blocked', 'Plan: Engellenen adım'), ('error', 'Plan: Hata bildirilen adım')]
+    plan_labels = [('pending', 'Plan: Next step'), ('running', 'Plan: Step in progress'),
+                   ('blocked', 'Plan: Blocked step'), ('error', 'Plan: Step with a reported error')]
     planned = copy.deepcopy(remembered)
     planned['projectOverview']['items'] = []
     for status, label in plan_labels:
         item = copy.deepcopy(archived)
-        item.update(projectId=status, projectName=status, nextStep={'title': 'Örnek plan adımı', 'status': status})
+        item.update(projectId=status, projectName=status, nextStep={'title': 'Example plan step', 'status': status})
         planned['projectOverview']['items'].append(item)
     plan_page = browser.new_page()
     plan_page.on('pageerror', lambda error: errors.append(str(error)))
     replay(plan_page, planned)
-    expect(plan_page.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(plan_page.locator('#connection-label')).to_have_text('Dashboard connected')
     for status, label in plan_labels:
         expect(plan_page.locator(f'[data-project="{status}"] .project-next .project-field-label')).to_have_text(label)
     plan_page.close()
     # Every project state has a readable text label and a consistent semantic tone.
     palette = copy.deepcopy(remembered)
     palette['projectOverview']['items'] = []
-    states = [('running', 'Çalışıyor', 'Arama Servisi'), ('waiting', 'Bekleyen iş', 'Mağaza'),
-              ('attention', 'İlgilenilmeli', 'Ödeme API'), ('finished', 'Son istek bitti', 'Not Defteri'),
-              ('cancelled', 'İptal', 'Takvim'), ('unknown', 'Sonuç bilinmiyor', 'Arşiv Projesi')]
+    states = [('running', 'Running', 'Search Service'), ('waiting', 'Unfinished work', 'Marketplace'),
+              ('attention', 'Needs attention', 'Payments API'), ('finished', 'Last request finished', 'Notebook'),
+              ('cancelled', 'Cancelled', 'Planner'), ('unknown', 'Outcome unknown', 'Archived Project')]
     for status, label, name in states:
         item = copy.deepcopy(archived)
         item.update(projectId=status, projectName=name, idleStatus=status,
             activeUntil=[datetime.now(timezone.utc).timestamp() * 1000 + 3600000] if status == 'running' else [],
-            nextStep={'title': 'Ödeme akışını doğrula', 'status': 'pending'} if status == 'waiting' else None,
+            nextStep={'title': 'Verify the checkout flow', 'status': 'pending'} if status == 'waiting' else None,
             pendingCount=1 if status == 'waiting' else 0)
-        item['latest'].update(prompt='Son değişiklikleri incele ve bir sonraki adımı belirle.',
-                              summary='Çalışma kaydı alındı. Son durum yukarıdaki etikette gösteriliyor.')
+        item['latest'].update(prompt='Review the latest changes and identify the next step.',
+                              summary='Work recorded. The latest state is shown in the status label above.')
         palette['projectOverview']['items'].append(item)
     design = browser.new_page(viewport={'width': 1440, 'height': 1100})
     design.on('pageerror', lambda error: errors.append(str(error)))
     replay(design, palette)
-    expect(design.locator('#connection-label')).to_have_text('Dashboard bağlı')
+    expect(design.locator('#connection-label')).to_have_text('Dashboard connected')
     colors = []
     for status, label, name in states:
         card = design.locator(f'.project-card[data-status="{status}"]')
@@ -479,7 +489,7 @@ with sync_playwright() as pw:
             colors.append(border)
     assert len(set(colors)) == 4, 'Running, waiting, attention and finished must be distinct'
     expect(design.locator('.project-next.has-next')).to_have_count(1)
-    expect(design.locator('.project-next.has-next')).to_contain_text('Ödeme akışını doğrula')
+    expect(design.locator('.project-next.has-next')).to_contain_text('Verify the checkout flow')
     # The palette must supplement labels without changing filters or navigation.
     for status, label, name in states:
         design.locator('#project-filter').select_option(status)
@@ -506,4 +516,4 @@ with sync_playwright() as pw:
     design.close()
     assert not errors, errors
     browser.close()
-print('UI passed: live-only overview, back navigation with filters/focus/scroll restored, stable project/session ordering under SSE, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))
+print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, stable project/session ordering under SSE, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))

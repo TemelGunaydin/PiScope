@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Everyone participating in Agent Desk issues, reviews, and discussions should:
+Everyone participating in PiScope issues, reviews, and discussions should:
 
 - Be respectful and give constructive, specific feedback.
 - Welcome different experience levels and communication styles.

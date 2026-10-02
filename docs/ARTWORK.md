@@ -1,4 +1,8 @@
-# Project cover
+# Historical project cover
+
+This artwork belongs to the earlier **Agent Desk** name. It is kept as historical
+provenance and is no longer used in PiScope's READMEs. The current README uses a
+real UI screenshot with synthetic data instead.
 
 - Asset: [agent-desk-cover.png](agent-desk-cover.png).
 - Created for Agent Desk on 2026-09-26 with the built-in `image_gen` tool.

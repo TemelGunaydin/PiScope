@@ -6,7 +6,7 @@ cd "$ROOT"
 command -v gh >/dev/null || { echo 'GitHub CLI is required. On Mac: brew install gh'; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo 'Authenticate first: gh auth login'; exit 1; }
 OWNER="$(gh api user --jq .login)"
-NAME="${1:-agent-workflow-dashboard}"
+NAME="${1:-PiScope}"
 [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo 'Invalid repository name'; exit 1; }
 [[ -d .git ]] || { echo 'Use the archive that includes .git, or clone the supplied Git bundle first.'; exit 1; }
 [[ "$(git rev-parse --show-toplevel)" == "$ROOT" ]] || { echo 'Wrong git root'; exit 1; }

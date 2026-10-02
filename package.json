@@ -1,8 +1,8 @@
 {
-  "name": "agent-workflow-dashboard",
+  "name": "piscope",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first, model-independent Pi workflow observability.",
+  "description": "PiScope: a local-first project and workflow dashboard for Pi coding agent users.",
   "type": "module",
   "engines": {
     "node": ">=22"

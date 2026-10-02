@@ -20,7 +20,7 @@ export default async function (pi: any) {
   } catch {
     // Basic monitoring still works. Warn clearly rather than inventing a tool.
     pi.on('session_start', (_e: any, ctx: any) => {
-      ctx.ui?.notify?.('Agent Desk: workflow_report unavailable (TypeBox not resolved). Basic monitoring remains enabled.', 'warning');
+      ctx.ui?.notify?.('PiScope: workflow_report unavailable (TypeBox not resolved). Basic monitoring remains enabled.', 'warning');
     });
   }
   registerMonitor(pi, { schema });

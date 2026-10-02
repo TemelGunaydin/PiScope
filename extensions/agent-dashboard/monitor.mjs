@@ -138,12 +138,12 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     emit('session.disconnected', {}, ctx); await client.stop();
   });
   pi.registerCommand('dashboard-status', {
-    description: 'Show the local Agent Desk connection; does not start model work',
+    description: 'Show the local PiScope connection; does not start model work',
     handler: async (_args, ctx) => {
       await client.flush(true);
       const storage = client.spool ? `; persisted=${client.spool.records.length}; bytes=${client.spool.bytes}; recovered=${client.spool.recovered}; quarantined=${client.spool.quarantined}` : '';
       const error = client.persistenceError ? `; ${client.persistenceError}` : '';
-      ctx.ui?.notify?.(`Agent Desk: ${client.status}; queued=${client.queue.length}; dropped=${client.dropped}${storage}${error}${client.lastError && client.status !== 'connected' ? `; ${client.lastError}` : ''}`, client.status === 'connected' && !client.persistenceError && !client.dropped ? 'info' : 'warning');
+      ctx.ui?.notify?.(`PiScope: ${client.status}; queued=${client.queue.length}; dropped=${client.dropped}${storage}${error}${client.lastError && client.status !== 'connected' ? `; ${client.lastError}` : ''}`, client.status === 'connected' && !client.persistenceError && !client.dropped ? 'info' : 'warning');
     }
   });
   pi.registerCommand('dashboard-evidence', {
@@ -161,7 +161,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
         ctx.ui?.notify?.(`JUnit report queued: ${evidence.tests} tests; ${evidence.passed} passed, ${evidence.failures} failed, ${evidence.errors} errors, ${evidence.skipped} skipped. This imports a report; it does not execute or certify tests.`, 'info');
       } catch (error) {
         // Do not echo raw paths, XML, assertion messages or stack traces into Pi.
-        ctx.ui?.notify?.(`Agent Desk: ${error.code ? `Report could not be read (${error.code})` : redact(error.message, 300)}`, 'warning');
+        ctx.ui?.notify?.(`PiScope: ${error.code ? `Report could not be read (${error.code})` : redact(error.message, 300)}`, 'warning');
       }
     }
   });

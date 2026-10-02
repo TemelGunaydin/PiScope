@@ -1,4 +1,36 @@
-# Doğrulama kaydı
+# Verification log / Doğrulama kaydı
+
+## PiScope branding and English UI — 2026-10-02
+
+Environment: macOS, Node.js v26.5.0, installed Pi 1.0.0, system Google Chrome.
+
+- `npm run check`: **35 JavaScript modules** passed syntax checks.
+- `npm test`: **130/130 passed**, no failures or skipped tests.
+- `npm run test:pi`: Pi 1.0.0 loaded the extension and TypeBox, registered
+  commands, checked the evidence import guard, and passed offline persistence,
+  process restart, ordered recovery and HTTP delivery. **No model was called.**
+  Earlier live-model checks below used Pi 0.87.1; this check does not extend
+  those provider/subagent compatibility claims to every Pi 1.0.0 workflow.
+- `test/browser-smoke.py --network`: isolated real HTTP/SSE passed with the
+  English PiScope UI, English metadata/accessibility labels, stable name order,
+  filters and return navigation. Non-English user text stayed unchanged.
+- `test/browser-smoke.py --tailscale`: the same suite passed through a local
+  HTTPS proxy simulating Tailscale Serve, including initial unauthorized state,
+  HTTPS pairing, Secure cookie and reload persistence. Real phone-to-tailnet
+  access was not independently tested; no existing Serve route was modified.
+- Existing regressions remained green: grouped sessions, live-only overview,
+  stale activity and signal expiry, unknown subagent outcomes, per-field
+  expansion/focus under SSE, 220-character boundaries, archived summaries,
+  plan status labels, JUnit evidence and workflow comparisons.
+- Desktop/mobile screenshots were inspected. English labels fit at 1440/390 px;
+  typography, semantic status colors, keyboard focus and 200% text checks passed.
+  `docs/preview.png` was replaced with an English screenshot from the disposable
+  collector using **synthetic data**, not personal records.
+
+Visible product names and documentation changed to PiScope. Existing data
+paths, environment variables, extension locations, command names and event
+schemas remain unchanged. Historical entries below describe earlier revisions.
+
 
 ## Projelerim ve kalıcı proje hafızası — 2026-09-26
 

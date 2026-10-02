@@ -11,8 +11,8 @@ open-source GitHub repository. No npm package or hosted dashboard is required.
    project summaries, and pending queues. `.gitignore` does not remove files already tracked.
 2. Confirm [LICENSE](../LICENSE), [README](../README.md),
    [Turkish guide](../README.tr.md), and [CHANGELOG](../CHANGELOG.md) match the
-   intended release. The cover is generated artwork with a documented
-   [prompt and provenance](ARTWORK.md); the UI screenshot uses demo data.
+   intended release. The README screenshot uses synthetic test data. Historical
+   cover artwork is documented in [prompt and provenance](ARTWORK.md).
 3. Run `npm run check`, `npm test`, and `git diff --check`.
    For extension changes run `npm run test:pi`; for UI changes run the optional
    browser check described in [CONTRIBUTING.md](../CONTRIBUTING.md).
@@ -28,7 +28,7 @@ name, or dirty working tree:
 bash scripts/publish-github.sh
 ```
 
-This command creates and pushes to `agent-workflow-dashboard` under the
+This command creates and pushes to `PiScope` under the
 authenticated account. An optional first argument changes the repository name.
 Run it only when creation and upload are intended; release preparation alone
 does not run it. If an origin already exists, inspect and use the existing

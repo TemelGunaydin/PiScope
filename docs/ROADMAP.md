@@ -28,7 +28,7 @@ tutulur. Runner/commit doğrulaması yerine geçmez. [EVIDENCE.md](EVIDENCE.md).
 Arayüz açık ve sade tasarıma geçirildi; büyük metin ve açılır yürütme ayrıntıları
 masaüstü/mobil tarayıcıda doğrulandı.
 
-Proje hafızası tamamlandı: aynı projenin sekmelerini birleştiren **Projelerim**,
+Proje hafızası tamamlandı: aynı projenin sekmelerini birleştiren **My projects**,
 son istek/yanıt, bildirilen bekleyen adım, son çalışma zamanı ve 7+ gün filtresi.
 Kısa özetler ayrıntılı kayıtların saklama sınırından bağımsız korunur; arayüz
 projenin tamamlandığını veya bildirilmemiş bir sonraki görevi tahmin etmez.

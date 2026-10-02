@@ -1,4 +1,10 @@
-# Private access with Tailscale Serve
+# Follow PiScope from your phone with Tailscale
+
+Leave Pi working on your computer and follow its projects, agents and responses
+from your phone while away from home — over mobile data or another Wi-Fi network.
+Both devices must be online and connected to the same tailnet. Keep the computer
+awake, PiScope running, and the Pi session running for live work. This is remote
+viewing, not remote control or a way to submit new tasks.
 
 The collector still binds only to `127.0.0.1`. Tailscale Serve terminates HTTPS
 and forwards browser requests to that local server. Pi continues to send events
@@ -21,13 +27,16 @@ tailscale serve status
 
 Use the exact machine name shown, such as `my-mac.my-tailnet.ts.net`.
 Check existing Serve routes before changing them; do not overwrite another app.
+The hostname belongs to this machine, not to PiScope. Use a free HTTPS port per
+application. The examples use **8443** to leave apps already on **443** untouched;
+make sure 8443 is not already serving another app either.
 
 ## 2. Start the dashboard with the allowed HTTPS origin
 
 Stop the old dashboard with Ctrl+C, then:
 
 ```bash
-AGENT_DASHBOARD_TAILSCALE_ORIGIN="https://my-mac.my-tailnet.ts.net" npm start
+AGENT_DASHBOARD_TAILSCALE_ORIGIN="https://my-mac.my-tailnet.ts.net:8443" npm start
 ```
 
 Keep this terminal open. The collector prints both its local pairing link and
@@ -42,7 +51,7 @@ The environment variable must be present on each dashboard start. Running plain
 In a second terminal on the Mac:
 
 ```bash
-tailscale serve --bg --https=443 http://127.0.0.1:7331
+tailscale serve --bg --https=8443 http://127.0.0.1:7331
 tailscale serve status
 ```
 
@@ -51,8 +60,8 @@ setup link. The machine's certificate hostname can appear in public certificate
 transparency logs, but **Serve does not make the dashboard publicly accessible**.
 Access still depends on your tailnet policy and the dashboard's pairing token.
 
-If port 443 is already serving another app, use a free Serve port instead, for
-example `--https=8443` and origin `https://my-mac.my-tailnet.ts.net:8443`.
+You can use 443 if it is free: change both `--https=8443` to `--https=443` and
+the configured origin to `https://my-mac.my-tailnet.ts.net` (without `:8443`).
 If you change `PORT`, update Serve's local target port too. Root-path serving is
 supported; mounting under `/dashboard` is not.
 
@@ -61,7 +70,9 @@ supported; mounting under `/dashboard` is not.
 With Tailscale connected on that device, open the **Tailscale browser pairing**
 link printed by `npm start` in a new browser tab. The link's token fragment is
 removed after login. The browser gets a host-only, HttpOnly, SameSite=Strict,
-Secure cookie. Subsequent visits can use just the HTTPS address.
+Secure cookie. Subsequent visits can use just the HTTPS address; bookmark
+`https://my-mac.my-tailnet.ts.net:8443/` on your phone. You do not need to run
+`npm run open` before every visit.
 
 On the Mac, both commands are available:
 
@@ -79,10 +90,11 @@ dashboard running. Background Serve remains configured until you disable it.
 Stop this Serve endpoint only (do not reset unrelated routes):
 
 ```bash
-tailscale serve --https=443 off
+tailscale serve --https=8443 off
 ```
 
-Use your selected HTTPS port if different. Restart the dashboard without
+Use your selected HTTPS port if different. Direct `http://100.x.y.z:7331` access
+is not supported because the backend only listens on loopback. Restart PiScope without
 `AGENT_DASHBOARD_TAILSCALE_ORIGIN` to disable its remote-host allowlist.
 
 - **Host rejected:** configured origin and actual Serve hostname/port must match.

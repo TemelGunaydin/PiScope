@@ -26,7 +26,7 @@ Can this be reproduced with the built-in demo or a small synthetic fixture?
 - Pi version (if relevant):
 - Subagent package/version (if relevant):
 - Browser/version:
-- Agent Desk commit:
+- PiScope commit:
 
 ## Sanitized evidence
 

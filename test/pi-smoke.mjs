@@ -33,7 +33,7 @@ async function probe(online) {
     let event; try { event = JSON.parse(line); } catch { return; }
     if (event.type === 'extension_ui_request' && event.method === 'notify') {
       if (event.message === '["workflow_report"]') tools = true;
-      if (event.message.startsWith('Agent Desk:')) status = event.message;
+      if (event.message.startsWith('PiScope:')) status = event.message;
       if (event.message.includes('Finish a request in this Pi session')) evidenceGuard = true;
     }
     if (event.type !== 'response' || !event.success) return;
@@ -52,10 +52,10 @@ async function probe(online) {
   assert.ok(tools, 'workflow_report/TypeBox did not load');
   assert.ok(evidenceGuard, 'Evidence import without a completed request must be refused');
   if (online) {
-    assert.match(status, /^Agent Desk: connected; queued=0; dropped=0/);
+    assert.match(status, /^PiScope: connected; queued=0; dropped=0/);
     assert.match(status, /recovered=2(?:;|$)/);
   } else {
-    assert.match(status, /^Agent Desk: disconnected; queued=1; dropped=0/);
+    assert.match(status, /^PiScope: disconnected; queued=1; dropped=0/);
     assert.match(status, /persisted=1(?:;|$)/);
   }
 }

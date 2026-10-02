@@ -1,55 +1,54 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="light"><title>Agent Desk · Yerel Workflow</title>
+  <meta name="color-scheme" content="light"><meta name="description" content="PiScope: track your Pi projects, requests and agents locally or privately from your phone with Tailscale."><title>PiScope · Pi Workflow Dashboard</title>
   <link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script>
 </head>
 <body>
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="Agent Desk ana sayfa"><span class="brand-mark">a<span>•</span></span><span>agent<span class="brand-light">desk</span><small>YOUR LOCAL CONTROL ROOM</small></span></a>
-    <div class="workspace-label">ÇALIŞMA ALANI <span>01</span></div>
-    <div class="workspace-summary">Projeler <span id="project-count">0</span></div>
-    <div class="section-caption">OTURUMLAR</div>
-    <nav id="sessions" aria-label="Proje ve oturumlar"></nav>
-    <div class="sidebar-bottom"><span class="shield">◇</span><strong>Verilerin bu Mac’te.</strong><p>Model API anahtarları okunmaz.<br>Bulut senkronizasyonu yok.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Bağlanıyor</span><span class="local-tag">LOCAL</span></div></div>
+    <a class="brand" href="/" aria-label="PiScope home"><span>Pi<span class="brand-light">Scope</span></span></a>
+    <div class="workspace-summary">Projects <span id="project-count">0</span></div>
+    <div class="section-caption">SESSIONS</div>
+    <nav id="sessions" aria-label="Projects and sessions"></nav>
+    <div class="sidebar-bottom"><span class="shield">◇</span><strong>Your data stays on this machine.</strong><p>No model API keys are read.<br>No cloud synchronization.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Connecting</span><span class="local-tag">LOCAL</span></div></div>
   </aside>
   <main>
-    <header class="topbar"><div class="workspace-location"><button id="back-to-projects" class="button hidden" type="button">← Projelere dön</button><span id="project-name">Projelerim</span></div><div class="top-actions"><span class="version">v0.1.0</span><a class="button subtle" id="export" href="/api/export">Geçmişi dışa aktar ↗</a></div></header>
+    <header class="topbar"><div class="workspace-location"><button id="back-to-projects" class="button hidden" type="button">← Back to projects</button><span id="project-name">My projects</span></div><div class="top-actions"><span class="version">v0.1.0</span><a class="button subtle" id="export" href="/api/export">Export history ↗</a></div></header>
     <div class="content">
-      <div id="pairing" class="notice hidden"><strong>Bu tarayıcı henüz eşleşmedi.</strong><p><code>npm start</code> çıktısındaki özel bağlantıyı aç veya <code>npm run open</code> çalıştır. Bu bağlantıyı paylaşma.</p></div>
+      <div id="pairing" class="notice hidden"><strong>This browser is not paired yet.</strong><p>Open the private pairing link printed by <code>npm start</code>, or run <code>npm run open</code> on the dashboard machine. For Tailscale access, use its separate HTTPS pairing link. Do not share these links.</p></div>
       <div id="storage-warning" class="notice hidden"></div>
       <section id="project-overview" aria-labelledby="overview-heading">
-        <div class="page-heading"><div><h1 id="overview-heading" tabindex="-1">Nerede kalmıştım?</h1><p>Projelerin, son çalışmaların ve devam edilecek işler.</p></div></div>
-        <div id="project-totals" class="metrics" aria-label="Proje özeti"></div>
-        <div class="project-filters"><div><label for="project-search">Projelerde ara</label><input id="project-search" type="search" placeholder="Proje, istek veya sonraki adım…"></div><div><label for="project-filter">Durum</label><select id="project-filter"><option value="">Tüm projeler</option><option value="running">Çalışıyor</option><option value="waiting">Bekleyen iş</option><option value="attention">İlgilenilmeli</option><option value="finished">Son istek bitti</option><option value="cancelled">İptal</option><option value="unknown">Sonuç bilinmiyor</option><option value="stale">7+ gündür dokunulmadı</option></select></div></div>
+        <div class="page-heading"><div><h1 id="overview-heading" tabindex="-1">Where did I leave off?</h1><p>Your Pi projects, recent work and next steps.</p></div></div>
+        <div id="project-totals" class="metrics" aria-label="Project overview"></div>
+        <div class="project-filters"><div><label for="project-search">Search projects</label><input id="project-search" type="search" placeholder="Project, request or next step…"></div><div><label for="project-filter">Status</label><select id="project-filter"><option value="">All projects</option><option value="running">Running</option><option value="waiting">Unfinished work</option><option value="attention">Needs attention</option><option value="finished">Last request finished</option><option value="cancelled">Cancelled</option><option value="unknown">Outcome unknown</option><option value="stale">Inactive for 7+ days</option></select></div></div>
         <p id="project-results" class="project-results" role="status"></p>
         <div id="project-list" class="project-list"></div>
-        <p class="project-scope">Durum ve bekleyen adım, son isteğin kayıtlarına dayanır. “Son istek bitti” projenin tamamlandığı anlamına gelmez. Yalnızca izleme eklentisiyle kaydedilen projeler görünür.</p>
+        <p class="project-scope">Status and plan steps come from the latest request's records. “Last request finished” does not mean the project is complete. Only projects recorded by the Pi monitoring extension appear.</p>
       </section>
       <div id="workspace-details" class="hidden">
-      <section class="page-heading"><div><div class="eyebrow">GÖRÜNÜR İŞ AKIŞI</div><h1 id="detail-heading" tabindex="-1">Workflow takibi</h1><p>İstekler, modeller ve test sonuçları.</p></div><div class="run-select-wrap"><label for="run-select">İstek geçmişi</label><select id="run-select"><option>Henüz istek yok</option></select></div></section>
-      <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>İlk Pi sinyalini bekliyor.</h2><p>Dashboard’u açık tut. Projene izleme eklentisini yükle ve Pi’de bir görev başlat.</p><code>npm run install:pi -- /tam/yol/projen</code><p class="small">Ardından Pi’de <code>/reload</code> ve <code>/dashboard-status</code> kullan.</p></section>
+      <section class="page-heading"><div><div class="eyebrow">OBSERVED WORKFLOW</div><h1 id="detail-heading" tabindex="-1">Workflow tracking</h1><p>Requests, models and test reports.</p></div><div class="run-select-wrap"><label for="run-select">Request history</label><select id="run-select"><option>No requests yet</option></select></div></section>
+      <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>Waiting for the first Pi signal.</h2><p>Keep PiScope running. Install the monitoring extension in your project and start a task in Pi.</p><code>npm run install:pi -- /absolute/path/to/your/project</code><p class="small">Then use <code>/reload</code> and <code>/dashboard-status</code> in Pi.</p></section>
       <div id="run-content" class="hidden">
-        <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">AKTİF İSTEK</span><span id="run-status" class="badge">Bekliyor</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div></section>
-        <section class="metrics" aria-label="Özet"><article><span class="metric-label">Gözlenen araçlar</span><strong id="metric-tools">0</strong><small>Ana oturum + alt agent kayıtları</small></article><article><span class="metric-label">Alt agent görevleri</span><strong id="metric-agents">0</strong><small>Ayrı çağrılar, ayrı sonuçlar</small></article><article><span class="metric-label">Bildirilen token</span><strong id="metric-tokens">—</strong><small>Fatura veya ücret hesabı değildir</small></article><article><span class="metric-label">İstek süresi</span><strong id="metric-duration">—</strong><small id="duration-label">Duvar saati süresi</small></article></section>
-        <section class="panel workflow-panel"><div class="panel-header"><div><h2>Görev akışı</h2><p>Agent’ın bildirdiği plan · otomatik doğrulama değildir</p></div><span class="tag">BİLDİRİLEN</span></div><div id="stages" class="stages"></div><p id="stage-reason" class="stage-reason"></p></section>
-        <section class="model-area"><div class="section-heading"><h2>Çalışan ekip</h2><span>Model kimlikleri Pi olaylarından alınır</span></div><div id="models" class="model-grid"></div></section>
-        <section class="panel comparison-panel" aria-labelledby="evidence-heading"><div class="panel-header"><div><h2 id="evidence-heading">Test raporları</h2><p>Seçili isteğe eklenen JUnit sonuçları · testler dashboard tarafından çalıştırılmaz</p></div><span class="tag">RAPORDAN</span></div><div id="test-evidence" class="perf-body"></div></section>
-        <section class="panel comparison-panel" aria-labelledby="comparison-heading"><div class="panel-header"><div><h2 id="comparison-heading">Workflow karşılaştırması</h2><p>Profil sürümü ve gözlenen modeller · seçili projenin kayıtları</p></div><div class="comparison-filter"><label for="workflow-task-set">Görev kümesi</label><select id="workflow-task-set"><option value="">Tüm kayıtlar</option></select></div></div><div id="workflow-comparison" class="perf-body"></div></section>
-        <details class="execution-details"><summary>Yürütme ayrıntıları ve proje geçmişi</summary>
+        <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">SELECTED REQUEST</span><span id="run-status" class="badge">Waiting</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div></section>
+        <section class="metrics" aria-label="Request overview"><article><span class="metric-label">Observed tools</span><strong id="metric-tools">0</strong><small>Main session + subagent records</small></article><article><span class="metric-label">Subagent tasks</span><strong id="metric-agents">0</strong><small>Separate calls, separate outcomes</small></article><article><span class="metric-label">Reported tokens</span><strong id="metric-tokens">—</strong><small>Not a bill or cost estimate</small></article><article><span class="metric-label">Request duration</span><strong id="metric-duration">—</strong><small id="duration-label">Wall-clock duration</small></article></section>
+        <section class="panel workflow-panel"><div class="panel-header"><div><h2>Task workflow</h2><p>Agent-reported plan · not automatic verification</p></div><span class="tag">REPORTED</span></div><div id="stages" class="stages"></div><p id="stage-reason" class="stage-reason"></p></section>
+        <section class="model-area"><div class="section-heading"><h2>Working team</h2><span>Model identities come from Pi events</span></div><div id="models" class="model-grid"></div></section>
+        <section class="panel comparison-panel" aria-labelledby="evidence-heading"><div class="panel-header"><div><h2 id="evidence-heading">Test reports</h2><p>JUnit results attached to this request · PiScope does not run tests</p></div><span class="tag">FROM REPORT</span></div><div id="test-evidence" class="perf-body"></div></section>
+        <section class="panel comparison-panel" aria-labelledby="comparison-heading"><div class="panel-header"><div><h2 id="comparison-heading">Workflow comparison</h2><p>Profile versions and observed models · selected project's records</p></div><div class="comparison-filter"><label for="workflow-task-set">Task set</label><select id="workflow-task-set"><option value="">All records</option></select></div></div><div id="workflow-comparison" class="perf-body"></div></section>
+        <details class="execution-details"><summary>Execution details and project history</summary>
         <section class="measure-grid">
-          <section class="panel"><div class="panel-header"><div><h2>Yürütme performansı</h2><p>Yalnızca gözlenen olaylar · bildirim ve yanıtlar doğrulama değildir</p></div><span class="tag">GÖZLENEN</span></div><div id="perf" class="perf-body"></div></section>
-          <section class="panel"><div class="panel-header"><div><h2>Proje yürütme geçmişi</h2><p>Seçili proje · son kayıtlı istekler</p></div><span class="tag">GÖZLENEN</span></div><div id="history" class="perf-body"></div></section>
+          <section class="panel"><div class="panel-header"><div><h2>Execution performance</h2><p>Observed events only · reports and responses are not verification</p></div><span class="tag">OBSERVED</span></div><div id="perf" class="perf-body"></div></section>
+          <section class="panel"><div class="panel-header"><div><h2>Project execution history</h2><p>Selected project · retained requests</p></div><span class="tag">OBSERVED</span></div><div id="history" class="perf-body"></div></section>
         </section>
         </details>
         <div class="detail-grid">
-          <section class="panel timeline-panel"><div class="panel-header"><div><h2>Aktivite akışı</h2><p>Araçlar, devirler ve sonuçlar</p></div><input id="event-search" type="search" aria-label="Olaylarda ara" placeholder="Olaylarda ara…"></div><div id="timeline" class="timeline" aria-live="off"></div></section>
-          <div class="right-column"><section class="panel next-panel"><div class="panel-header"><h2>Sıradaki görev</h2><span class="tag">PLAN</span></div><div id="next-task"></div></section><section class="panel"><div class="panel-header"><h2>Son yanıt</h2><span class="tag">METİN</span></div><p id="summary" class="summary"></p></section><section class="privacy-note"><span>◎</span><p>“Araç bitti” başarılı test anlamına gelmez. Gelecek görevler yalnızca workflow bildirildiğinde görünür. Gizli model düşünceleri toplanmaz.</p></section></div>
+          <section class="panel timeline-panel"><div class="panel-header"><div><h2>Activity feed</h2><p>Tools, handoffs and outcomes</p></div><input id="event-search" type="search" aria-label="Search events" placeholder="Search events…"></div><div id="timeline" class="timeline" aria-live="off"></div></section>
+          <div class="right-column"><section class="panel next-panel"><div class="panel-header"><h2>Next planned task</h2><span class="tag">PLAN</span></div><div id="next-task"></div></section><section class="panel"><div class="panel-header"><h2>Last response</h2><span class="tag">TEXT</span></div><p id="summary" class="summary"></p></section><section class="privacy-note"><span>◎</span><p>A finished tool does not mean tests passed. Next steps appear only when a workflow is reported. Private model reasoning is not collected.</p></section></div>
         </div>
       </div>
       </div>
-      <footer><span>AGENT DESK</span><span>Yerel kayıt · SSE canlı akış · Pi izleme eklentisi</span><span id="last-update">Henüz veri yok</span></footer>
+      <footer><span>PISCOPE</span><span>Local records · Live SSE updates · Pi monitoring extension</span><span id="last-update">No data yet</span></footer>
     </div>
   </main>
 </body>
