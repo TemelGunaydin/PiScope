@@ -197,8 +197,16 @@ paydası bu özetlerden hesaplanmaz. [Proje hafızası](PROJECTS.md).
 | `/api/state` GET | Güncel bounded görünüm | Bearer veya cookie |
 | `/api/export` GET | Görünümü JSON indir | Bearer veya cookie |
 
-Sunucu başka host’a bind edilemez; bu sürüm reverse proxy, Tailscale paylaşımı,
-çok kullanıcılı erişim veya uzaktan yönetim için tasarlanmadı.
+Sunucu başka host’a bind edilemez. İsteğe bağlı
+`AGENT_DASHBOARD_TAILSCALE_ORIGIN=https://machine.tailnet.ts.net` ile yalnızca
+bu HTTPS host/port çifti de kabul edilir. Tailscale Serve TLS'i sonlandırır ve
+Host'u koruyarak loopback'e iletir. Origin, isteğin izinli host'una ait olmalıdır;
+X-Forwarded-* başlıkları yeni bir host'a izin vermez. Proxy başlıklarıyla gelen
+loopback Host istekleri reddedilir. Tailscale eşleştirme çerezi ayrıca Secure'dür.
+Uzak origin'de olay POST'u kapalıdır; Pi `connection.json.url` üzerinden yerelde
+kalır. Tarayıcı için ayrı `tailscaleUrl` saklanır. Varsayılan davranış yereldir.
+[Kurulum ve güven sınırları](TAILSCALE.md). Genel reverse proxy, Funnel, çok
+kullanıcılı erişim veya uzaktan yönetim desteği yoktur.
 
 ## İncelenen birincil referanslar
 

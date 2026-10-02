@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { EventStore } from './store.mjs';
 import { equalSecret, cookieValue } from './security.mjs';
 import { validateEvent } from './events.mjs';
+import { parseTailscaleOrigin } from './config.mjs';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -38,10 +39,11 @@ async function body(req) {
   catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
 }
 
-export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 }) {
+export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000, tailscaleOrigin }) {
   if (!token || token.length < 24) throw new Error('A strong local access token is required');
+  const remoteOrigin = parseTailscaleOrigin(tailscaleOrigin);
   const store = new EventStore(dataDir, { maxBytes });
-  const clients = new Set(); let updateTimer; let origins = new Set();
+  const clients = new Set(); let updateTimer; let origins = new Map();
   function sendSnapshot(client) {
     if (client.destroyed) return;
     // Disconnect slow consumers rather than accumulating unbounded buffers.
@@ -59,9 +61,16 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', CSP);
     try {
-      const requestOrigin = `http://${req.headers.host}`;
-      if (!origins.has(requestOrigin)) return json(res, 403, { error: 'Host rejected' });
-      if (req.headers.origin && !origins.has(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      // Serve preserves Host. Never trust X-Forwarded-* to authorize a host or TLS.
+      const requestOrigin = origins.get(req.headers.host?.toLowerCase());
+      if (!requestOrigin) return json(res, 403, { error: 'Host rejected' });
+      if (req.headers.origin && req.headers.origin !== requestOrigin) return json(res, 403, { error: 'Origin rejected' });
+      const remote = requestOrigin === remoteOrigin;
+      // Serve adds forwarding headers. A proxied caller must not select the
+      // local-only ingestion path by spoofing a loopback Host. Headers can deny
+      // access here, but never grant it or expand the host allowlist.
+      const forwarded = ['forwarded', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto'].some(name => req.headers[name] !== undefined);
+      if (forwarded && !remote) return json(res, 403, { error: 'Proxy requests require the configured Tailscale host' });
       const url = new URL(req.url, requestOrigin);
       if (url.pathname === '/health' && req.method === 'GET') return json(res, 200, { ok: true, version: '0.1.0' });
       if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
@@ -73,8 +82,8 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 
       if (url.pathname === '/api/login' && req.method === 'POST') {
         const input = await body(req);
         if (!equalSecret(input?.token, token)) return json(res, 401, { error: 'Invalid token' });
-        // HTTP is intentionally loopback-only. SameSite+Origin checks restrict browser cross-site access.
-        res.setHeader('Set-Cookie', `agentdesk=${token}; HttpOnly; SameSite=Strict; Path=/`);
+        // Only the explicitly configured Serve origin receives a Secure cookie.
+        res.setHeader('Set-Cookie', `agentdesk=${token}; HttpOnly; SameSite=Strict; Path=/${remote ? '; Secure' : ''}`);
         return json(res, 200, { ok: true });
       }
       const headerToken = (req.headers.authorization || '').replace(/^Bearer /, '');
@@ -86,6 +95,7 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 
         return json(res, 200, store.snapshot());
       }
       if (url.pathname === '/api/events' && req.method === 'POST') {
+        if (remote) return json(res, 403, { error: 'Event ingestion is local-only' });
         if (!authorizedHeader) return json(res, 403, { error: 'Ingestion requires a bearer token' });
         const input = await body(req); const batch = Array.isArray(input) ? input : [input];
         if (!batch.length || batch.length > 40) return json(res, 400, { error: 'Expected 1–40 events' });
@@ -117,7 +127,12 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000 
     async listen(port = 7331) {
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); }); });
       const actualPort = server.address().port;
-      origins = new Set([`http://127.0.0.1:${actualPort}`, `http://localhost:${actualPort}`]);
+      origins = new Map(['127.0.0.1', 'localhost'].map(host => [`${host}:${actualPort}`, `http://${host}:${actualPort}`]));
+      if (remoteOrigin) {
+        const remote = new URL(remoteOrigin);
+        origins.set(remote.host, remoteOrigin);
+        if (!remote.port) origins.set(`${remote.hostname}:443`, remoteOrigin);
+      }
       return `http://127.0.0.1:${actualPort}`;
     },
     async close() {

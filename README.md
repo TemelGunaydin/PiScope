@@ -36,13 +36,15 @@ npm run open
 ```
 
 The server listens only on `127.0.0.1:7331`. Treat the pairing URL as a secret.
-To explore without a model or Pi session:
+Optional private HTTPS access from your other devices is available through
+[Tailscale Serve](docs/TAILSCALE.md); local startup and Pi ingestion stay unchanged.
+The dashboard opens directly to your recorded projects; there is no mode selector.
+Cards and sessions stay in project-name order during live updates. In a request's
+detail view, **← Projelere dön** returns to your filters and scroll position.
+Synthetic demo records are excluded from the UI.
 
-```bash
-npm run demo -- --fast
-```
-
-Select **Demo** in the dashboard. Synthetic events are separate from live data.
+For an isolated browser test without Pi or model calls, see
+[verification instructions](docs/VERIFICATION.md#tekrar-çalıştırma).
 
 ## Connect a Pi project
 

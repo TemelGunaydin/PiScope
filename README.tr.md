@@ -50,6 +50,26 @@ npm run open
 Bu komut tarayıcıyı açar. Sunucu ilk terminalde açık kalmalı. Standart adresi
 sonraki ziyaretlerinde eşleştirme çereziyle kullanabilirsin.
 
+## Tailscale ile başka cihazdan erişim
+
+Yerel kullanım değişmez. Tailscale üzerinden erişim için mevcut sunucuyu durdurup
+kendi Mac'inin Tailscale adıyla başlat:
+
+```bash
+AGENT_DASHBOARD_TAILSCALE_ORIGIN="https://mac-adin.tailnet-adin.ts.net" npm start
+```
+
+İkinci terminalde (başka Serve uygulamasının 443 portunu kullanmadığını kontrol et):
+
+```bash
+tailscale serve --bg --https=443 http://127.0.0.1:7331
+```
+
+Diğer cihazda Tailscale açıkken terminaldeki **Tailscale browser pairing**
+bağlantısını yeni sekmede aç. Mac'te `npm run open -- --tailscale` de kullanılabilir.
+Eşleştirme bağlantısını paylaşma. Bu özel tailnet erişimidir; **Funnel kullanma**.
+[Kurulum, kapatma ve sorun giderme](docs/TAILSCALE.md).
+
 ## Pi projesine bağla
 
 İkinci terminalde, yine dashboard klasöründen:
@@ -118,9 +138,11 @@ anlamına gelmez. Bekleyen adım yalnızca bildirilen plandan alınır; tahmin
 edilmez. Güncel Pi sinyali kesilince çalışıyor rozeti kaldırılır. Heartbeat veya
 boşta bir sekmeyi yeniden açmak son çalışma tarihini yenilemez.
 
-**Son isteğe git** ile ayrıntılara, soldaki **Projelerim** ile listeye dön.
-Ayrıntılı olaylar saklama sınırından düşse de **Kayıtlı özeti oku** erişilebilir
-kalır. Canlı ve demo için ayrı ayrı en fazla **500 proje özeti** saklanır.
+**Son isteğe git** ile ayrıntılara, **← Projelere dön** ile listeye dön.
+Son istek ve son yanıt kartta doğrudan okunur. Yalnızca 220 karakteri aşan
+metnin altında **Devamını göster** çıkar; metni aynı yerde açar, **Daha az göster**
+ile kısaltır. Ayrıntılı olaylar saklama sınırından düşse de kayıtlı metinler
+kartta okunabilir kalır. Canlı ve demo için ayrı ayrı en fazla **500 proje özeti** saklanır.
 Yalnızca Pi izleme eklentisinin kaydettiği projeler görünür; diskteki bütün
 projeler veya diğer araçlardaki sekmeler otomatik taranmaz.
 [Saklama ve durum kuralları](docs/PROJECTS.md).
@@ -201,7 +223,7 @@ başlatmada korunur. Kapsamı yürütme kanıtıdır; kalite doğrulaması deği
   (oturum başına en fazla 30 istek; journal rotasyonu eskilerini düşürebilir).
   Oran tanımı açıktır: **payda = sonuçlanmış istekler (tamamlanan + hata +
   iptal)**; sonuçsuz istekler paydada ve başarıda yer almaz. Demo verileri
-  canlı toplamdan hariçtir; Demo sekmesi kendi örnek toplamını gösterir.
+  canlı toplamdan ve arayüzden hariçtir.
 - Sınırlar: görev doğrulama ve maliyet/ücret hesabı yapılmaz. JUnit raporları
   aşağıdaki ayrı akışla içe aktarılır; teknik tamamlanma oranını değiştirmez.
 
@@ -234,8 +256,12 @@ Komut test çalıştırmaz; yalnızca seçilen raporu okur. Eski ve proje dış�
 raporlar reddedilir. Kullanım, desteklenen XML yapısı ve güven sınırları:
 [EVIDENCE.md](docs/EVIDENCE.md).
 
-Web arayüzü açık temalıdır; ana metin 16 px, yardımcı metinler en az 14 px'tir.
+Web arayüzü açık temalıdır; ana metin 18 px, yardımcı metinler en az 16 px'tir.
 Görev akışı ve çalışan modeller önde, yürütme ayrıntıları açılır bölümde kalır.
+Panel doğrudan kayıtlı projeleri açar; Canlı/Demo seçimi gerekmez. Projeler ve
+oturumlar proje adına göre sıralanır; yeni olaylar kartları öne taşımaz.
+**Son isteğe git** ile açılan detaydan **← Projelere dön** düğmesiyle geri
+gelebilirsin; arama/durum filtresi ve listedeki kaydırma konumu korunur.
 
 ## Farklı sağlayıcılar ve yerel modeller
 
@@ -245,22 +271,19 @@ alt agent olaylarından alır; sağlayıcı yönlendirmesini değiştirmez. Baş
 cihazdaki yerel modeli kullanıyorsan o cihaza ayrıca dashboard kurman gerekmez.
 Mevcut Pi workflow’unun API/abonelik kullanımı normal şekilde devam eder.
 
-## Demo
+## İzole arayüz testi
 
-Sunucu açıkken ikinci terminalde:
-
-```bash
-npm run demo
-```
-
-Tarayıcıda **Demo** sekmesine geç. Varsayılan Canlı görünümü örnek verilerle
-doldurulmaz. Demo bir model çağırmaz, repository dosyalarına dokunmaz.
+Python Playwright ve Chromium kuruluysa, Pi veya model çağırmadan test et:
 
 ```bash
-npm run demo -- --hold     # DeepSeek inceleme aşamasında bırak
-npm run demo -- --error    # Başarısız uygulama / engellenen inceleme örneği
-npm run demo -- --fast     # Bekleme olmadan örnek olay gönder
+python test/browser-smoke.py --network
 ```
+
+Test kendi geçici sunucusunu ve sentetik kayıtlarını oluşturur; çalışan
+sunucuna veya gerçek proje geçmişine dokunmaz. Ayrıntılar:
+[doğrulama rehberi](docs/VERIFICATION.md#tekrar-çalıştırma).
+`npm run demo` geliştirici testleri için örnek olay üretmeye devam eder;
+bu kayıtlar normal panelde gösterilmez.
 
 ## Günlük kullanım ve kayıtlar
 
@@ -315,8 +338,12 @@ Pi’ye ver. Kayıt dizinini Git deposunun içine koyma.
 
 ### Gizlilik
 
-Sunucu yalnızca IPv4 loopback’e bağlıdır; başka cihazlardan erişim kapalıdır.
-Host/Origin kontrolleri, bearer anahtarlı olay alımı, HttpOnly/SameSite çerezi,
+Sunucu yalnızca IPv4 loopback’e bağlıdır. Başka cihazlardan erişim varsayılan
+olarak kapalıdır; açıkça yapılandırılan Tailscale Serve HTTPS adresi üzerinden
+özel tailnet erişimi kullanılabilir. Bu, çok kullanıcılı yetkilendirme değildir;
+eşleşmiş tarayıcı tüm kayıtları okuyabilir. Pi olay alımı yerelde kalır.
+Host/Origin kontrolleri, bearer anahtarlı olay alımı, HttpOnly/SameSite çerezi
+(Tailscale adresinde ayrıca Secure),
 sıkı Content Security Policy ve payload limitleri vardır. İçerik HTML olarak
 yürütülmez, metin olarak gösterilir. Dış CDN/telemetri kullanılmaz.
 

@@ -403,24 +403,21 @@ npm run check
 npm test
 ```
 
-Demo ve UI:
-
-```bash
-npm start
-# ikinci terminal:
-npm run demo -- --hold
-npm run open
-```
-
-Headless UI kontrolü isteğe bağlıdır; Python Playwright ve Chromium gerektirir:
+Headless UI kontrolü isteğe bağlıdır; Python Playwright ve Chromium gerektirir.
+Sunucuyu veya demoyu elle başlatmak gerekmez; test kendi geçici collector'ını açar:
 
 ```bash
 python test/browser-smoke.py
 # Gerçek tarayıcı HTTP/SSE ve karşılaştırma güncellemeleri:
 python test/browser-smoke.py --network
+# Yerel HTTPS proxy ile Tailscale Serve benzetimi (openssl de gerekir):
+python test/browser-smoke.py --tailscale
 ```
 
 Python testi varsayılan olarak fixture replay kullanır. `--network` ile ana
 sayfa gerçek HTTP/SSE üzerinden doğrulanır; ayrı regresyon sayfası fixture
-replay kullanmaya devam eder. İzole bir demo sunucusunda çalıştır; bu mod
-aynı demo projesine iki sentetik karşılaştırma varyantı ekler.
+replay kullanmaya devam eder. `test/browser-fixture.mjs` rastgele portta,
+geçici kayıt dizininde çalışır ve test bitince kapanır; kullanıcının dashboard
+ayarlarını veya kayıtlarını kullanmaz. Sentetik canlı kayıtlarla birlikte demo
+kayıtları da üretilir; demoların arayüzde görünmediği doğrulanır. Geri dönüşte
+filtre/odak/kaydırma korunması ve SSE güncellemelerinde sabit sıralama test edilir.

@@ -11,8 +11,8 @@ export function event(type = 'run.started', data = {}, overrides = {}) {
 export function directory(t) {
   const dir = mkdtempSync(join(tmpdir(), 'agent-desk-test-')); t.after(() => rmSync(dir, { recursive: true, force: true })); return dir;
 }
-export async function fixture(t) {
-  const dir = mkdtempSync(join(tmpdir(), 'agent-desk-test-')); const app = createDashboard({ dataDir: dir, token });
+export async function fixture(t, options = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'agent-desk-test-')); const app = createDashboard({ ...options, dataDir: dir, token });
   t.after(async () => { try { await app.close(); } finally { rmSync(dir, { recursive: true, force: true }); } });
   const url = await app.listen(0);
   const request = (path, options = {}) => fetch(url + path, { ...options, headers: { Authorization: `Bearer ${token}`, ...options.headers } });

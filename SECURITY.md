@@ -16,8 +16,15 @@ publicly while arranging that channel. No response-time guarantee is offered.
 
 ## Trust boundaries
 
-- The collector binds only to IPv4 loopback. It is not designed for public
-  hosting, reverse proxies, remote sharing, or multiple untrusted users.
+- The collector binds only to IPv4 loopback. Optional private HTTPS viewing
+  through Tailscale Serve requires an explicitly configured, exact `.ts.net`
+  origin. No wildcard hosts or automatic proxy-header trust are used. Event
+  ingestion stays local; the Serve origin only permits authenticated viewing
+  and export. See [Tailscale setup](docs/TAILSCALE.md).
+- Tailscale is an additional network boundary, not per-user authorization.
+  A paired browser can read all retained projects. Restrict tailnet access with
+  grants/ACLs; never use Funnel. General-purpose reverse proxies, public hosting
+  and multiple untrusted users are not supported.
 - The bearer token and pairing URL grant access to local records. Same-user
   OS processes may read the files; this is not an OS security sandbox.
 - Safe-field projection and redaction reduce collected information, but do

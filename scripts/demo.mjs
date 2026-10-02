@@ -61,4 +61,4 @@ if (!hold || fail) {
   await send('run.ended', { outcome: fail ? 'error' : 'idle', summary: fail ? 'Demo: İş başarısız senaryoyla durduruldu.' : 'Demo akışı tamamlandı. Gerçek görev, kod değişikliği veya model API çağrısı yapılmadı.' });
   await send('run.settled');
 }
-console.log('Simulated events sent. Open the dashboard and select Demo. No model was called.');
+console.log('Simulated events sent for collector testing (hidden from the live dashboard). No model was called.');

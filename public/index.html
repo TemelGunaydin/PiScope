@@ -9,17 +9,15 @@
   <aside class="sidebar">
     <a class="brand" href="/" aria-label="Agent Desk ana sayfa"><span class="brand-mark">a<span>•</span></span><span>agent<span class="brand-light">desk</span><small>YOUR LOCAL CONTROL ROOM</small></span></a>
     <div class="workspace-label">ÇALIŞMA ALANI <span>01</span></div>
-    <div class="mode-switch" role="group" aria-label="Veri kaynağı"><button id="live-mode" class="selected" type="button">Canlı</button><button id="demo-mode" type="button">Demo</button></div>
-    <button id="overview-button" class="overview-button active" type="button" aria-pressed="true">Projelerim <span id="project-count">0</span></button>
-    <div class="section-caption">SON OTURUMLAR</div>
+    <div class="workspace-summary">Projeler <span id="project-count">0</span></div>
+    <div class="section-caption">OTURUMLAR</div>
     <nav id="sessions" aria-label="Proje ve oturumlar"></nav>
     <div class="sidebar-bottom"><span class="shield">◇</span><strong>Verilerin bu Mac’te.</strong><p>Model API anahtarları okunmaz.<br>Bulut senkronizasyonu yok.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Bağlanıyor</span><span class="local-tag">LOCAL</span></div></div>
   </aside>
   <main>
-    <header class="topbar"><div><span class="crumb">Workspace</span><span class="slash">/</span><span id="project-name">Pi oturumları</span></div><div class="top-actions"><span class="version">v0.1.0</span><a class="button subtle" id="export" href="/api/export">Geçmişi dışa aktar ↗</a></div></header>
+    <header class="topbar"><div class="workspace-location"><button id="back-to-projects" class="button hidden" type="button">← Projelere dön</button><span id="project-name">Projelerim</span></div><div class="top-actions"><span class="version">v0.1.0</span><a class="button subtle" id="export" href="/api/export">Geçmişi dışa aktar ↗</a></div></header>
     <div class="content">
       <div id="pairing" class="notice hidden"><strong>Bu tarayıcı henüz eşleşmedi.</strong><p><code>npm start</code> çıktısındaki özel bağlantıyı aç veya <code>npm run open</code> çalıştır. Bu bağlantıyı paylaşma.</p></div>
-      <div id="demo-banner" class="notice demo-banner hidden">DEMO MODU <span>Aşağıdaki olaylar simülasyondur. Hiçbir model çağrılmadı veya proje değiştirilmedi.</span></div>
       <div id="storage-warning" class="notice hidden"></div>
       <section id="project-overview" aria-labelledby="overview-heading">
         <div class="page-heading"><div><h1 id="overview-heading" tabindex="-1">Nerede kalmıştım?</h1><p>Projelerin, son çalışmaların ve devam edilecek işler.</p></div></div>
@@ -31,7 +29,7 @@
       </section>
       <div id="workspace-details" class="hidden">
       <section class="page-heading"><div><div class="eyebrow">GÖRÜNÜR İŞ AKIŞI</div><h1 id="detail-heading" tabindex="-1">Workflow takibi</h1><p>İstekler, modeller ve test sonuçları.</p></div><div class="run-select-wrap"><label for="run-select">İstek geçmişi</label><select id="run-select"><option>Henüz istek yok</option></select></div></section>
-      <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>İlk Pi sinyalini bekliyor.</h2><p>Dashboard’u açık tut. Projene izleme eklentisini yükle ve Pi’de bir görev başlat.</p><code>npm run install:pi -- /tam/yol/projen</code><p class="small">Ardından Pi’de <code>/reload</code> ve <code>/dashboard-status</code> kullan.<br>Arayüzü denemek için başka terminalde <code>npm run demo</code> çalıştırıp Demo sekmesini seç.</p></section>
+      <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>İlk Pi sinyalini bekliyor.</h2><p>Dashboard’u açık tut. Projene izleme eklentisini yükle ve Pi’de bir görev başlat.</p><code>npm run install:pi -- /tam/yol/projen</code><p class="small">Ardından Pi’de <code>/reload</code> ve <code>/dashboard-status</code> kullan.</p></section>
       <div id="run-content" class="hidden">
         <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">AKTİF İSTEK</span><span id="run-status" class="badge">Bekliyor</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div></section>
         <section class="metrics" aria-label="Özet"><article><span class="metric-label">Gözlenen araçlar</span><strong id="metric-tools">0</strong><small>Ana oturum + alt agent kayıtları</small></article><article><span class="metric-label">Alt agent görevleri</span><strong id="metric-agents">0</strong><small>Ayrı çağrılar, ayrı sonuçlar</small></article><article><span class="metric-label">Bildirilen token</span><strong id="metric-tokens">—</strong><small>Fatura veya ücret hesabı değildir</small></article><article><span class="metric-label">İstek süresi</span><strong id="metric-duration">—</strong><small id="duration-label">Duvar saati süresi</small></article></section>

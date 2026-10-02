@@ -5,10 +5,17 @@ on?” using recorded Pi events, without model calls or a new task runner.
 
 Each project has one card with its last work time, latest request excerpt,
 latest visible response excerpt, and first unfinished reported stage. Cards
-are ordered by last work time. Search covers the saved name, request, response,
-and next step. A status filter includes projects untouched for at least seven
-days. **Kayıtlı özeti oku** expands the saved text; **Son isteğe git** opens the
-source request if it is still retained. The sidebar also lists recent sessions.
+are ordered by project name (Turkish locale, with project ID as a tie-breaker),
+so activity updates do not move them. Search covers the saved name, request,
+response, and next step. A status filter includes projects untouched for at
+least seven days. Request and response text are shown directly on the card.
+Only fields longer than 220 characters have **Devamını göster** underneath;
+it expands that field in place, without a duplicate summary. **Daha az göster**
+collapses it again. Each field keeps its expansion state across live updates.
+**Son isteğe git** opens the source request if it is still retained. **← Projelere dön** restores
+the overview's filters, scroll position, and focus on the originating card when
+it is still visible. The sidebar lists sessions by project name and session ID.
+The UI only shows live records; there is no Live/Demo or overview selector.
 
 ## Identity and scope
 
@@ -42,9 +49,11 @@ and monitor warnings do not refresh it.
 
 Active work takes precedence; otherwise the table is evaluated from cancellation
 downwards. Pending, running, blocked, and error stages count as unfinished.
-The displayed next step is the first such stage in plan order. It is an agent
-report, not an inferred next action or manual “paused” setting. A cancelled
-request can still show the plan it left behind.
+The displayed step is the first such stage in plan order. Its label distinguishes
+**Plan: Devam eden adım** (running), **Plan: Sıradaki adım** (pending),
+**Plan: Engellenen adım** (blocked), and **Plan: Hata bildirilen adım** (error).
+This is an agent report, not proof of current execution, an inferred next action,
+or a manual “paused” setting. A cancelled request can still show the plan it left behind.
 
 The browser expires working badges without requiring a new SSE snapshot.
 Restarted collectors do not treat historical sessions as currently connected.
