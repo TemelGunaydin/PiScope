@@ -3,6 +3,7 @@ Regression fixtures replay separately. No models or user dashboard data are used
 """
 import atexit
 import argparse
+import base64
 import copy
 import json
 import os
@@ -84,7 +85,9 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     html = (root / 'public/index.html').read_text().replace(
         '<link rel="stylesheet" href="/style.css">', '<style>' + (root / 'public/style.css').read_text() + '</style>'
-    ).replace('<script type="module" src="/app.js"></script>', '')
+    ).replace('<script type="module" src="/app.js"></script>', '').replace(
+        'src="/icon-64.png"', 'src="data:image/png;base64,' + base64.b64encode((root / 'public/icon-64.png').read_bytes()).decode() + '"'
+    )
     # Deliberately stub only browser transport. Never disguise this as network E2E.
     def replay(target, data):
         target.set_content(html)
@@ -107,6 +110,12 @@ with sync_playwright() as pw:
     assert page.locator('html').get_attribute('lang') == 'en'
     expect(page).to_have_title('PiScope · Pi Workflow Dashboard')
     expect(page.get_by_role('link', name='PiScope home')).to_be_visible()
+    expect(page.locator('.brand-icon')).to_be_visible()
+    expect(page.locator('.brand-icon')).to_have_js_property('naturalWidth', 64)
+    expect(page.locator('.brand-icon')).to_have_js_property('naturalHeight', 64)
+    expect(page.locator('.brand-icon')).to_have_attribute('alt', '')
+    expect(page.locator('link[rel="icon"]')).to_have_attribute('href', '/favicon.ico')
+    expect(page.locator('link[rel="apple-touch-icon"]')).to_have_attribute('href', '/apple-touch-icon.png')
     expect(page.locator('#overview-heading')).to_have_text('Where did I leave off?')
     expect(page.locator('#project-filter option[value="running"]')).to_have_text('Running')
     # Built-in UI copy is English; recorded user text is never translated.

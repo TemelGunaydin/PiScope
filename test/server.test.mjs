@@ -11,6 +11,38 @@ test('server listens on loopback; static HTML contains no access token', async t
   assert.ok(!(await response.text()).includes(token));
   assert.match(response.headers.get('content-security-policy'), /script-src 'self'/);
 });
+test('branding assets are public, typed, and keep Host/Origin and private-file boundaries', async t => {
+  const f = await fixture(t);
+  for (const [path, type, size] of [
+    ['/icon.png', 'image/png', 1024], ['/icon-64.png', 'image/png', 64],
+    ['/apple-touch-icon.png', 'image/png', 180], ['/favicon.ico', 'image/x-icon']
+  ]) {
+    const response = await fetch(f.url + path); // Pairing is not required for public branding.
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), type);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.deepEqual(bytes, readFileSync(new URL(`../public${path}`, import.meta.url)));
+    if (size) {
+      assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+      assert.equal(bytes.readUInt32BE(16), size); assert.equal(bytes.readUInt32BE(20), size);
+    } else {
+      assert.deepEqual([...bytes.subarray(0, 4)], [0, 0, 1, 0]);
+      assert.equal(bytes.readUInt16LE(4), 3);
+      assert.deepEqual([6, 22, 38].map(offset => bytes[offset]), [48, 32, 16]);
+    }
+    assert.equal((await fetch(f.url + path, { headers: { Origin: 'https://evil.example' } })).status, 403);
+    const { request } = await import('node:http');
+    const code = await new Promise(resolve => {
+      const req = request(f.url + path, { headers: { Host: 'evil.example' } }, res => { res.resume(); resolve(res.statusCode); });
+      req.end();
+    });
+    assert.equal(code, 403);
+  }
+  for (const path of ['/icon.json', '/auth.token', '/connection.json', '/src/config.mjs']) {
+    assert.equal((await f.request(path)).status, 404);
+  }
+});
 test('private state and stream require authentication', async t => {
   const f = await fixture(t);
   for (const path of ['/api/state', '/api/events', '/api/export']) assert.equal((await fetch(f.url + path)).status, 401);

@@ -9,7 +9,11 @@ import { parseTailscaleOrigin } from './config.mjs';
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
-  ['/style.css', ['style.css', 'text/css; charset=utf-8']]
+  ['/style.css', ['style.css', 'text/css; charset=utf-8']],
+  ['/icon.png', ['icon.png', 'image/png']],
+  ['/icon-64.png', ['icon-64.png', 'image/png']],
+  ['/apple-touch-icon.png', ['apple-touch-icon.png', 'image/png']],
+  ['/favicon.ico', ['favicon.ico', 'image/x-icon']]
 ]);
 const publicDir = new URL('../public/', import.meta.url);
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
@@ -73,7 +77,6 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
       if (forwarded && !remote) return json(res, 403, { error: 'Proxy requests require the configured Tailscale host' });
       const url = new URL(req.url, requestOrigin);
       if (url.pathname === '/health' && req.method === 'GET') return json(res, 200, { ok: true, version: '0.1.0' });
-      if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
       if (assets.has(url.pathname) && req.method === 'GET') {
         const [name, contentType] = assets.get(url.pathname);
         res.writeHead(200, { 'Content-Type': contentType });

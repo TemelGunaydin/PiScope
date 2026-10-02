@@ -1,5 +1,23 @@
 # Verification log / Doğrulama kaydı
 
+## PiScope app icon — 2026-10-02
+
+- Generated an original icon with `imagegen` / `gpt-image-2`. Normalized the
+  master to 1024 px and derived 64 px sidebar, 180 px Apple touch, and
+  16/32/48 px favicon assets. Files are metadata-stripped; the tool's local-path
+  sidecar is not tracked. [Artwork and prompt](ARTWORK.md).
+- `npm run check`: **35 modules** passed syntax checks.
+- `npm test`: **131/131 passed**. The new regression checks exact asset bytes,
+  MIME types, PNG/ICO dimensions, public availability and unchanged Host/Origin
+  restrictions. Private files and non-allowlisted paths remain inaccessible.
+- Isolated browser suites passed for real HTTP/SSE and a simulated Tailscale
+  Serve HTTPS proxy. The sidebar icon loaded at its expected size, favicon and
+  touch-icon links matched, and previous navigation/accessibility/layout checks
+  stayed green. Existing Serve routes and personal history were untouched.
+- Inspected the dashboard screenshot and small icon variants; refreshed
+  `docs/preview.png` using synthetic fixture data. No Pi extension or model
+  configuration was changed, and no model-based Pi integration test was needed.
+
 ## PiScope branding and English UI — 2026-10-02
 
 Environment: macOS, Node.js v26.5.0, installed Pi 1.0.0, system Google Chrome.

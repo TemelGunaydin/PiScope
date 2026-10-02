@@ -1,3 +1,5 @@
+<img src="public/icon.png" width="88" height="88" alt="PiScope icon">
+
 # PiScope
 
 [English](README.md) · Türkçe kurulum rehberi

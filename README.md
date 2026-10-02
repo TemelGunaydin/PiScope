@@ -1,3 +1,5 @@
+<img src="public/icon.png" width="88" height="88" alt="PiScope icon">
+
 # PiScope
 
 **Your Pi projects, at a glance — anywhere.**

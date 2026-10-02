@@ -6,6 +6,7 @@ Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
 - PiScope name and English UI, with Pi-specific onboarding and an updated screenshot.
+- Original PiScope icon in the sidebar and READMEs, with favicon and Apple touch variants.
 - Local, authenticated Pi workflow dashboard with a light, readable interface.
 - Model-independent profiles and comparisons by version, task set, and role.
 - Explicit execution outcomes, reported token use, and bounded retained history.

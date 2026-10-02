@@ -46,6 +46,7 @@ input::placeholder { color: var(--subtle); opacity: 1; }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 264px; padding: 32px 24px; background: #17263e; color: #f3f7ff; display: flex; flex-direction: column; gap: 24px; }
 .sidebar :focus-visible { outline-color: #a9c9ff; }
 .brand { display: flex; align-items: center; gap: 8px; font-size: 1.75rem; font-weight: 650; letter-spacing: -.04em; }
+.brand-icon { display: block; width: 36px; height: 36px; flex-shrink: 0; border-radius: 8px; }
 .brand-light { font-weight: 400; color: #bdd1f2; }
 .brand-mark, .brand small, .workspace-label, .tag { display: none; }
 .section-caption { display: flex; justify-content: space-between; color: #b9c9df; font-size: var(--small); }
