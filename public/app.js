@@ -1,7 +1,8 @@
+import { initializeControls, renderControls } from './control.js';
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
-let overviewScrollY = 0, returnProjectId = '';
+let overviewScrollY = 0, returnProjectId = '', followSubmission;
 const labels = { running: 'Running', starting: 'Request sent', pending: 'Waiting', idle: 'Response finished', done: 'Done', error: 'Error', blocked: 'Blocked', cancelled: 'Cancelled', unknown: 'Outcome unknown' };
 const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
 const count = n => new Intl.NumberFormat('en-US', { notation: n > 99999 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
@@ -349,6 +350,7 @@ function renderEvidence(r) {
 }
 function updateDuration() {
   const { s, r } = selected(); if (!s || !r) return;
+  renderControls(s, r, snapshot.control);
   const fresh = s.connected && Date.now() - Date.parse(s.lastSeen) < 30000;
   $('freshness').textContent = fresh ? '● Pi signal is current' : `○ Pi signal stale / offline · ${time(s.lastSeen)}`;
   if (!fresh && r.status === 'running') $('run-status').textContent = 'Disconnected · last state: running';
@@ -357,6 +359,10 @@ function updateDuration() {
   $('duration-label').textContent = !fresh && !r.endedAt ? 'At last signal; outcome unknown' : 'Wall-clock duration';
 }
 function render() {
+  if (followSubmission && sessionId === followSubmission.sessionId) {
+    const latest = snapshot.sessions.find(s => s.id === sessionId)?.runs.at(-1);
+    if (latest && latest.id !== followSubmission.runId) { runId = latest.id; followSubmission = undefined; }
+  }
   const { s, r } = selected(); renderSidebar();
   $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview);
   renderProjects();
@@ -379,7 +385,7 @@ function render() {
   const uses = Object.values(r.usage);
   $('metric-tokens').textContent = uses.length ? count(uses.reduce((sum, u) => sum + (u.input || 0) + (u.output || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0), 0)) : '—';
   $('summary').textContent = r.summary || 'No completed text response yet.';
-  renderStages(r); renderModels(s, r); renderPerf(s, r); renderHistory(s); renderEvidence(r); renderWorkflowComparison(s, r); renderTimeline(r); updateDuration();
+  renderControls(s, r, snapshot.control); renderStages(r); renderModels(s, r); renderPerf(s, r); renderHistory(s); renderEvidence(r); renderWorkflowComparison(s, r); renderTimeline(r); updateDuration();
 }
 function connect() {
   eventSource?.close();
@@ -393,20 +399,24 @@ function connect() {
 $('back-to-projects').onclick = returnToProjects;
 $('project-search').oninput = renderProjects;
 $('project-filter').onchange = renderProjects;
-$('run-select').onchange = e => { runId = e.target.value; render(); };
+$('run-select').onchange = e => { followSubmission = undefined; runId = e.target.value; render(); };
 $('event-search').oninput = () => { const { r } = selected(); if (r) renderTimeline(r); };
 $('workflow-task-set').onchange = () => { const { s, r } = selected(); if (r) renderWorkflowComparison(s, r); };
 setInterval(updateDuration, 1000);
 setInterval(renderProjects, 1000);
 async function boot() {
-  const token = new URLSearchParams(location.hash.slice(1)).get('token');
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  const controlToken = fragment.get('control-token');
+  const token = controlToken || fragment.get('token');
   if (token) {
     history.replaceState(null, '', location.pathname);
-    const response = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+    const response = await fetch(controlToken ? '/api/control/login' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
     if (!response.ok) throw new Error('Pairing failed');
   }
   const response = await fetch('/api/state');
   if (!response.ok) { $('pairing').classList.remove('hidden'); $('connection-label').textContent = 'Pairing required'; return; }
-  snapshot = await response.json(); render(); connect();
+  snapshot = await response.json();
+  await initializeControls(receipt => { followSubmission = sessionId === receipt.sessionId ? receipt : undefined; render(); });
+  render(); connect();
 }
 boot().catch(() => { $('pairing').classList.remove('hidden'); $('connection-label').textContent = 'Could not connect'; });

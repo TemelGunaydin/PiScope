@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { basename, relative, isAbsolute } from 'node:path';
 import { MonitorClient } from './client.mjs';
+import { PiControl } from './control.mjs';
 import { redact } from './privacy.mjs';
 import { readWorkflowProfile } from './workflow.mjs';
 import { readJUnitReport } from './evidence.mjs';
@@ -22,7 +23,8 @@ function usage(u) {
 /** Pi adapter separated from schema imports so its behavior is unit-testable. */
 export function registerMonitor(pi, { schema, client = new MonitorClient(), now = () => new Date(), capturePrompts = process.env.AGENT_DASHBOARD_CAPTURE_PROMPTS !== '0', readProfile = readWorkflowProfile } = {}) {
   let context; let runId; let identity; let heartbeat; let droppedReported = 0; let running = false;
-  let runStartedAt; const reportKeys = new Set();
+  let runStartedAt; let settled = true; const reportKeys = new Set();
+  const control = new PiControl(pi, client, () => ({ context, identity: context ? identify(context) : identity, runId, running, settled }));
   const toolCalls = new Map(), fingerprints = new Map();
   function identify(ctx) {
     const cwd = ctx.cwd || process.cwd();
@@ -42,7 +44,8 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     }
   });
   listen('session_start', (_e, ctx) => {
-    context = ctx; identity = identify(ctx); runId = undefined; running = false;
+    void control.stop();
+    context = ctx; identity = identify(ctx); runId = undefined; running = false; settled = true;
     runStartedAt = undefined; reportKeys.clear();
     toolCalls.clear(); fingerprints.clear(); clearInterval(heartbeat); client.start();
     emit('session.connected', { model: modelName(ctx.model) }, ctx);
@@ -54,8 +57,12 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
       }
     }, 10000); heartbeat.unref();
   });
+  listen('session_tree', (_e, ctx) => {
+    void control.stop(); context = ctx; identity = identify(ctx); runId = undefined; running = false; settled = true;
+    emit('session.connected', { model: modelName(ctx.model) }, ctx);
+  });
   listen('before_agent_start', (e, ctx) => {
-    context = ctx; identity = identify(ctx); runId = randomUUID(); running = true;
+    context = ctx; identity = identify(ctx); runId = randomUUID(); running = true; settled = false;
     runStartedAt = now().getTime(); reportKeys.clear();
     toolCalls.clear(); fingerprints.clear();
     emit('prompt.received', { prompt: capturePrompts ? redact(e.prompt, 12000) : '[Prompt capture disabled]' }, ctx);
@@ -131,11 +138,24 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     }, ctx);
     running = false;
   });
-  listen('agent_settled', (_e, ctx) => emit('run.settled', {}, ctx));
+  listen('agent_settled', (_e, ctx) => { settled = true; emit('run.settled', {}, ctx); });
   // New session/reload tears down timers. No disk/HTTP handles remain in Pi.
   pi.on('session_shutdown', async (_e, ctx) => {
     clearInterval(heartbeat); heartbeat = undefined;
+    await control.stop();
     emit('session.disconnected', {}, ctx); await client.stop();
+  });
+  pi.registerCommand('dashboard-control', {
+    description: 'Explicitly enable/disable browser prompts for this Pi session: on | off',
+    handler: async (args, ctx) => {
+      context = ctx;
+      if (args.trim() === 'on' && typeof pi.sendUserMessage === 'function' && typeof ctx.isIdle === 'function' && typeof ctx.hasPendingMessages === 'function') {
+        await client.flush(true); await control.start();
+        ctx.ui?.notify?.('PiScope control enabled for this session. A control-paired browser can submit work with your Pi permissions. Use /dashboard-control off to revoke it.', 'warning');
+      } else if (args.trim() === 'off') {
+        await control.stop(); ctx.ui?.notify?.('PiScope control disabled for this session.', 'info');
+      } else ctx.ui?.notify?.('Usage: /dashboard-control on | off. Requires Pi sendUserMessage, isIdle and hasPendingMessages support.', 'warning');
+    }
   });
   pi.registerCommand('dashboard-status', {
     description: 'Show the local PiScope connection; does not start model work',
@@ -143,7 +163,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
       await client.flush(true);
       const storage = client.spool ? `; persisted=${client.spool.records.length}; bytes=${client.spool.bytes}; recovered=${client.spool.recovered}; quarantined=${client.spool.quarantined}` : '';
       const error = client.persistenceError ? `; ${client.persistenceError}` : '';
-      ctx.ui?.notify?.(`PiScope: ${client.status}; queued=${client.queue.length}; dropped=${client.dropped}${storage}${error}${client.lastError && client.status !== 'connected' ? `; ${client.lastError}` : ''}`, client.status === 'connected' && !client.persistenceError && !client.dropped ? 'info' : 'warning');
+      ctx.ui?.notify?.(`PiScope: ${client.status}; queued=${client.queue.length}; dropped=${client.dropped}${storage}${error}${client.lastError && client.status !== 'connected' ? `; ${client.lastError}` : ''}; control=${control.enabled ? 'enabled' : 'disabled'}${control.lastError ? `; ${control.lastError}` : ''}`, client.status === 'connected' && !client.persistenceError && !client.dropped ? 'info' : 'warning');
     }
   });
   pi.registerCommand('dashboard-evidence', {
@@ -169,12 +189,12 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     name: 'workflow_report', label: 'Workflow report',
     description: 'Report the real plan/stage state to the local dashboard. Observation only: does not run code, switch models, delegate, or prove tests passed. Send the full stage list when it changes. Never include secrets.',
     promptSnippet: 'Report real task stages and upcoming work to the local dashboard.',
-    promptGuidelines: ['For multi-step work, report the full plan with workflow_report before starting and after stage transitions. Report state only; actual delegation still uses subagent. Never imply tests passed without evidence.'],
+    promptGuidelines: ['Report the full plan before multi-step work and after stage transitions. At the end of a request, also report up to five optional recommendations with stable IDs, titles and self-contained prompts. Ask for user approval; do not execute recommendations automatically. Use an empty recommendations list when none remain. Report state only; actual delegation uses existing tools. Never imply tests passed without evidence.'],
     parameters: schema,
     async execute(_id, params, _signal, _update, ctx) {
-      const recorded = emit('workflow.updated', { stages: params.stages, reason: redact(params.reason || '', 500), source: 'reported' }, ctx) !== false;
+      const recorded = emit('workflow.updated', { stages: params.stages, recommendations: capturePrompts ? params.recommendations || [] : [], reason: redact(params.reason || '', 500), source: 'reported' }, ctx) !== false;
       return { content: [{ type: 'text', text: recorded ? 'Workflow update queued for the local monitor. No work was executed.' : 'Workflow update could not be persisted. Check /dashboard-status. No work was executed.' }], details: { recorded } };
     }
   });
-  return { client };
+  return { client, control };
 }

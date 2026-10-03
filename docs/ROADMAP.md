@@ -42,10 +42,11 @@ ayrımı, çağrı bazlı süre, proje geçmişi toplamı). Sıradaki adımlar:
 - Test runner/exit-code ve commit bağlamıyla yürütme kanıtını güçlendirme; gerekirse xcresult adapter'ı.
 - Yeni Pi/alt agent sürümleri ve farklı sağlayıcı hata biçimleri için uyumluluk fixture’larını genişletme.
 - Ayrı tüm-journal dışa aktarma, arama ve saklama sınırı arayüzü.
-- Proje bazlı TODO düzenleme ve açık kullanıcı onaylı görev çalıştırma.
+- Proje bazlı TODO düzenleme (Recommended/Other ile açık, boşta Pi oturumuna
+  kullanıcı onaylı prompt gönderimi eklendi; [güven sınırı](CONTROL.md)).
 - Gerekiyorsa deterministik workflow state machine; sınırlı retry ve iptal.
 - Workflow karşılaştırmasına doğrulanabilir maliyet verisi ekleme.
 - Ayrı testlerle OpenCode/OMP adapter’ları.
 
-Görev başlatma, model routing, retry politikası ve otomatik commit gibi yazıcı
-özellikler, yalnızca izleyen bu sürümden ayrı bir güvenlik sınırı gerektirir.
+Onaylı prompt gönderimi varsayılan salt izleme davranışından ayrı, opt-in bir
+güven sınırıdır. Model routing, otomatik retry ve otomatik commit kapsam dışıdır.

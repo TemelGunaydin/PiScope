@@ -26,6 +26,10 @@ credentials, or an account.
 - Run `npm run check` and `npm test` for code changes.
 - Run `npm run test:pi` for extension-loader or command changes when Pi is
   installed. It uses isolated directories and makes no model calls.
+- For control changes, also run `npm run test:pi:control`,
+  `python3 test/control-browser.py` and `python3 test/control-browser.py --tailscale`.
+  Real Pi input is intercepted before model execution; browser tests use a mock
+  Pi adapter. No personal project or Serve configuration is changed.
 - For UI changes, install Python Playwright and Chromium in your own environment:
 
   ```bash
@@ -46,7 +50,10 @@ needs updating. State which checks you ran and any unavailable checks.
 
 ## Design boundaries
 
-- Preserve observation-only behavior: no hidden model calls or shell execution.
+- Preserve read-only defaults. Prompt control must require collector/session/
+  browser opt-in and an explicit confirmation, without hidden model calls,
+  spawned Pi processes, model switching or permission bypass. Check duplicate,
+  stale, busy, offline, revocation and uncertain-delivery paths.
 - Treat agent reports, imported reports, and observed execution as separate
   sources. Missing data is unknown, not success or zero cost.
 - Keep live and demo data separate. Keep historical identities stable when

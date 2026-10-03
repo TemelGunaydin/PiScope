@@ -4,12 +4,12 @@ import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, chmodSync, openSync, closeSync, unlinkSync } from 'node:fs';
 
 export function dataDirectory() { return resolve(process.env.AGENT_DASHBOARD_HOME || join(homedir(), '.agent-workflow-dashboard')); }
-export function ensureToken(dir) {
+export function ensureToken(dir, name = 'auth.token') {
   mkdirSync(dir, { recursive: true, mode: 0o700 }); chmodSync(dir, 0o700);
-  const file = join(dir, 'auth.token');
+  const file = join(dir, name);
   try {
     const token = readFileSync(file, 'utf8').trim();
-    if (!/^[a-f0-9]{64}$/.test(token)) throw new Error('Malformed auth.token; restore or remove it before restarting');
+    if (!/^[a-f0-9]{64}$/.test(token)) throw new Error(`Malformed ${name}; restore or remove it before restarting`);
     chmodSync(file, 0o600); return token;
   } catch (err) {
     if (err.code !== 'ENOENT') throw err;
@@ -43,8 +43,8 @@ export function parseTailscaleOrigin(value) {
       url.pathname !== '/' || url.search || url.hash) throw new Error(message);
   return url.origin;
 }
-export function saveConnection(dir, url, token, tailscaleUrl) {
+export function saveConnection(dir, url, token, tailscaleUrl, controlEnabled = false) {
   const file = join(dir, 'connection.json');
   // Pi always uses the local URL. The optional HTTPS URL is for browsers only.
-  writeFileSync(file, JSON.stringify({ url, token, tailscaleUrl: parseTailscaleOrigin(tailscaleUrl) }, null, 2) + '\n', { mode: 0o600 }); chmodSync(file, 0o600);
+  writeFileSync(file, JSON.stringify({ url, token, tailscaleUrl: parseTailscaleOrigin(tailscaleUrl), ...(controlEnabled ? { controlEnabled: true } : {}) }, null, 2) + '\n', { mode: 0o600 }); chmodSync(file, 0o600);
 }

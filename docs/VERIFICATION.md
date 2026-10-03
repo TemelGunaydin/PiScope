@@ -1,5 +1,39 @@
 # Verification log / Doğrulama kaydı
 
+## Approved Pi continuation — 2026-10-03
+
+Environment: macOS, Node.js v26.5.0, installed Pi 1.0.0, system Google Chrome.
+
+- `npm run check`: **40 JavaScript modules** passed syntax checks.
+- `npm test`: **153/153 passed**, no failures or skips. Control coverage includes
+  read-only defaults, separate private tokens, exact Origin/JSON checks, HTTPS
+  cookies, local-only polling/ingestion, current project/run targeting,
+  stale/busy/disconnected/demo rejection, exact recommendation preview binding,
+  bounded payloads/receipts, deduplication, revocation races, lost delivery,
+  retained reservations, late acknowledgements and non-replay after restart.
+- `npm run test:pi`: Pi 1.0.0 extension/TypeBox load, commands, evidence guard,
+  offline persistence, restart and HTTP recovery passed without model calls.
+- `npm run test:pi:control`: the actual installed Pi loaded the extension,
+  locally enabled control, adopted a synthetic retained terminal request,
+  received one browser-approved prompt through real `sendUserMessage`/`input`
+  despite two identical submissions, acknowledged it, and revoked access.
+  **An input hook intercepted it before any model call.** This proves delivery,
+  not paid-provider execution or universal model/workflow compatibility.
+- `test/control-browser.py` and `--tailscale`: mobile-sized Chromium passed
+  separate view/control pairing, preview/cancel/confirm, Recommended and Other,
+  duplicate-click protection, automatic new-request selection, typed-draft
+  preservation under real SSE, literal HTML-like text and older-run blocking.
+  The Pi adapter is mocked; no model is called. HTTPS uses an isolated proxy
+  with simulated Serve headers, not a real iPhone/Tailscale device test.
+- Both existing `test/browser-smoke.py --network` and `--tailscale` suites
+  passed: monitoring, English UI, original-language user content, stable order,
+  grouped projects, filtering/return focus/scroll, text expansion, evidence,
+  comparison, semantic colors, keyboard, mobile and 200% text remained intact.
+- Inspected the generated mobile approval screenshot. Tests used disposable
+  data only; no personal projects, Pi permissions/models, history, control
+  grants or existing Serve routes were changed. Activation remains explicit;
+  [control setup and limitations](CONTROL.md).
+
 ## PiScope app icon — 2026-10-02
 
 - Generated an original icon with `imagegen` / `gpt-image-2`. Normalized the

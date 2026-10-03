@@ -22,6 +22,17 @@ function usage(u) {
   return Object.fromEntries(['input', 'output', 'cacheRead', 'cacheWrite'].map(k => [k, number(u[k])]).filter(([, v]) => v !== undefined));
 }
 
+export function recommendations(value = []) {
+  if (!Array.isArray(value) || value.length > 5) throw new Error('At most five recommendations allowed');
+  const ids = new Set();
+  return value.map(r => {
+    if (!isObject(r)) throw new Error('Invalid recommendation');
+    const id = identifier(r.id, 'recommendation.id'), title = str(r.title), prompt = str(r.prompt, 4000);
+    if (ids.has(id) || !title.trim() || !prompt.trim()) throw new Error('Recommendations need distinct IDs, titles and prompts');
+    ids.add(id); return { id, title, prompt };
+  });
+}
+
 /** Strict projection: unknown/sensitive fields are dropped before disk or browser. */
 export function validateEvent(raw, now = new Date()) {
   if (!isObject(raw) || raw.schemaVersion !== 1 || !TYPES.has(raw.type)) throw new Error('Unsupported event schema/type');
@@ -58,6 +69,7 @@ export function validateEvent(raw, now = new Date()) {
       if (!statuses.has(stage.status)) throw new Error('Invalid stage status');
       return { id, title: str(stage.title), agent: str(stage.agent), model: str(stage.model, 300), status: stage.status };
     });
+    data.recommendations = recommendations(d.recommendations);
     data.source = 'reported'; // Plans are assertions, never silently promoted to observations.
   }
   return {

@@ -51,16 +51,31 @@ export class MonitorClient {
     void operation.finally(() => { if (this.generation === generation) this.inFlight = undefined; });
     return operation;
   }
+  connection() {
+    const cfg = JSON.parse(readFileSync(this.configPath, 'utf8'));
+    const url = new URL(cfg.url);
+    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Only a loopback dashboard is allowed');
+    if (!/^[a-f0-9]{64}$/.test(cfg.token)) throw new Error('Invalid dashboard token');
+    return { ...cfg, url };
+  }
+  async controlRequest(input) {
+    const cfg = this.connection();
+    if (!cfg.controlEnabled) throw new Error('Dashboard control is disabled');
+    const response = await this.fetch(new URL('/api/control/agent', cfg.url), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.token}` },
+      body: JSON.stringify(input), signal: AbortSignal.timeout(900), redirect: 'error'
+    });
+    if (!response.ok) { await response.body?.cancel(); throw new Error(`Control HTTP ${response.status}`); }
+    return response.json();
+  }
   async deliver(generation) {
     const records = this.spool.batch(this.batchLimit);
     const heartbeat = !records.length && !this.spool.records.length ? this.heartbeat : undefined;
     const batch = records.length ? records.map(r => r.event) : heartbeat ? [heartbeat] : [];
     if (!batch.length) return;
     try {
-      const cfg = JSON.parse(readFileSync(this.configPath, 'utf8'));
-      const url = new URL(cfg.url);
-      if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.username || url.password || url.pathname !== '/') throw new Error('Only a loopback dashboard is allowed');
-      if (!/^[a-f0-9]{64}$/.test(cfg.token)) throw new Error('Invalid dashboard token');
+      const cfg = this.connection();
+      const url = cfg.url;
       this.requestAbort = new AbortController();
       const timeout = Math.max(1, Math.min(900, (this.stopDeadline || Infinity) - Date.now()));
       const response = await this.fetch(new URL('/api/events', url), {

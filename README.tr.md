@@ -17,9 +17,10 @@ evden uzaktayken telefonundan aç.
 performansı değildir.*
 
 Arayüz **İngilizcedir**; proje adların, isteklerin ve yanıtların kendi dilinde
-kalır. PiScope yalnızca **izler**: model çağırmaz, model değiştirmez, görev
-başlatmaz/delege etmez, kod yazmaz ve test çalıştırmaz. Ek model aboneliği veya
-API anahtarı gerekmez; mevcut Pi kurulumunu kullanır.
+kalır. PiScope **varsayılan olarak yalnızca izler**. İsteğe bağlı onaylı kontrol,
+açık ve boşta olan Pi oturumuna prompt gönderir; Pi mevcut modeli, izinleri ve
+kotasıyla dosya değiştirebilir veya araç çalıştırabilir. PiScope doğrudan model
+çağırmaz veya model/sağlayıcı seçmez. Ek abonelik veya API anahtarı gerekmez.
 
 ## 1. PiScope’u çalıştır
 
@@ -115,8 +116,9 @@ sil ve Pi’yi reload et; kayıtlı geçmiş korunur. Eski veri/eklenti yolları
 Bilgisayarında ve telefonunda **Tailscale** kurulu, aynı tailnet’e bağlı ve açık
 olsun. Bilgisayar **uyanık, internete bağlı ve PiScope çalışıyor** olmalı; canlı
 ilerleme için Pi oturumu da çalışmaya devam etmeli. Mobil veri veya başka Wi-Fi
-üzerinden erişebilirsin. Bu yalnızca izleme içindir, telefondan yeni Pi görevi
-göndermez. Public sunucu veya router port yönlendirmesi gerekmez.
+üzerinden erişebilirsin. Normal eşleştirme yalnızca izleme içindir; görev göndermek
+için aşağıdaki ayrı kontrol izni gerekir. Public sunucu veya router port
+yönlendirmesi gerekmez.
 
 Bilgisayarın Tailscale adını ve mevcut Serve yollarını kontrol et:
 
@@ -178,6 +180,33 @@ Eşleşmiş tarayıcı bütün kayıtlı projeleri okuyabilir/dışa aktarabilir
 tailnet grants/ACL’leriyle güvenilir cihazlarla sınırla.
 [Tam rehber ve sorun giderme](docs/TAILSCALE.md).
 
+## 4. İsteğe bağlı: dashboard’dan Pi’ye iş gönder
+
+Kontrol **varsayılan olarak kapalıdır**. Açmak için:
+
+1. PiScope’u `AGENT_DASHBOARD_CONTROL=1 npm start` ile yeniden başlat.
+   Telefon kullanıyorsan mevcut `AGENT_DASHBOARD_TAILSCALE_ORIGIN` ayarını da koru.
+2. PiScope klasöründe hedef eklentiyi güncelle:
+   `npm run install:pi -- "/tam/yol/proje" --update`.
+3. Hedef projenin açık Pi oturumunda `/reload`, ardından `/dashboard-control on`.
+4. Terminaldeki ayrı **Control pairing** bağlantısını istediğin tarayıcıda aç.
+   iPhone’da yeni Safari sekmesi kullan; Mac’i eşleştirmek telefonu eşleştirmez.
+
+Son isteği aç. **Recommended → Review and start** ile agent’ın önerisini seç
+veya **Other → Review prompt** alanına kendi isteğini yaz. Proje, oturum, model
+ve tam prompt’u inceleyip **Confirm and send to Pi** ile onayla. Bu onay olmadan
+hiçbir iş başlamaz. Öneriler `workflow_report` raporudur; otomatik üretilen karar
+veya kalite kanıtı değildir. Öneri yoksa Other kullanılabilir.
+
+Kapalı, meşgul, henüz durulmamış veya eski istek hedefleri reddedilir. Çift gönderim
+koruması vardır; **unknown** teslimat otomatik tekrarlanmaz, önce Pi’yi kontrol et.
+**Submitted**, Pi girdisine iletildi demektir; işin başarıyla yapıldığı anlamına
+gelmez. Mevcut model/workflow ve Pi izinleri korunur; iş mevcut model kotasını
+kullanabilir. `/dashboard-control off` veya kontrol ayarı olmadan yeniden başlatma
+yeni gönderimleri kapatır, başlamış işi durdurmaz.
+
+[Detaylı kurulum, güvenlik, öneri şeması ve teslimat durumları](docs/CONTROL.md).
+
 ## Nerede kalmıştım?
 
 **My projects** görünümünde aynı projenin Pi sekmeleri tek kartta birleşir.
@@ -212,7 +241,7 @@ Rapor tek başına güncel kodun/test koşusunun bağımsız doğrulaması deği
 ## Veri, güvenlik ve testler
 
 Kayıtlar yerelde `~/.agent-workflow-dashboard/` içinde tutulur; cloud senkronizasyon,
-telemetri veya model çağrısı yoktur. Özel veri dizini için **hem Pi hem PiScope’ta**
+telemetri veya doğrudan model çağrısı yoktur. Onaylı devam, mevcut Pi modelini kullanır. Özel veri dizini için **hem Pi hem PiScope’ta**
 `AGENT_DASHBOARD_HOME` ayarla; repository dışında tut. Eşleştirme token’larını,
 `connection.json`, kuyrukları ve kişisel geçmişi commit etme.
 
@@ -228,7 +257,8 @@ Yalnız journal silmek bütün özetleri silmez; export sonsuz arşiv değildir.
 AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
 ```
 
-Dosya adları, model kimlikleri ve plan aşamaları kalabilir. Maskeleme bütün
+Dosya adları, model kimlikleri ve plan aşamaları kalabilir. Öneri metinleri de
+kaydedilmez; açık kontrol üzerinden onaylanan prompt yine Pi’ye iletilir. Maskeleme bütün
 sırları bulma garantisi değildir. Aynı OS kullanıcısı yerel kayıtları okuyabilir.
 Paylaşmadan önce export’u incele. [Güvenlik politikası](SECURITY.md).
 
@@ -236,10 +266,13 @@ Paylaşmadan önce export’u incele. [Güvenlik politikası](SECURITY.md).
 npm run check
 npm test
 npm run test:pi  # Kurulu Pi ile, model çağırmadan isteğe bağlı kontrol
+npm run test:pi:control  # Gerçek Pi girdisi; model çağrısından önce testte durdurulur
 
 # Python Playwright + Chromium; HTTPS testi için openssl de gerekir.
 python test/browser-smoke.py --network
 python test/browser-smoke.py --tailscale
+python test/control-browser.py
+python test/control-browser.py --tailscale
 ```
 
 Tarayıcı testleri kendi geçici sunucusunu ve sentetik kayıtlarını kullanır;

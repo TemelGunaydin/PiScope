@@ -111,7 +111,7 @@ export class EventStore {
         // the result is unknown. Known terminal statuses from run.ended survive.
         if (r.status === 'running') r.status = 'unknown';
         r.settled = true; r.endedAt ||= e.time; break;
-      case 'workflow.updated': r.stages = d.stages; r.stageReason = d.reason || ''; break;
+      case 'workflow.updated': r.stages = d.stages; r.recommendations = d.recommendations || []; r.stageReason = d.reason || ''; break;
       case 'tests.recorded': {
         r.testReports ||= Object.create(null);
         const report = d.evidence;

@@ -5,10 +5,12 @@ import { EventStore } from './store.mjs';
 import { equalSecret, cookieValue } from './security.mjs';
 import { validateEvent } from './events.mjs';
 import { parseTailscaleOrigin } from './config.mjs';
+import { ControlBroker } from './control.mjs';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/control.js', ['control.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
   ['/icon.png', ['icon.png', 'image/png']],
   ['/icon-64.png', ['icon-64.png', 'image/png']],
@@ -43,22 +45,33 @@ async function body(req) {
   catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
 }
 
-export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000, tailscaleOrigin }) {
+export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000, tailscaleOrigin, controlToken }) {
   if (!token || token.length < 24) throw new Error('A strong local access token is required');
   const remoteOrigin = parseTailscaleOrigin(tailscaleOrigin);
+  if (controlToken !== undefined && (!/^[a-f0-9]{64}$/.test(controlToken) || equalSecret(controlToken, token))) throw new Error('Control requires a separate strong token');
   const store = new EventStore(dataDir, { maxBytes });
+  const control = controlToken ? new ControlBroker(store) : undefined;
+  const snapshot = () => ({ ...store.snapshot(), control: control?.snapshot() || { enabled: false, agents: [], requests: [] } });
   const clients = new Set(); let updateTimer; let origins = new Map();
   function sendSnapshot(client) {
     if (client.destroyed) return;
     // Disconnect slow consumers rather than accumulating unbounded buffers.
     if (client.writableLength > 1024 * 1024) { client.destroy(); return; }
-    client.write(`id: ${store.sequence}\nevent: snapshot\ndata: ${JSON.stringify(store.snapshot())}\n\n`);
+    client.write(`id: ${store.sequence}\nevent: snapshot\ndata: ${JSON.stringify(snapshot())}\n\n`);
   }
   function announce() {
     if (updateTimer) return;
     updateTimer = setTimeout(() => { updateTimer = null; for (const client of clients) sendSnapshot(client); }, 180);
     updateTimer.unref();
   }
+  const controlView = () => JSON.stringify(control?.snapshot(), (key, value) => key === 'until' ? undefined : value);
+  let controlSignature = controlView();
+  function controlChanged() {
+    const next = controlView();
+    if (next !== controlSignature) { controlSignature = next; announce(); }
+  }
+  const controlTimer = control ? setInterval(controlChanged, 1000) : undefined;
+  controlTimer?.unref();
   const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -82,6 +95,14 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
         res.writeHead(200, { 'Content-Type': contentType });
         return res.end(readFileSync(new URL(name, publicDir)));
       }
+      if (url.pathname === '/api/control/login' && req.method === 'POST') {
+        if (!control || req.headers.origin !== requestOrigin) return json(res, 403, { error: 'Control is disabled or exact Origin is missing' });
+        const input = await body(req);
+        if (!equalSecret(input?.token, controlToken)) return json(res, 401, { error: 'Invalid control token' });
+        const flags = `; HttpOnly; SameSite=Strict${remote ? '; Secure' : ''}`;
+        res.setHeader('Set-Cookie', [`agentdesk=${token}; Path=/${flags}`, `piscope-control=${controlToken}; Path=/api/control${flags}`]);
+        return json(res, 200, { ok: true });
+      }
       if (url.pathname === '/api/login' && req.method === 'POST') {
         const input = await body(req);
         if (!equalSecret(input?.token, token)) return json(res, 401, { error: 'Invalid token' });
@@ -92,10 +113,20 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
       const headerToken = (req.headers.authorization || '').replace(/^Bearer /, '');
       const authorizedHeader = equalSecret(headerToken, token);
       if (!authorizedHeader && !equalSecret(cookieValue(req.headers.cookie, 'agentdesk'), token)) return json(res, 401, { error: 'Open the pairing URL printed by npm start' });
-      if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, store.snapshot());
+      if (url.pathname === '/api/control' && req.method === 'GET') return json(res, 200, { enabled: Boolean(control), canSubmit: Boolean(control && equalSecret(cookieValue(req.headers.cookie, 'piscope-control'), controlToken)) });
+      if (url.pathname === '/api/control/requests' && req.method === 'POST') {
+        if (!control || req.headers.origin !== requestOrigin || !equalSecret(cookieValue(req.headers.cookie, 'piscope-control'), controlToken)) return json(res, 403, { error: 'Pair this browser with the separate control link first' });
+        const receipt = control.submit(await body(req)); controlChanged(); return json(res, 202, receipt);
+      }
+      if (url.pathname === '/api/control/agent' && req.method === 'POST') {
+        if (!control || remote || forwarded || !authorizedHeader) return json(res, 403, { error: 'Pi control polling requires a local bearer token and control opt-in' });
+        const result = control.agent(await body(req)); controlChanged();
+        return json(res, 200, result);
+      }
+      if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, snapshot());
       if (url.pathname === '/api/export' && req.method === 'GET') {
         res.setHeader('Content-Disposition', 'attachment; filename="agent-workflow-history.json"');
-        return json(res, 200, store.snapshot());
+        return json(res, 200, snapshot());
       }
       if (url.pathname === '/api/events' && req.method === 'POST') {
         if (remote) return json(res, 403, { error: 'Event ingestion is local-only' });
@@ -126,7 +157,7 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
   });
   server.requestTimeout = 10000; server.headersTimeout = 10000;
   return {
-    server, store,
+    server, store, control,
     async listen(port = 7331) {
       await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); }); });
       const actualPort = server.address().port;
@@ -139,7 +170,7 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
       return `http://127.0.0.1:${actualPort}`;
     },
     async close() {
-      clearTimeout(updateTimer); for (const client of clients) client.destroy();
+      clearTimeout(updateTimer); clearInterval(controlTimer); for (const client of clients) client.destroy();
       server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
       store.close();

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { redact } from './security.mjs';
 import { runVerdict } from './metrics.mjs';
+import { recommendations } from '../extensions/agent-dashboard/events.mjs';
 
 export const PROJECT_LIMIT = 500;
 const keyOf = p => `${p.demo ? 'demo' : 'live'}:${p.projectId}`;
@@ -24,6 +25,7 @@ function projectRecord(raw) {
     if (!['completed', 'failed', 'cancelled', 'unknown'].includes(r.verdict) || !Array.isArray(r.stages) || r.stages.length > 20) throw new Error('Invalid project work summary');
     p.latest = { sessionId: id(r.sessionId), runId: id(r.runId), startedAt: date(r.startedAt),
       prompt: redact(r.prompt, 600), summary: redact(r.summary, 1000), verdict: r.verdict,
+      recommendations: recommendations(r.recommendations),
       stages: r.stages.map(s => {
         if (!states.has(s.status)) throw new Error('Invalid remembered stage');
         return { id: id(s.id), title: redact(s.title, 160), status: s.status };
@@ -95,6 +97,7 @@ export class ProjectMemory {
         const partialCompletion = old && !knownStart && this.partialRuns.has(run) && verdict === 'completed';
         p.latest = { sessionId: e.sessionId, runId: e.runId, startedAt: old?.startedAt || knownStart || run.startedAt,
           prompt: redact(run.prompt || old?.prompt || '', 600), summary: redact(run.summary || old?.summary || '', 1000),
+          recommendations: recommendations(run.recommendations ?? old?.recommendations),
           stages: (run.stages?.length ? run.stages : old?.stages || []).map(s => ({ id: s.id, title: redact(s.title, 160), status: s.status })),
           verdict: partialCompletion || old && !run.outcome && !['prompt.received', 'run.started', 'run.settled'].includes(e.type) && !e.type.startsWith('agent.')
             ? old.verdict : verdict };

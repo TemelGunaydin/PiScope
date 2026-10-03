@@ -107,6 +107,22 @@ select { max-width: 100%; width: 100%; min-height: 48px; background: var(--panel
 #project-totals [data-status="waiting"] { background: var(--yellow-bg); border-color: var(--yellow); }
 #project-totals [data-status="waiting"] strong { color: var(--yellow); }
 
+/* Explicit, session-bound approval controls. */
+.control-body { padding: 24px; display: grid; gap: 24px; }
+.control-body h3 { font-size: 1.25rem; }
+.control-note { color: var(--muted); font-size: var(--small); overflow-wrap: anywhere; }
+#control-recommendations { display: grid; gap: 16px; }
+.control-recommendation { padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
+.control-recommendation p, #control-review-prompt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 16px 0; }
+#control-other-form { display: grid; gap: 16px; }
+#control-other-form label { font-size: var(--small); }
+#control-other-prompt { display: block; width: 100%; min-width: 0; resize: vertical; padding: 16px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--panel); font: inherit; color: inherit; }
+#control-other-prompt:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+#control-other-form button { justify-self: start; }
+.control-review { padding: 16px; border-left: 4px solid var(--accent); background: var(--blue-bg); border-radius: 8px; }
+.control-actions { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+#control-panel { margin-bottom: 32px; }
+
 /* Project overview: status -> last request -> next action. */
 .project-filters { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; margin-bottom: 16px; }
 .project-filters input { width: 100%; min-height: 48px; border: 1px solid var(--control-line); border-radius: 8px; padding: 8px 16px; background: var(--panel); font-size: var(--body); }

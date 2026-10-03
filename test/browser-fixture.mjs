@@ -9,15 +9,19 @@ import http from 'node:http';
 import https from 'node:https';
 import { createDashboard } from '../src/server.mjs';
 import { saveConnection } from '../src/config.mjs';
+import { MonitorClient } from '../extensions/agent-dashboard/client.mjs';
+import { registerMonitor } from '../extensions/agent-dashboard/monitor.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'agentdesk-browser-'));
 const token = randomBytes(32).toString('hex');
-let app, proxy, url, tailscaleOrigin;
+const controlToken = process.argv.includes('--control') ? randomBytes(32).toString('hex') : undefined;
+let app, proxy, url, tailscaleOrigin, mockShutdown;
 let closing = false;
 async function close() {
   if (closing) return;
   closing = true;
   try {
+    await mockShutdown?.();
     if (proxy) { proxy.closeAllConnections(); await new Promise(resolve => proxy.close(resolve)); }
     await app?.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
@@ -42,9 +46,31 @@ try {
     await new Promise((resolve, reject) => { proxy.once('error', reject); proxy.listen(0, '127.0.0.1', resolve); });
     tailscaleOrigin = `https://dashboard.test-tailnet.ts.net:${proxy.address().port}`;
   }
-  app = createDashboard({ dataDir: dir, token, tailscaleOrigin });
+  app = createDashboard({ dataDir: dir, token, tailscaleOrigin, controlToken });
   url = await app.listen(0);
-  saveConnection(dir, url, token, tailscaleOrigin);
+  saveConnection(dir, url, token, tailscaleOrigin, Boolean(controlToken));
+  if (controlToken) {
+    const handlers = new Map(), commands = new Map(), tools = new Map(); let idle = true, finish;
+    const ctx = { cwd: '/synthetic/Control-Fixture', model: { provider: 'synthetic', id: 'current-model' }, isIdle: () => idle,
+      hasPendingMessages: () => false, sessionManager: { getSessionId: () => 'browser-control-fixture' }, ui: { notify() {} } };
+    const pi = { on: (n, f) => handlers.set(n, f), registerCommand: (n, c) => commands.set(n, c), registerTool: t => tools.set(t.name, t),
+      sendUserMessage(prompt) {
+        idle = false; handlers.get('before_agent_start')({ prompt }, ctx); handlers.get('agent_start')({}, ctx);
+        finish = setTimeout(async () => {
+          await tools.get('workflow_report').execute('mock-report', { stages: [{ id: 'respond', title: 'Respond', status: 'done' }], recommendations: [{ id: 'check', title: 'Check the result', prompt: 'Run the relevant tests.' }] }, undefined, undefined, ctx);
+          handlers.get('agent_end')({ messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Synthetic response; no model called.' }] }] }, ctx);
+          idle = true; handlers.get('agent_settled')({}, ctx);
+        }, 1200);
+      } };
+    const client = new MonitorClient({ configPath: join(dir, 'connection.json') });
+    registerMonitor(pi, { schema: {}, client }); handlers.get('session_start')({}, ctx);
+    handlers.get('before_agent_start')({ prompt: 'Synthetic completed request' }, ctx); handlers.get('agent_start')({}, ctx);
+    await tools.get('workflow_report').execute('mock-report', { stages: [{ id: 'respond', title: 'Respond', status: 'done' }], recommendations: [{ id: 'check', title: 'Check the result', prompt: 'Run the relevant tests.' }] }, undefined, undefined, ctx);
+    handlers.get('agent_end')({ messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Synthetic response; no model called.' }] }] }, ctx);
+    handlers.get('agent_settled')({}, ctx); await client.flush(true);
+    await commands.get('dashboard-control').handler('on', ctx);
+    mockShutdown = async () => { clearTimeout(finish); await handlers.get('session_shutdown')({}, ctx); };
+  } else {
   await promisify(execFile)(process.execPath, ['scripts/demo.mjs', '--fast', '--hold'], {
     cwd: new URL('../', import.meta.url), env: { ...process.env, AGENT_DASHBOARD_HOME: dir }
   });
@@ -56,8 +82,9 @@ try {
       projectId: `fixture-${e.projectId}`, projectName: 'Fixture Playground' };
   });
   for (const event of events) app.store.append(event);
+  }
   // Read only by the parent test process; never uses the user's access token.
-  console.log(JSON.stringify({ url, token, tailscaleUrl: tailscaleOrigin }));
+  console.log(JSON.stringify({ url, token, tailscaleUrl: tailscaleOrigin, controlToken }));
 } catch (error) {
   await close();
   throw error;

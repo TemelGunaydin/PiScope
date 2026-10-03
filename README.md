@@ -15,9 +15,11 @@ English · [Turkish setup guide](README.tr.md)
 
 *The screenshot uses synthetic data, not real prompts or measured model performance.*
 
-PiScope is a companion to Pi, not another coding agent. It **observes** your
-existing sessions: it does not call models, choose providers, delegate tasks,
-write code or run tests. No additional model subscription or API key is needed.
+PiScope is a companion to Pi, not another coding agent. It **observes by default**.
+Optional [approved continuation](docs/CONTROL.md) sends your confirmed prompt to
+an existing, idle Pi session; Pi can then edit files or run tools using its
+current model, permissions and quota. PiScope does not choose providers or call
+models directly. No additional model subscription or API key is needed.
 The dashboard UI is in English; your project names, prompts and responses stay
 in their original language.
 
@@ -31,6 +33,8 @@ in their original language.
 - **Test reports:** explicitly attached JUnit summaries, separate from execution status.
 - **Persistent history:** short project summaries survive dashboard restarts.
 - **Phone access:** private HTTPS viewing over Tailscale, including outside your home Wi-Fi.
+- **Optional continuation:** review **Recommended** suggestions or write **Other**;
+  confirm before sending to an open, idle Pi session. Separate control pairing is required.
 
 Cards stay in project-name order instead of jumping around during live updates.
 Use search and status filters, **Open last request**, and **Back to projects** to
@@ -148,8 +152,9 @@ Wi-Fi network. No public server or router port forwarding is needed.
 Install [Tailscale](https://tailscale.com) on the computer running PiScope and on
 your phone. Sign both into the same tailnet and keep Tailscale connected. The
 computer must stay **awake, online, with PiScope running**; live progress also
-requires the Pi session to keep running. Remote viewing does not control Pi or
-submit new tasks.
+requires the Pi session to keep running. The normal pairing link grants viewing
+only; [optional control](#4-optional-continue-pi-from-the-dashboard) requires a
+separate opt-in and pairing.
 
 ### Find your computer's Tailscale name
 
@@ -218,6 +223,32 @@ A paired browser can read/export **all** retained projects. Restrict access to
 trusted devices/users through your tailnet grants/ACLs. Pi ingestion remains
 local. See [full Tailscale setup and troubleshooting](docs/TAILSCALE.md).
 
+## 4. Optional: continue Pi from the dashboard
+
+Control is **off by default**, including on the phone. To enable it:
+
+1. Restart PiScope with `AGENT_DASHBOARD_CONTROL=1 npm start`. Keep your
+   `AGENT_DASHBOARD_TAILSCALE_ORIGIN` setting too if using the phone.
+2. From PiScope, update the target project's extension with
+   `npm run install:pi -- "/absolute/path/to/project" --update`.
+3. In that project's open Pi session, run `/reload`, then `/dashboard-control on`.
+4. Open the **Control pairing** link printed by PiScope in the intended browser.
+   On iPhone, open it in a new Safari tab; pairing the Mac does not pair the phone.
+
+Open the project's latest request. Choose **Recommended → Review and start**,
+or write **Other → Review prompt**. Inspect the target and exact prompt, then
+**Confirm and send to Pi**. No task starts without that click. Suggestions come
+from `workflow_report`; nothing is invented or automatically continued.
+
+Closed, busy, unsettled and old-request targets are blocked. Double submissions
+are reserved; an **unknown** receipt is never automatically retried. **Submitted**
+means sent to Pi's input, not successful execution. Existing Pi permissions and
+model/workflow configuration stay in place; work may consume model quota.
+Use `/dashboard-control off` or restart PiScope without the control setting to
+revoke new submissions. This does not abort existing Pi work.
+
+[Activation, phone pairing, recommendations, receipts and security details](docs/CONTROL.md).
+
 ## Workflow profiles and test reports
 
 To compare workflow versions, add `.pi/agent-dashboard.workflow.json` to a
@@ -242,7 +273,8 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
 ## Data and privacy
 
 - Records stay on the Pi machine in `~/.agent-workflow-dashboard/` (the retained
-  compatibility path). No cloud telemetry, external frontend CDN or model calls.
+  compatibility path). No cloud telemetry, external frontend CDN or direct model calls.
+  Opt-in approved prompts resume Pi with its existing model usage.
 - Set `AGENT_DASHBOARD_HOME` in **both Pi and PiScope** to change the data directory.
   Keep it outside the repository. Do not commit records or pairing information.
 - If the server is offline, Pi persists accepted events and retries delivery.
@@ -260,6 +292,7 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
   ```
 
   File names, model identities and reported stages may still be recorded.
+  This also omits reported recommendations; control prompts still reach Pi when approved.
 - Same-user OS processes can read local records. Tailscale is an extra network
   boundary, not per-project or multi-user authorization. Review exports before
   sharing, and keep pairing links, queues and `connection.json` private.
@@ -271,6 +304,7 @@ npm run check
 npm test
 # Optional installed-Pi integration check (no model calls):
 npm run test:pi
+npm run test:pi:control  # Real Pi input delivery, intercepted before any model call
 ```
 
 Core tests need no Pi installation, credentials or paid models. Optional browser
@@ -280,6 +314,8 @@ checks use a disposable collector, synthetic data and no personal history:
 # Requires Python Playwright + Chromium; --tailscale also requires openssl.
 python test/browser-smoke.py --network
 python test/browser-smoke.py --tailscale
+python test/control-browser.py
+python test/control-browser.py --tailscale
 ```
 
 The Tailscale test simulates an HTTPS proxy; real phone access must still be

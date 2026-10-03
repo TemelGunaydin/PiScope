@@ -11,12 +11,12 @@ function setup(t, options = {}) {
   const handlers = new Map(), tools = new Map(), commands = new Map();
   const pi = { on(name, f) { handlers.set(name, f); }, registerTool(tool) { tools.set(tool.name, tool); }, registerCommand(name, command) { commands.set(name, command); } };
   const client = { queue: [], dropped: 0, status: 'connected', enqueue(e) { this.queue.push(e); }, start() {}, async stop() {}, async flush() {} };
-  registerMonitor(pi, { schema: {}, client, ...options });
+  const monitor = registerMonitor(pi, { schema: {}, client, ...options });
   const ctx = { cwd: '/projects/swift-app', model: { provider: 'provider', id: 'sol' }, sessionManager: { getSessionId: () => 'pi-session' }, ui: { notify() {} } };
   handlers.get('session_start')({}, ctx);
   t.after(async () => handlers.get('session_shutdown')({}, ctx));
   const emit = (type, e = {}) => handlers.get(type)?.({ type, ...e }, ctx);
-  return { emit, client, ctx, tools, commands };
+  return { emit, client, ctx, tools, commands, pi, monitor };
 }
 test('Pi prompt, model, tool and shutdown events produce monitor records', t => {
   const f = setup(t); f.emit('before_agent_start', { prompt: 'Fix the test' }); f.emit('agent_start');
@@ -66,6 +66,19 @@ test('prompt capture can be explicitly disabled', t => {
   const f = setup(t, { capturePrompts: false }); f.emit('before_agent_start', { prompt: 'SENSITIVE PROMPT' });
   f.emit('message_end', { message: { role: 'assistant', content: [{ type: 'text', text: 'SENSITIVE ANSWER' }] } });
   assert.ok(!JSON.stringify(f.client.queue).includes('SENSITIVE'));
+});
+test('reported recommendations obey disabled prompt capture', async t => {
+  const f = setup(t, { capturePrompts: false }); f.emit('before_agent_start', { prompt: 'PRIVATE_PROMPT' });
+  await f.tools.get('workflow_report').execute('report', { stages: [{ id: 'a', title: 'Respond', status: 'done' }], recommendations: [{ id: 'next', title: 'PRIVATE_TITLE', prompt: 'PRIVATE_RECOMMENDATION' }] }, undefined, undefined, f.ctx);
+  assert.deepEqual(f.client.queue.find(e => e.type === 'workflow.updated').data.recommendations, []);
+  assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_'));
+});
+test('local control opt-in is revoked on session-tree navigation', async t => {
+  const f = setup(t); f.pi.sendUserMessage = () => assert.fail('No prompt is approved');
+  f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+  const advertised = []; f.client.controlRequest = async p => { advertised.push(p); return { command: null }; };
+  await f.commands.get('dashboard-control').handler('on', f.ctx); assert.equal(f.monitor.control.enabled, true);
+  f.emit('session_tree'); assert.equal(f.monitor.control.enabled, false); assert.equal(advertised.at(-1).enabled, false);
 });
 test('workflow tool reports only; it cannot spawn a model or alter code', async t => {
   const f = setup(t); f.emit('before_agent_start', { prompt: 'work' });

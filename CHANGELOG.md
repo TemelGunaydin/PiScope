@@ -5,6 +5,10 @@
 Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
+- Optional Recommended/Other continuation into existing idle Pi sessions,
+  requiring separate collector/session/browser opt-ins and explicit confirmation.
+  Exact-preview binding, duplicate/stale/busy/offline safeguards, ephemeral
+  receipts, and no automatic replay or model/workflow changes.
 - PiScope name and English UI, with Pi-specific onboarding and an updated screenshot.
 - Original PiScope icon in the sidebar and READMEs, with favicon and Apple touch variants.
 - Local, authenticated Pi workflow dashboard with a light, readable interface.

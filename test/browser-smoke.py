@@ -95,7 +95,8 @@ with sync_playwright() as pw:
             'window.fetch=async()=>new Response(JSON.stringify(fixture));'
             'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
-        target.add_script_tag(content=(root / 'public/app.js').read_text())
+        target.add_script_tag(content=(root / 'public/control.js').read_text().replace('export ', ''))
+        target.add_script_tag(content=(root / 'public/app.js').read_text().replace("import { initializeControls, renderControls } from './control.js';", ''))
     if args.network:
         browser_url = config['tailscaleUrl'] if args.tailscale else config['url']
         if args.tailscale:

@@ -4,7 +4,8 @@ Leave Pi working on your computer and follow its projects, agents and responses
 from your phone while away from home — over mobile data or another Wi-Fi network.
 Both devices must be online and connected to the same tailnet. Keep the computer
 awake, PiScope running, and the Pi session running for live work. This is remote
-viewing, not remote control or a way to submit new tasks.
+viewing **by default**. Sending a task requires the separate collector, Pi
+session and browser opt-ins described in [approved continuation](CONTROL.md).
 
 The collector still binds only to `127.0.0.1`. Tailscale Serve terminates HTTPS
 and forwards browser requests to that local server. Pi continues to send events
@@ -105,8 +106,9 @@ is not supported because the backend only listens on loopback. Restart PiScope w
   unauthenticated dashboard tab.
 - **502 / unreachable:** check `npm start`, Tailscale connection, HTTPS setup,
   Serve target port and tailnet grants/ACLs.
-- **Remote event POST rejected:** intentional. Serve is for viewing; Pi event
-  ingestion stays local. Forwarding headers cannot authorize extra hosts or
+- **Remote event POST rejected:** intentional. Pi event ingestion and control
+  polling stay local; only separately authorized browser prompt submissions
+  can be remote. Forwarding headers cannot authorize extra hosts or
   bypass the local-only ingestion boundary.
 
 ## Validation

@@ -6,7 +6,7 @@ Kod projesi / Mac
     └─ .pi/extensions/agent-dashboard/
          ├─ salt gözlem: session / prompt / model / tool / message
          ├─ pi-open-agents: structured progress / results
-         └─ workflow_report: agent’ın bildirdiği plan
+         └─ workflow_report: agent’ın bildirdiği plan / öneriler
                 │
                 ├─ safe-field projection + redaction → private disk spool
                 │
@@ -26,9 +26,30 @@ Kod projesi / Mac
 
 ## Sınırlar
 
-Dashboard bir orchestrator değildir. Kod deposuna shell çalıştırma, model
-seçme, commit/push, task başlatma veya test başlatma API’si yoktur. Bu işlemler
-Pi’de kalır. Web arayüzü yalnızca gözlem, proje özetleri, filtreleme ve dışa aktarma yapar.
+Dashboard bir orchestrator değildir; doğrudan shell, model seçme veya provider
+API’si yoktur. Varsayılan web arayüzü yalnızca gözlem ve dışa aktarma yapar.
+İsteğe bağlı kontrol, kullanıcı onaylı prompt’u mevcut Pi oturumuna iletir;
+dosya değişikliği, araçlar, model kullanımı ve izinler Pi’de kalır.
+
+## Onaylı devam sınırı
+
+`src/control.mjs` yalnız bellekte sınırlı komut/teslimat ve kısa süreli sahiplik
+lease’lerini tutar. Collector opt-in, ayrı browser kontrol token/cookie’si ve
+Pi’de `/dashboard-control on` birlikte gereklidir. Browser POST exact Origin
+ister; extension polling local bearer ile yalnız loopback’tir. İzleme token’ı
+yazma hakkı vermez. HTTPS yetkili browser gönderimi ingestion iznini genişletmez.
+
+Recommended, `workflow.updated.recommendations` raporudur; Other düz prompt’tur.
+Öneri önizlemesi birebir metne bağlanır. Güncel run, canlı bağlantı, settled/idle
+ve süreç sahibi doğrulanır. Komut bir kez claim edilir; Pi adapter’i kimlik,
+branch, idle ve pending mesajları tekrar kontrol edip `sendUserMessage` çağırır.
+Model/workflow değiştirme, Pi başlatma, steering veya otomatik tekrar yoktur.
+`submitted` yalnız girdiye teslimdir; gözlenen yürütme ayrı olaylardır.
+
+Prompt claim/expiry sonrası silinir; komut journal/spool’a yazılmaz veya yeniden
+başlatmada oynatılmaz. Belirsiz teslimat `unknown` kalır. Öneriler ise rapor
+olarak normal projection/redaction ve kalıcı proje özetlerine dahil edilir.
+[Etkinleştirme ve tam güven sınırları](CONTROL.md).
 
 Ana oturum model değişimi ile alt agent delegasyonu farklı olaylardır.
 `agent.started` istek gönderildiğini bildirir; child model ancak yapılandırılmış

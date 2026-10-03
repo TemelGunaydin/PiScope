@@ -12,6 +12,7 @@
     "demo": "node scripts/demo.mjs",
     "test": "node --test test/*.test.mjs",
     "test:pi": "node test/pi-smoke.mjs",
+    "test:pi:control": "node test/control-pi-smoke.mjs",
     "check": "node scripts/check.mjs",
     "install:pi": "node scripts/install-pi.mjs",
     "open": "node scripts/open.mjs"
