@@ -80,7 +80,8 @@ test('SSE immediately supplies a snapshot and delivers updates', async t => {
   await f.post(event('prompt.received', { prompt: 'live message' }));
   const updated = (await stream.next()).value;
   assert.equal(updated.sessions[0].runs[0].prompt, 'live message');
-  controller.abort(); await stream.return();
+  // Close the reader before aborting fetch; otherwise decoder cancellation can reject.
+  await stream.return(); controller.abort();
 });
 test('reconnected SSE includes durable latest state, not a blank session', async t => {
   const f = await fixture(t); await f.post(event('prompt.received', { prompt: 'keep me' }));
@@ -90,7 +91,7 @@ test('reconnected SSE includes durable latest state, not a blank session', async
     const stream = snapshots(response.body);
     const value = (await stream.next()).value;
     assert.equal(value.sessions[0].runs[0].prompt, 'keep me');
-    controller.abort(); await stream.return();
+    await stream.return(); controller.abort();
   }
 });
 test('SSE snapshot reader handles split UTF-8, retry frames and coalesced snapshots', async () => {
@@ -104,6 +105,23 @@ test('SSE snapshot reader handles split UTF-8, retry frames and coalesced snapsh
   assert.deepEqual((await stream.next()).value, { prompt: 'İş' });
   assert.deepEqual((await stream.next()).value, { prompt: 'updated' });
   await assert.rejects(stream.next(), /stream ended/);
+});
+test('SSE snapshot reader does not hide read or cleanup errors', async () => {
+  for (const error of [new Error('SSE connection lost'), new DOMException('Unexpected abort', 'AbortError')]) {
+    const failed = new ReadableStream({ start(controller) { controller.error(error); } });
+    await assert.rejects(snapshots(failed).next(), actual => actual === error);
+
+    let source;
+    const body = new ReadableStream({ start(controller) {
+      source = controller;
+      controller.enqueue(new TextEncoder().encode('event: snapshot\ndata: {"sessions":[]}\n\n'));
+    } });
+    const stream = snapshots(body);
+    assert.deepEqual((await stream.next()).value, { sessions: [] });
+    source.error(error);
+    await new Promise(resolve => setImmediate(resolve)); // Let the decoder receive the failure.
+    await assert.rejects(stream.return(), actual => actual === error);
+  }
 });
 test('malformed JSON, unknown paths and non-JSON ingestion fail safely', async t => {
   const f = await fixture(t);

@@ -1,5 +1,20 @@
 # Verification log / Doğrulama kaydı
 
+## CI SSE shutdown ordering — 2026-10-04
+
+- Hosted CI for `3e71799` passed on Node 22 but failed two SSE tests on
+  Node 24/26, on both Linux and macOS. Snapshot assertions passed; aborting
+  fetch before closing the decoder iterator made cleanup reject with
+  `AbortError`. Allowing abort propagation reproduced this on local Node 26.5.0.
+- Changed only test shutdown ordering: await the iterator's return before
+  aborting fetch. Added regression checks that connection errors and unexpected
+  aborts still reject during reads and cleanup; no blanket exception catch.
+  Product code, SSE assertions and the Node 22/24/26 CI matrix are unchanged.
+- Local `node --test test/server.test.mjs`: **13/13 passed**.
+  `npm test`: **161/161 passed**, no failures or skips. `npm run check`:
+  **40 modules** passed. `bash -n scripts/publish-github.sh` and
+  `git diff --check` passed. Hosted matrix results are verified separately.
+
 ## Selected response and provider errors — 2026-10-04
 
 Environment: macOS, installed Pi 1.0.2, system Google Chrome.
