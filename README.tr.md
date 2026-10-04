@@ -81,8 +81,9 @@ Pi içinde:
 
 **`PiScope: connected`** görünmeli. Normal bir görev ver; çalışma kaydedilince
 proje kartı dashboard’da belirir. Diğer projelerde tekrarla. Açık Pi oturumun
-varsa yeniden başlatmak yerine `/reload` kullanabilirsin. `/dashboard-status`
-teslimatı kontrol eder, görev başlatmaz.
+varsa `/reload` deneyebilirsin; komutlar görünmüyorsa veya eski eklenti yüklü
+kalıyorsa Pi’yi kapatıp yeniden aç. `/dashboard-status` teslimatı kontrol eder,
+görev başlatmaz.
 
 ### Plan ve sıradaki adım — isteğe bağlı
 
@@ -106,9 +107,13 @@ PiScope güncellendikten sonra kurulu projelerde:
 npm run install:pi -- "/tam/yol/proje" --update
 ```
 
-Ardından Pi’de `/reload`. Yalnız web arayüzü değiştiyse tarayıcıyı yenilemek
-yeterlidir. Kaldırmak için yalnız `.pi/extensions/agent-dashboard/` dizinini
-sil ve Pi’yi reload et; kayıtlı geçmiş korunur. Eski veri/eklenti yolları ve
+Güncellemeden sonra o projenin Pi oturumunu kapatıp yeniden aç; `/reload` tek
+başına eski modülleri yüklü tutabilir. Kontrol kullanıyorsan yeniden
+`/dashboard-control on` yaz. Collector kodu değiştiyse mevcut kontrol/Tailscale
+ayarlarını koruyarak PiScope’u da yeniden başlat. Yalnız web arayüzü değiştiyse
+tarayıcıyı yenilemek yeterlidir. Kaldırmak için yalnız
+`.pi/extensions/agent-dashboard/` dizinini sil ve Pi’yi yeniden başlat;
+kayıtlı geçmiş korunur. Eski veri/eklenti yolları ve
 `AGENT_DASHBOARD_*` değişkenleri uyumluluk için aynen kalır.
 
 ## 3. Evden uzaktayken telefonundan takip et
@@ -188,7 +193,8 @@ Kontrol **varsayılan olarak kapalıdır**. Açmak için:
    Telefon kullanıyorsan mevcut `AGENT_DASHBOARD_TAILSCALE_ORIGIN` ayarını da koru.
 2. PiScope klasöründe hedef eklentiyi güncelle:
    `npm run install:pi -- "/tam/yol/proje" --update`.
-3. Hedef projenin açık Pi oturumunda `/reload`, ardından `/dashboard-control on`.
+3. Güncel eklentinin yüklenmesi için hedef projedeki Pi’yi kapatıp yeniden aç;
+   `/dashboard-control on` ve `/dashboard-status` yaz.
 4. Terminaldeki ayrı **Control pairing** bağlantısını istediğin tarayıcıda aç.
    iPhone’da yeni Safari sekmesi kullan; Mac’i eşleştirmek telefonu eşleştirmez.
 
@@ -197,6 +203,19 @@ veya **Other → Review prompt** alanına kendi isteğini yaz. Proje, oturum, mo
 ve tam prompt’u inceleyip **Confirm and send to Pi** ile onayla. Bu onay olmadan
 hiçbir iş başlamaz. Öneriler `workflow_report` raporudur; otomatik üretilen karar
 veya kalite kanıtı değildir. Öneri yoksa Other kullanılabilir.
+
+**Continue this project** içinde, Recommended/Other alanlarının yanında seçili
+isteğin **Last model response** metni de görünür; yalnız izleme modunda da
+okunabilir. Uzun yanıt kaydırılır. İlgisiz canlı güncellemeler okuma konumunu,
+metin seçimini ve gönderilmemiş Other taslağını korur.
+
+Pi’nin bildirdiği model/sağlayıcı hataları (örneğin Codex yoğunluk hatası) ayrı
+uyarı olarak gösterilir; başarılı yanıt gibi sunulmaz. Yeni deneme veya başarılı
+yanıt güncel uyarıyı kaldırır; geçmiş hatalar activity feed’de kalır. PiScope bu
+hataları otomatik tekrar denemez veya model değiştirmez; Pi’nin kendi tekrar
+deneme ayarları geçerliliğini korur. Eski kayıtlarda yalnız genel hata bildirimi
+olabilir. Ayrıntılı hata kaydı için yukarıdaki eklenti güncellemesi ve
+Pi/PiScope yeniden başlatma adımları gerekir.
 
 Kapalı, meşgul, henüz durulmamış veya eski istek hedefleri reddedilir. Çift gönderim
 koruması vardır; **unknown** teslimat otomatik tekrarlanmaz, önce Pi’yi kontrol et.
@@ -213,6 +232,9 @@ yeni gönderimleri kapatır, başlamış işi durdurmaz.
 Son istek, son yanıt, çalışma tarihi ve bildirilen ilk bitmemiş plan adımı
 saklanır. Proje/metin araması ve durum/7+ gün filtresi vardır. Kartlar proje
 adına göre sabit sırada kalır; yeni olaylarla yer değiştirmez.
+
+Model/sağlayıcı hatası kartta hata metniyle gösterilir. Aktif istek yoksa kırmızı
+**Error** rozeti görünür; çalışma devam ediyorsa **Running** korunur.
 
 **Open last request** ayrıntıya, **← Back to projects** listeye döner;
 filtre, kaydırma ve kart odağı korunur. 220 karakterden uzun alanlar
@@ -251,15 +273,17 @@ kabul edilmişler korunur. `/dashboard-status` ile kontrol et. Ayrıntılı geç
 sınırlıdır; kısa proje özetleri daha uzun saklanır (canlı/demo başına **500**).
 Yalnız journal silmek bütün özetleri silmez; export sonsuz arşiv değildir.
 
-İstek ve yanıt metinlerini kaydetmemek için Pi’yi şöyle başlat:
+İstek, yanıt ve ayrıntılı model/sağlayıcı hata metinlerini kaydetmemek için
+Pi’yi şöyle başlat:
 
 ```bash
 AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
 ```
 
-Dosya adları, model kimlikleri ve plan aşamaları kalabilir. Öneri metinleri de
-kaydedilmez; açık kontrol üzerinden onaylanan prompt yine Pi’ye iletilir. Maskeleme bütün
-sırları bulma garantisi değildir. Aynı OS kullanıcısı yerel kayıtları okuyabilir.
+Dosya adları, model kimlikleri, plan aşamaları ve genel hata bildirimi kalabilir.
+Öneri metinleri de kaydedilmez; açık kontrol üzerinden onaylanan prompt yine
+Pi’ye iletilir. Hata metinleri sınırlanır ve maskelenir; maskeleme bütün sırları
+bulma garantisi değildir. Aynı OS kullanıcısı yerel kayıtları okuyabilir.
 Paylaşmadan önce export’u incele. [Güvenlik politikası](SECURITY.md).
 
 ```bash

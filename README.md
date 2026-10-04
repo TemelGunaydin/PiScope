@@ -27,6 +27,10 @@ in their original language.
 
 - **All your monitored Pi projects:** one card per project, even across several sessions.
 - **Recent context:** last request, last response, last work time and reported plan step.
+- **Response beside continuation:** read the selected request's **Last model response**
+  inside **Continue this project**, alongside Recommended and Other.
+- **Provider errors:** reported model/provider failures appear on project cards and
+  in a separate detail alert; inactive projects show an **Error** badge.
 - **Live work:** main model, subagent calls, tools, handoffs and activity feed.
 - **Unfinished work:** distinguish running, waiting, blocked and unknown outcomes.
 - **Workflow comparisons:** profile versions, observed models, duration and reported tokens.
@@ -110,8 +114,9 @@ In Pi:
 
 You should see **`PiScope: connected`**. Give Pi a normal task; the project will
 appear in PiScope when its work is recorded. Repeat for other projects. If you
-already have a Pi session open in the project, `/reload` is enough to load the
-new extension. `/dashboard-status` checks delivery — it does not start a task.
+already have a Pi session open in the project, try `/reload`; if the commands
+are missing or the old extension remains loaded, restart Pi.
+`/dashboard-status` checks delivery — it does not start a task.
 
 ### Optional: show the agent's plan
 
@@ -137,9 +142,12 @@ After pulling updates to PiScope:
 npm run install:pi -- "/absolute/path/to/project" --update
 ```
 
-Then `/reload` in that project's Pi session. To uninstall, remove only
-`.pi/extensions/agent-dashboard/` and reload Pi. Recorded history is kept.
+Restart that project's Pi runtime after updating: `/reload` alone may keep old
+imported modules. Re-enable `/dashboard-control on` if you use control. Restart
+PiScope when collector code changes, preserving your control/Tailscale settings.
 Web-only changes need just a browser refresh, not an extension reinstall.
+To uninstall, remove only `.pi/extensions/agent-dashboard/` and restart Pi.
+Recorded history is kept.
 Existing data and installs retain their original `agent-dashboard` paths and
 `AGENT_DASHBOARD_*` settings for compatibility with earlier versions.
 
@@ -231,7 +239,8 @@ Control is **off by default**, including on the phone. To enable it:
    `AGENT_DASHBOARD_TAILSCALE_ORIGIN` setting too if using the phone.
 2. From PiScope, update the target project's extension with
    `npm run install:pi -- "/absolute/path/to/project" --update`.
-3. In that project's open Pi session, run `/reload`, then `/dashboard-control on`.
+3. Restart Pi in that project to load the updated extension, then run
+   `/dashboard-control on` and `/dashboard-status`.
 4. Open the **Control pairing** link printed by PiScope in the intended browser.
    On iPhone, open it in a new Safari tab; pairing the Mac does not pair the phone.
 
@@ -239,6 +248,16 @@ Open the project's latest request. Choose **Recommended → Review and start**,
 or write **Other → Review prompt**. Inspect the target and exact prompt, then
 **Confirm and send to Pi**. No task starts without that click. Suggestions come
 from `workflow_report`; nothing is invented or automatically continued.
+
+The same panel shows the selected request's **Last model response**, even in
+view-only mode. Long recorded excerpts scroll; unrelated live updates preserve
+reading position, text selection and unsent Other drafts. Pi-reported errors,
+such as Codex overload, appear separately rather than as successful output.
+A new attempt or successful reply clears the current warning; historical errors
+remain in the activity feed. Active projects retain **Running**. PiScope never
+automatically retries these errors or changes models; Pi's own retry settings
+still apply. Older records may have only a generic error notice. Detailed error
+capture requires the updated project extension and Pi/collector restarts above.
 
 Closed, busy, unsettled and old-request targets are blocked. Double submissions
 are reserved; an **unknown** receipt is never automatically retried. **Submitted**
@@ -284,15 +303,17 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
   survive longer (up to **500 live projects**, separately from hidden demo data).
   Exports contain retained state, not an unlimited archive. Deleting journals
   alone does not erase project summaries. [Project memory](docs/PROJECTS.md).
-- Prompt/response excerpts can contain private information. Secret redaction is
-  not complete data-loss prevention. To omit prompt, task and response text:
+- Prompt/response excerpts and provider error messages can contain private
+  information. Error details are bounded and redacted; secret redaction is not
+  complete data-loss prevention. To omit prompt, task, response and detailed error text:
 
   ```bash
   AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
   ```
 
   File names, model identities and reported stages may still be recorded.
-  This also omits reported recommendations; control prompts still reach Pi when approved.
+  This also omits reported recommendations; generic error notices remain visible.
+  Control prompts still reach Pi when approved.
 - Same-user OS processes can read local records. Tailscale is an extra network
   boundary, not per-project or multi-user authorization. Review exports before
   sharing, and keep pairing links, queues and `connection.json` private.
