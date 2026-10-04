@@ -1,5 +1,31 @@
 # Verification log / Doğrulama kaydı
 
+## Selected response and provider errors — 2026-10-04
+
+Environment: macOS, installed Pi 1.0.2, system Google Chrome.
+
+- `npm run check`: **40 JavaScript modules** passed syntax checks.
+- `npm test`: **160/160 passed**, no failures or skips. Added provider error
+  capture/projection/redaction, disabled-capture privacy, normal replies and
+  cancellation, legacy generic notices, persistence/detail eviction, and
+  recovery without erasing historical error events.
+- `npm run test:pi` and `npm run test:pi:control`: installed Pi extension load,
+  command/TypeBox guards, persistence/recovery and real approved input delivery
+  passed. Input was intercepted before model execution; **no model called**.
+- `test/control-browser.py` over HTTP and simulated Serve HTTPS: selected-run
+  response isolation, literal HTML-like reply text, preserved selection/scroll
+  on unchanged-response SSE updates, unsent drafts, provider alert and project
+  **Error** badge, recovery and missing-text/error-detail fallback passed.
+  Inspected synthetic mobile card and error-panel screenshots.
+- Both existing `test/browser-smoke.py --network` and `--tailscale` passed;
+  monitoring, stable ordering, return navigation, expansion, evidence,
+  comparisons, keyboard/contrast and responsive/200% text checks stayed green.
+- Provider errors are synthetic fixtures, not a real paid-provider outage.
+  HTTPS is an isolated proxy, not a physical iPhone test. No personal projects,
+  installed extensions, history, models, workflow settings, grants or Serve
+  routes were changed. Updated error capture requires collector restart and
+  project extension update/Pi restart; [activation notes](CONTROL.md).
+
 ## Approved Pi continuation — 2026-10-03
 
 Environment: macOS, Node.js v26.5.0, installed Pi 1.0.0, system Google Chrome.

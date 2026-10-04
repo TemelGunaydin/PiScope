@@ -10,6 +10,14 @@ test('event projection drops credentials, code and arbitrary object fields', () 
   assert.equal(value.data.file, 'Source.swift');
   assert.equal(value.data.apiKey, undefined); assert.equal(value.data.content, undefined); assert.equal(value.data.headers, undefined);
 });
+test('provider error projection is type-bound, redacted, bounded and rejects raw objects', () => {
+  for (const type of ['message.completed', 'run.ended']) {
+    const value = validateEvent(event(type, { errorMessage: 'Codex overloaded. api_key=PRIVATE_VALUE ' + 'x'.repeat(4000), stack: 'PRIVATE_STACK' }));
+    assert.equal(value.data.errorMessage.length, 2000); assert.ok(!JSON.stringify(value).includes('PRIVATE_VALUE')); assert.equal(value.data.stack, undefined);
+    assert.equal(validateEvent(event(type, { errorMessage: { message: 'RAW_OBJECT' } })).data.errorMessage, undefined);
+  }
+  assert.equal(validateEvent(event('tool.started', { errorMessage: 'UNRELATED' })).data.errorMessage, undefined);
+});
 test('common credentials are redacted from prompt text', () => {
   const s = redact('Authorization: Bearer abcdefghijkl API_KEY=hello sk-12345678901234567890123');
   assert.ok(!s.includes('abcdefghijkl')); assert.ok(!s.includes('hello')); assert.ok(!s.includes('sk-123'));

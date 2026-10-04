@@ -78,7 +78,26 @@ separate. Restrict Tailscale access to trusted devices and people.
 
 ## Recommended and Other
 
-Open a project's **last request**. The **Continue this project** panel offers:
+Open a project's **last request**. The **Continue this project** panel shows
+**Last model response** for the selected request, updating from reported Pi
+text as it arrives. Long responses scroll without taking over the form;
+unrelated live updates preserve reading position, selection and unsent drafts. This is the
+recorded excerpt, not a guarantee of task completion or test quality.
+
+When Pi reports a model/provider error (for example, Codex overload), the
+project card shows the message and, when no request is active, an **Error**
+badge. Active projects retain **Running**. This panel shows a separate error
+alert. A new attempt or successful reply clears the current
+warning; historical error events stay in the activity feed. PiScope does not
+automatically retry or change models. Pi's own retry settings still apply.
+Error details are bounded/redacted and omitted when prompt capture is disabled.
+Older records without error details can show a generic error notice only.
+Update the project extension and restart the Pi runtime for error capture;
+`/reload` alone may keep old imported modules in some runtimes. Re-enable
+`/dashboard-control on` after restarting. Restart the collector for updated
+error projection; browser-only response display changes need just a refresh.
+
+The panel offers:
 
 - **Recommended:** up to five agent-reported suggestions. Choose **Review and
   start**, inspect the exact prompt and target project/session/model, then

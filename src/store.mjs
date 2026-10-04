@@ -96,7 +96,7 @@ export class EventStore {
     }
     switch (e.type) {
       case 'prompt.received': r.requestStartedAt ||= e.time; r.prompt = d.prompt || ''; break;
-      case 'run.started': r.requestStartedAt ||= e.time; r.observedStartedAt ||= e.time; r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.model = d.model || s.model; break;
+      case 'run.started': r.requestStartedAt ||= e.time; r.observedStartedAt ||= e.time; r.status = 'running'; delete r.endedAt; delete r.outcome; r.settled = false; r.errorMessage = ''; r.model = d.model || s.model; break;
       case 'model.selected': r.model = d.model || ''; break;
       case 'run.ended':
         // Only known terminal outcomes map to a settled status; an unrecognized
@@ -105,7 +105,11 @@ export class EventStore {
         r.status = d.outcome === 'error' ? 'error' : d.outcome === 'aborted' ? 'cancelled'
           : d.outcome === 'idle' ? 'idle' : 'unknown';
         r.outcome = d.outcome || 'unknown';
-        r.endedAt = e.time; r.summary = d.summary || r.summary; break;
+        r.endedAt = e.time; r.summary = d.summary || r.summary;
+        if (typeof d.errorMessage === 'string') r.errorMessage = d.errorMessage;
+        else if (d.outcome === 'error') r.errorMessage ||= 'Pi reported a model/provider error. No error details were recorded.';
+        else r.errorMessage = '';
+        break;
       case 'run.settled':
         // Settled without an observed run.ended outcome is not 'idle' completion:
         // the result is unknown. Known terminal statuses from run.ended survive.
@@ -125,6 +129,7 @@ export class EventStore {
         break;
       case 'message.completed':
         if (d.summary) r.summary = d.summary;
+        if (typeof d.errorMessage === 'string') r.errorMessage = d.errorMessage;
         if (d.usage) r.usage[e.id] = { model: d.model || r.model, ...d.usage };
         break;
       case 'tool.started':

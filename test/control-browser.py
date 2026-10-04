@@ -35,6 +35,8 @@ with sync_playwright() as pw:
     expect(page.locator('#connection-label')).to_have_text('Dashboard connected')
     page.locator('.project-open').click()
     expect(page.locator('#control-status')).to_contain_text('Viewing only')
+    expect(page.locator('#control-response-text')).to_have_text('Synthetic response; no model called.')
+    expect(page.locator('#control-error')).to_be_hidden()
     expect(page.locator('.control-start')).to_be_disabled()
     expect(page.locator('#control-other-prompt')).to_be_disabled()
     page.goto('about:blank')
@@ -88,10 +90,79 @@ with sync_playwright() as pw:
     expect(page.locator('#run-select option')).to_have_count(3)
     expect(page.locator('#prompt')).to_have_text(custom)
     expect(page.locator('.control-start')).to_be_enabled(timeout=10000)
+    latest_run_id = page.locator('#run-select').input_value()
     page.locator('#run-select').select_option(session['runs'][0]['id'])
     expect(page.locator('#control-status')).to_contain_text('older request')
     expect(page.locator('#control-other-prompt')).to_be_disabled()
+    expect(page.locator('#control-response-text')).to_have_text('Synthetic response; no model called.')
+    def emit(kind, data, run_id=latest_run_id):
+        payload = {**update, 'id': str(uuid.uuid4()), 'time': datetime.now(timezone.utc).isoformat(), 'type': kind, 'data': data, 'runId': run_id}
+        request = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request) as response:
+            assert response.status == 200
+    reply = 'Final reply:\nLiteral <img src=x onerror=alert(1)> output.\n' + 'The reported result is ready for your next instruction.\n' * 45
+    emit('message.completed', {'summary': reply, 'errorMessage': ''})
+    # An older selected request must not borrow the latest request's response.
+    page.wait_for_timeout(400)
+    expect(page.locator('#control-response-text')).to_have_text('Synthetic response; no model called.')
+    page.locator('#run-select').select_option(latest_run_id)
+    region = page.locator('#control-response-text')
+    expect(region).to_have_text(reply)
+    expect(page.locator('#summary')).to_have_text(reply)
+    assert page.locator('#control-panel img').count() == 0
+    page.locator('#control-other-prompt').fill('Keep this unsent draft while reading the reply.')
+    region.focus()
+    page.evaluate('''() => {
+      const box = document.getElementById('control-response-text'), range = document.createRange();
+      range.setStart(box.firstChild, 0); range.setEnd(box.firstChild, 11);
+      const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      box.scrollTop = 120; window.replyScroll = box.scrollTop; window.replyUpdates = 0;
+      new MutationObserver(() => replyUpdates++).observe(document.getElementById('last-update'), {childList:true});
+    }''')
+    emit('session.heartbeat', {})
+    page.wait_for_function('() => window.replyUpdates > 0')
+    expect(region).to_be_focused()
+    assert page.evaluate("getSelection().toString()") == 'Final reply'
+    assert region.evaluate('(box) => box.scrollTop === window.replyScroll && box.scrollTop > 0')
+    expect(page.locator('#control-other-prompt')).to_have_value('Keep this unsent draft while reading the reply.')
+    # Provider details are visible as errors, not invented successful output.
+    overload = 'Codex error: Our servers are currently overloaded. Please try again later.'
+    emit('message.completed', {'errorMessage': overload})
+    emit('run.ended', {'outcome': 'error', 'errorMessage': overload})
+    expect(page.locator('#control-error')).to_be_visible()
+    expect(page.locator('#control-error-text')).to_have_text(overload)
+    expect(region).to_have_text(reply)
+    page.locator('#back-to-projects').click()
+    card = page.locator('.project-card').first
+    expect(card.locator('.badge')).to_have_text('Error')
+    expect(card.locator('.project-error')).to_have_text(overload)
+    page.evaluate('() => window.scrollTo(0, 0)')
+    page.screenshot(path=str(output / ('https-error-card.png' if args.tailscale else 'error-card.png')), full_page=True)
+    card.locator('.project-open').click()
+    expect(page.locator('#control-error-text')).to_have_text(overload)
+    page.locator('#control-panel').screenshot(path=str(output / ('https-provider-error.png' if args.tailscale else 'provider-error.png')))
+    # A successful subsequent reply removes the current warning and Error badge.
+    emit('message.completed', {'summary': 'Recovered response.', 'errorMessage': ''})
+    expect(page.locator('#control-error')).to_be_hidden()
+    expect(region).to_have_text('Recovered response.')
+    emit('run.ended', {'outcome': 'idle', 'errorMessage': ''})
+    expect(page.locator('#control-error')).to_be_hidden()
+    expect(region).to_have_text('Recovered response.')
+    page.locator('#back-to-projects').click()
+    expect(card.locator('.badge')).to_have_text('Last request finished')
+    expect(card.locator('.project-error')).to_have_count(0)
+    card.locator('.project-open').click()
+    pending_run = 'pending-' + str(uuid.uuid4())
+    emit('prompt.received', {'prompt': 'Synthetic pending work; no model is called.'}, pending_run)
+    expect(page.locator('#run-select option')).to_have_count(4)
+    page.locator('#run-select').select_option(pending_run)
+    expect(region).to_have_text('Pi is working. Its response will appear here.')
+    expect(page.locator('#control-error')).to_be_hidden()
+    emit('run.ended', {'outcome': 'error'}, pending_run)
+    expect(page.locator('#control-error-text')).to_contain_text('No error details were recorded')
+    expect(region).to_have_text('No model response recorded for this request.')
+    page.screenshot(path=str(output / ('https-error.png' if args.tailscale else 'error.png')), full_page=True)
     assert page.evaluate('() => document.documentElement.scrollWidth <= innerWidth')
     assert not errors, errors
     browser.close()
-print('Approval UI passed: read/control separation, mobile confirmation/cancel, Recommended + Other, preserved draft under SSE, exact prompt/model/session, duplicate-click protection, current-run targeting and ' + ('simulated Serve HTTPS Secure cookies.' if args.tailscale else 'real HTTP/SSE.'))
+print('Approval UI passed: read/control separation, mobile confirmation/cancel, Recommended + Other, preserved draft under SSE, selected-request response/selection/scroll preservation, literal reply text, provider Error card/alert/recovery, exact prompt/model/session, duplicate-click protection, current-run targeting and ' + ('simulated Serve HTTPS Secure cookies.' if args.tailscale else 'real HTTP/SSE.'))

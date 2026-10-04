@@ -44,6 +44,7 @@ export function validateEvent(raw, now = new Date()) {
     if (typeof d[k] === 'string') data[k] = str(d[k], k === 'file' ? 512 : 300);
   }
   for (const k of ['prompt', 'summary', 'task', 'message']) if (typeof d[k] === 'string') data[k] = str(d[k], k === 'prompt' ? 12000 : 4000);
+  if (['message.completed', 'run.ended'].includes(raw.type) && typeof d.errorMessage === 'string') data.errorMessage = str(d.errorMessage, 2000);
   for (const k of ['elapsedMs', 'exitCode', 'dropped']) if (number(d[k]) !== undefined) data[k] = d[k];
   for (const k of ['isError', 'final']) if (typeof d[k] === 'boolean') data[k] = d[k];
   if (usage(d.usage)) data.usage = usage(d.usage);

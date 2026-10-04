@@ -17,6 +17,35 @@ const overview = s => s.snapshot().projectOverview.items;
 const weekAgo = new Date(Date.now() - 8 * 86400000).toISOString();
 const plan = status => ({ stages: [{ id: 'build', title: 'Build the overview', status }] });
 
+test('provider errors survive restart and detail eviction without replacing model replies', t => {
+  const { store, open } = setup(t);
+  store.append(event('prompt.received', { prompt: 'Synthetic task' }));
+  store.append(event('message.completed', { summary: 'Earlier recorded response', errorMessage: 'Codex overloaded. api_key=PRIVATE_VALUE' }));
+  store.append(event('run.ended', { outcome: 'error', errorMessage: 'Codex overloaded. api_key=PRIVATE_VALUE' }));
+  const run = store.snapshot().sessions[0].runs[0]; assert.match(run.errorMessage, /Codex overloaded/); assert.equal(run.summary, 'Earlier recorded response');
+  const remembered = overview(store)[0]; assert.equal(remembered.status, 'attention'); assert.ok(!remembered.latest.errorMessage.includes('PRIVATE_VALUE'));
+  store.close(); const restored = open(); assert.match(overview(restored)[0].latest.errorMessage, /Codex overloaded/);
+  restored.sessions.clear(); restored.append(event('model.selected', { model: 'fixture/model' }));
+  assert.match(overview(restored)[0].latest.errorMessage, /Codex overloaded/);
+});
+test('legacy parent errors retain a generic notice instead of looking like an empty success', t => {
+  const { store } = setup(t); store.append(event('prompt.received', { prompt: 'Legacy request' }));
+  store.append(event('run.started')); store.append(event('run.ended', { outcome: 'error' }));
+  const run = store.snapshot().sessions[0].runs[0]; assert.match(run.errorMessage, /No error details were recorded/);
+  assert.equal(overview(store)[0].latest.errorMessage, run.errorMessage);
+});
+test('a new attempt or successful reply clears current errors, while retaining error events', t => {
+  const { store } = setup(t); store.append(event('prompt.received', { prompt: 'Synthetic task' }));
+  store.append(event('run.ended', { outcome: 'error', errorMessage: 'Provider overload' }));
+  store.append(event('run.started', { model: 'fixture/model' }));
+  assert.equal(store.snapshot().sessions[0].runs[0].errorMessage, ''); assert.equal(overview(store)[0].latest.errorMessage, '');
+  store.append(event('message.completed', { errorMessage: 'Temporary error' }));
+  store.append(event('message.completed', { errorMessage: '', summary: 'Recovered response' }));
+  store.append(event('run.ended', { outcome: 'idle' }));
+  const run = store.snapshot().sessions[0].runs[0]; assert.equal(run.errorMessage, ''); assert.equal(run.summary, 'Recovered response');
+  assert.equal(overview(store)[0].latest.errorMessage, ''); assert.equal(overview(store)[0].status, 'finished');
+  assert.ok(run.events.some(e => e.data.errorMessage === 'Provider overload'));
+});
 test('project overview combines tabs, isolates demo, and expires live activity', t => {
   const { store } = setup(t);
   store.append(event('prompt.received', { prompt: 'First tab' }));

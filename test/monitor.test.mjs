@@ -34,6 +34,33 @@ test('raw command arguments, source code and thinking blocks are never collected
   const serialized = JSON.stringify(f.client.queue); for (const x of ['PRIVATE SOURCE', 'PRIVATE COMMAND', 'PRIVATE REASONING']) assert.ok(!serialized.includes(x));
   assert.ok(serialized.includes('Public summary'));
 });
+test('Pi assistant errors expose only a bounded, redacted provider message', t => {
+  const f = setup(t); f.emit('before_agent_start', { prompt: 'Synthetic work' }); f.emit('agent_start');
+  const message = { role: 'assistant', provider: 'openai-codex', model: 'fixture', stopReason: 'error', content: [],
+    errorMessage: 'Codex error: Our servers are currently overloaded. Please try again later. api_key=PRIVATE_SECRET',
+    stack: 'PRIVATE_STACK', response: { body: 'PRIVATE_BODY' } };
+  f.emit('message_end', { message }); f.emit('agent_end', { messages: [message] });
+  const observed = f.client.queue.filter(e => ['message.completed', 'run.ended'].includes(e.type));
+  for (const e of observed) { assert.match(e.data.errorMessage, /servers are currently overloaded/); assert.ok(!e.data.errorMessage.includes('PRIVATE_SECRET')); }
+  assert.equal(observed.at(-1).data.outcome, 'error');
+  assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_STACK')); assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_BODY'));
+});
+test('disabled prompt capture hides provider-echoed details but still reports an error', t => {
+  const f = setup(t, { capturePrompts: false }); f.emit('before_agent_start', { prompt: 'PRIVATE_PROMPT' });
+  const message = { role: 'assistant', stopReason: 'error', content: [], errorMessage: 'PRIVATE_PROVIDER_ECHO' };
+  f.emit('message_end', { message }); f.emit('agent_end', { messages: [message] });
+  assert.match(f.client.queue.at(-1).data.errorMessage, /Details omitted/); assert.equal(f.client.queue.at(-1).data.outcome, 'error');
+  assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_'));
+});
+test('ordinary reply text and user cancellation do not become provider errors', t => {
+  for (const stopReason of ['stop', 'aborted']) {
+    const f = setup(t); f.emit('before_agent_start', { prompt: 'Synthetic work' });
+    const message = { role: 'assistant', stopReason, errorMessage: 'NOT_A_PROVIDER_ERROR', content: [{ type: 'text', text: 'Error is discussed in this normal reply.' }] };
+    f.emit('message_end', { message }); f.emit('agent_end', { messages: [message] });
+    assert.equal(f.client.queue.at(-1).data.errorMessage, ''); assert.notEqual(f.client.queue.at(-1).data.outcome, 'error');
+    assert.ok(!JSON.stringify(f.client.queue).includes('NOT_A_PROVIDER_ERROR'));
+  }
+});
 test('pi-open-agents structured progress reveals actual child model and error', t => {
   const f = setup(t); f.emit('before_agent_start', { prompt: 'work' });
   f.emit('tool_execution_start', { toolCallId: 'child1', toolName: 'subagent', args: { agent: 'mimo', task: 'Implement' } });

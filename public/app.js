@@ -1,4 +1,4 @@
-import { initializeControls, renderControls } from './control.js';
+import { initializeControls, renderControls, modelError } from './control.js';
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
@@ -64,7 +64,7 @@ function returnToProjects() {
   window.scrollTo(0, overviewScrollY);
 }
 function appendProjectText(card, field, label, text, expanded) {
-  const paragraph = el('p', `project-text ${field === 'prompt' ? 'project-prompt' : 'project-answer'}`, text);
+  const paragraph = el('p', `project-text ${field === 'prompt' ? 'project-prompt' : field === 'error' ? 'project-error' : 'project-answer'}`, text);
   paragraph.id = `project-text-${encodeURIComponent(card.dataset.project)}-${field}`;
   paragraph.dataset.field = field; paragraph.tabIndex = -1;
   card.append(el('p', 'project-field-label', label), paragraph);
@@ -112,7 +112,9 @@ function renderProjects() {
   }
   for (const p of matches) {
     const card = el('article', 'project-card'); card.dataset.project = p.projectId; card.dataset.status = p.status;
-    const heading = el('div', 'project-card-head'), [tone, label] = projectStates[p.status] || projectStates.unknown;
+    const recorded = snapshot.sessions.find(s => s.id === p.latest?.sessionId)?.runs.find(r => r.id === p.latest.runId);
+    const error = p.latest?.errorMessage || modelError(recorded);
+    const heading = el('div', 'project-card-head'), [tone, label] = error && !p.activeSessions ? ['error', 'Error'] : projectStates[p.status] || projectStates.unknown;
     heading.append(el('h2', '', p.projectName), el('span', `badge ${tone}`, label));
     const when = el('p', 'project-when');
     if (p.lastWorkedAt) { const date = el('time', '', `${p.ago} · ${fullDate(p.lastWorkedAt)}`); date.dateTime = p.lastWorkedAt; when.append(date); }
@@ -120,6 +122,7 @@ function renderProjects() {
     if (p.activeSessions) when.append(el('span', '', ` · ${p.activeSessions} active ${p.activeSessions === 1 ? 'session' : 'sessions'}`));
     card.append(heading, when);
     appendProjectText(card, 'prompt', 'Last request', p.latest?.prompt || 'Request text not recorded.', expanded);
+    if (error) appendProjectText(card, 'error', 'Model/provider error', error, expanded);
     appendProjectText(card, 'summary', 'Last response', p.latest?.summary || 'Response summary not recorded.', expanded);
     const next = el('div', `project-next${p.nextStep ? ' has-next' : ''}`);
     const nextLabel = { running: 'Plan: Step in progress', pending: 'Plan: Next step', blocked: 'Plan: Blocked step', error: 'Plan: Step with a reported error' }[p.nextStep?.status] || 'Plan: Next step';
@@ -205,13 +208,13 @@ function eventPresentation(e) {
     'model.selected': 'Main session model changed', 'tool.started': `${d.toolName || 'Tool'} started`,
     'tool.finished': `${d.toolName || 'Tool'} ${d.isError ? 'returned an error' : 'finished'}`,
     'agent.started': `Task sent to ${d.agent || 'subagent'}`, 'agent.finished': `${d.agent || 'Subagent'} ${d.isError ? 'failed' : 'returned a result'}`,
-    'message.completed': 'Model response recorded', 'workflow.updated': 'Task plan updated', 'workflow.configured': 'Workflow profile recorded',
+    'message.completed': d.errorMessage ? 'Model/provider error reported' : 'Model response recorded', 'workflow.updated': 'Task plan updated', 'workflow.configured': 'Workflow profile recorded',
     'tests.recorded': 'JUnit test report attached',
     'run.ended': d.outcome === 'error' ? 'Main run stopped with an error' : d.outcome === 'aborted' ? 'Main run cancelled' : d.outcome === 'idle' ? 'Main model finished its response' : d.outcome ? `Main run stopped with an unknown outcome (${d.outcome})` : 'Main run stopped without an outcome',
     'run.settled': 'Pi automatic continuation ended', 'monitor.warning': 'Monitoring warning', 'session.disconnected': 'Pi session disconnected'
   }[e.type] || e.type;
   const reportDetail = e.type === 'tests.recorded' ? `${d.evidence.file} · ${d.evidence.passed} passed / ${d.evidence.failures + d.evidence.errors} failed / ${d.evidence.skipped} skipped · SHA-256 ${d.evidence.sha256.slice(0, 12)}` : '';
-  const detail = reportDetail || (e.type === 'workflow.configured' ? `${d.workflow.label} · ${d.workflow.id} @ ${d.workflow.version}` : '') || (e.type === 'agent.finished' ? [d.model, d.summary].filter(Boolean).join('\n') : '') || d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
+  const detail = d.errorMessage || reportDetail || (e.type === 'workflow.configured' ? `${d.workflow.label} · ${d.workflow.id} @ ${d.workflow.version}` : '') || (e.type === 'agent.finished' ? [d.model, d.summary].filter(Boolean).join('\n') : '') || d.file || d.task || d.reason || d.message || d.model || (['message.completed', 'run.ended'].includes(e.type) ? d.summary : '') || '';
   return { title, detail, icon: e.type.startsWith('agent.') ? '↗' : e.type === 'tool.finished' ? (d.isError ? '!' : '✓') : e.type === 'workflow.updated' ? '≡' : '·' };
 }
 function renderPerf(s, r) {

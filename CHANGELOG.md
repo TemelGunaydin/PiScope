@@ -5,6 +5,10 @@
 Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
+- Last model response inside Continue this project, with selection/scroll
+  preserved under live updates. Bounded, redacted Pi provider errors appear
+  in project Error badges, detail alerts and the activity feed; recovery clears
+  current warnings without adding retries or model changes.
 - Optional Recommended/Other continuation into existing idle Pi sessions,
   requiring separate collector/session/browser opt-ins and explicit confirmation.
   Exact-preview binding, duplicate/stale/busy/offline safeguards, ephemeral

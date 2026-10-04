@@ -2,6 +2,11 @@ const controlEl = (tag, className, text) => { const e = document.createElement(t
 const controlId = id => document.getElementById(id);
 let authorized = false, current, draft, sending = false, receipt, recommendationsKey = '';
 
+export function modelError(run) {
+  if (typeof run?.errorMessage === 'string') return run.errorMessage;
+  return run?.outcome === 'error' ? 'Pi reported a model/provider error. No error details were recorded.' : '';
+}
+
 function unavailable() {
   if (!current?.control?.enabled) return 'Control is off. Start PiScope with AGENT_DASHBOARD_CONTROL=1.';
   if (!authorized) return 'Viewing only. Open the separate control pairing link in this browser to send work.';
@@ -52,9 +57,16 @@ export function renderControls(s, r, control) {
   if (current && (current.s.id !== s.id || current.r.id !== r.id)) {
     draft = undefined; controlId('control-review').classList.add('hidden');
     controlId('control-other-prompt').value = ''; recommendationsKey = '';
+    controlId('control-response-text').scrollTop = 0;
     controlId('control-receipt').textContent = ''; if (!sending) receipt = undefined;
   }
   current = { s, r, control };
+  const response = r.summary || (r.status === 'running' ? 'Pi is working. Its response will appear here.' : 'No model response recorded for this request.');
+  const responseText = controlId('control-response-text');
+  if (responseText.textContent !== response) responseText.textContent = response;
+  const error = modelError(r), errorText = controlId('control-error-text');
+  if (errorText.textContent !== error) errorText.textContent = error;
+  controlId('control-error').classList.toggle('hidden', !error);
   const reason = unavailable();
   controlId('control-status').textContent = reason || `Ready for your approval · ${s.projectName} · ${s.model || r.model || 'current Pi model'}`;
   const key = JSON.stringify(r.recommendations || []);

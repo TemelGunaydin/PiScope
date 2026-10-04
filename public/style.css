@@ -111,6 +111,12 @@ select { max-width: 100%; width: 100%; min-height: 48px; background: var(--panel
 .control-body { padding: 24px; display: grid; gap: 24px; }
 .control-body h3 { font-size: 1.25rem; }
 .control-note { color: var(--muted); font-size: var(--small); overflow-wrap: anywhere; }
+.control-response, .control-error { padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-alt); }
+.control-response-text { margin-top: 16px; max-width: 75ch; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.control-error { background: var(--red-bg); border-left: 4px solid var(--red); }
+.control-error h3, #control-error-text { color: var(--red); }
+#control-error-text { margin: 16px 0; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.project-error { padding: 16px; border-left: 4px solid var(--red); border-radius: 8px; background: var(--red-bg); color: var(--red); white-space: pre-wrap; overflow-wrap: anywhere; }
 #control-recommendations { display: grid; gap: 16px; }
 .control-recommendation { padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
 .control-recommendation p, #control-review-prompt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 16px 0; }

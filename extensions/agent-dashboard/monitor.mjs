@@ -9,6 +9,12 @@ import { readJUnitReport } from './evidence.mjs';
 const hash = s => createHash('sha256').update(s).digest('hex').slice(0, 28);
 const textOnly = message => (Array.isArray(message?.content) ? message.content.filter(p => p.type === 'text').map(p => p.text).join('\n') : typeof message?.content === 'string' ? message.content : '');
 function modelName(model) { return model ? (model.provider ? `${model.provider}/${model.id}` : model.id || '') : ''; }
+function modelError(message, capturePrompts) {
+  if (message?.stopReason !== 'error') return '';
+  if (!capturePrompts) return 'Model/provider error. Details omitted because prompt capture is disabled.';
+  return typeof message.errorMessage === 'string' && message.errorMessage.trim()
+    ? redact(message.errorMessage, 2000) : 'Model/provider error. No error details were reported by Pi.';
+}
 function fileName(args, cwd) {
   const path = args?.path || args?.file_path;
   if (typeof path !== 'string') return '';
@@ -84,7 +90,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     if (e.message?.role !== 'assistant') return;
     const m = e.message;
     const model = m.provider && m.model ? `${m.provider}/${m.model}` : modelName(ctx.model);
-    emit('message.completed', { model, summary: capturePrompts ? redact(textOnly(m), 4000) : '', usage: usage(m.usage) }, ctx);
+    emit('message.completed', { model, summary: capturePrompts ? redact(textOnly(m), 4000) : '', errorMessage: modelError(m, capturePrompts), usage: usage(m.usage) }, ctx);
   });
   listen('tool_execution_start', (e, ctx) => {
     const entry = { toolName: e.toolName, toolCallId: e.toolCallId,
@@ -134,7 +140,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     const last = [...(e.messages || [])].reverse().find(m => m.role === 'assistant');
     emit('run.ended', {
       outcome: last?.stopReason === 'error' ? 'error' : last?.stopReason === 'aborted' ? 'aborted' : 'idle',
-      summary: capturePrompts ? redact(textOnly(last), 4000) : ''
+      summary: capturePrompts ? redact(textOnly(last), 4000) : '', errorMessage: modelError(last, capturePrompts)
     }, ctx);
     running = false;
   });
