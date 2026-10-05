@@ -1,5 +1,13 @@
 # Approved Pi continuation
 
+[Generate report](DAILY-REPORTS.md) reuses these same three opt-ins and handoff
+for one explicitly reviewed all-project daily summarization request. Only the
+selected execution session needs runtime opt-in; retained context from other
+tracked projects is included even when their Pi sessions are closed. It uses the current
+Pi model and quota, without automatic calls, model changes or a new provider API.
+The reporting tool returns a bound structured summary; a normal chat reply or
+input-delivery receipt alone does not complete report generation.
+
 PiScope is **view-only by default**. Optional control sends a plain user prompt
 to an existing, explicitly opted-in Pi session. It does not spawn Pi, select a
 model, call a provider directly, launch a subagent itself or bypass Pi's tools

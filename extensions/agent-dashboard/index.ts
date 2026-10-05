@@ -3,12 +3,13 @@
 import { registerMonitor } from './monitor.mjs';
 
 export default async function (pi: any) {
-  let schema: any;
+  let schema: any, reportSchema: any;
   try {
     let module: any;
     try { module = await import('typebox'); }
     catch { module = await import('@sinclair/typebox'); }
     const T = module.Type;
+    reportSchema = T.Object({ requestId: T.String({ minLength: 1, maxLength: 160 }), summary: T.String({ minLength: 1, maxLength: 2400 }), remaining: T.Optional(T.String({ maxLength: 800 })) });
     schema = T.Object({
       reason: T.Optional(T.String({ description: 'Why the workflow changed; no secrets' })),
       accomplishments: T.Optional(T.Array(T.String({ minLength: 1, maxLength: 240, description: 'Brief outcome actually achieved; an agent report, not independent verification' }), { maxItems: 5 })),
@@ -27,5 +28,5 @@ export default async function (pi: any) {
       ctx.ui?.notify?.('PiScope: workflow_report unavailable (TypeBox not resolved). Basic monitoring remains enabled.', 'warning');
     });
   }
-  registerMonitor(pi, { schema });
+  registerMonitor(pi, { schema, reportSchema });
 }

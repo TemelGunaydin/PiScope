@@ -57,13 +57,20 @@ try {
       sendUserMessage(prompt) {
         idle = false; handlers.get('before_agent_start')({ prompt }, ctx); handlers.get('agent_start')({}, ctx);
         finish = setTimeout(async () => {
+          const reportId = /^PiScope daily work summary\. Request ID: ([a-zA-Z0-9_.:\-]+)/.exec(prompt)?.[1];
+          if (reportId && prompt.includes('REPORT_PROVIDER_FAILURE_FIXTURE')) {
+            handlers.get('agent_end')({ messages: [{ role: 'assistant', stopReason: 'error', errorMessage: 'Synthetic provider overload during report generation.', content: [] }] }, ctx);
+            idle = true; handlers.get('agent_settled')({}, ctx); return;
+          }
+          const reportDay = /recorded work for (\d{4}-\d{2}-\d{2})/.exec(prompt)?.[1];
+          if (reportId) await tools.get('daily_report').execute('mock-daily', { requestId: reportId, summary: `Daily ${reportDay}: Control-Fixture — Calendar navigation and reminder handling were improved together.${prompt.includes('OTHER_PROJECT_CONTEXT') ? ' Other Project — recorded work remains unresolved.' : ''} Literal <img src=x onerror=alert(1)> stays text.`, remaining: 'Export is still blocked by a provider failure; no test pass is independently verified.' }, undefined, undefined, ctx);
           await tools.get('workflow_report').execute('mock-report', { stages: [{ id: 'respond', title: 'Respond', status: 'done' }], recommendations: [{ id: 'check', title: 'Check the result', prompt: 'Run the relevant tests.' }] }, undefined, undefined, ctx);
           handlers.get('agent_end')({ messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Synthetic response; no model called.' }] }] }, ctx);
           idle = true; handlers.get('agent_settled')({}, ctx);
         }, 1200);
       } };
     const client = new MonitorClient({ configPath: join(dir, 'connection.json') });
-    registerMonitor(pi, { schema: {}, client }); handlers.get('session_start')({}, ctx);
+    registerMonitor(pi, { schema: {}, reportSchema: {}, client }); handlers.get('session_start')({}, ctx);
     handlers.get('before_agent_start')({ prompt: 'Synthetic completed request' }, ctx); handlers.get('agent_start')({}, ctx);
     await tools.get('workflow_report').execute('mock-report', { stages: [{ id: 'respond', title: 'Respond', status: 'done' }], recommendations: [{ id: 'check', title: 'Check the result', prompt: 'Run the relevant tests.' }] }, undefined, undefined, ctx);
     handlers.get('agent_end')({ messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Synthetic response; no model called.' }] }] }, ctx);

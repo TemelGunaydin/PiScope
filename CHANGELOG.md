@@ -5,11 +5,17 @@
 Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
-- Read-only Daily report with date navigation, project-grouped accomplishments
-  or recorded reply excerpts, honest error/cancelled/unknown outcomes, Copy report,
-  responsive layout and preserved reading under unrelated live updates. Bounded
-  private daily excerpts survive detail expiry and ordinary collector restarts;
-  optional workflow reports add short accomplishments without extra model calls.
+- Daily report with one Generate report button and one AI-generated overall-day
+  report across all tracked projects, not per-project buttons or raw request/reply
+  lists. Generate report uses an existing idle Pi session's current model through the three control opt-ins and exact preview/confirmation, with no
+  provider integration, model switching, automatic requests or retries. Bounded
+  project/record coverage, separate remaining work, cross-project stale-source and
+  duplicate-pending-day protection, preserved good summaries on failure, private
+  persistence and Copy report; generation uses Pi quota.
+- Clear daily-report setup states beside Generate, a separate current-model
+  display, automatic ready-session selection and retained explicit choices.
+  Equal-height project cards within desktop rows, with bottom-aligned actions
+  and unclipped expansion/larger text; natural-height mobile cards.
 - Last model response inside Continue this project, with selection/scroll
   preserved under live updates. Bounded, redacted Pi provider errors appear
   in project Error badges, detail alerts and the activity feed; recovery clears

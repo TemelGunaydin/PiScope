@@ -12,12 +12,17 @@ least seven days. Request and response text are shown directly on the card.
 Only fields longer than 220 characters have **Show more** underneath;
 it expands that field in place, without a duplicate summary. **Show less**
 collapses it again. Each field keeps its expansion state across live updates.
+Cards in the same desktop row share a height, with next-step/actions anchored at
+the bottom. Expansion and larger text grow the row without clipping content;
+mobile cards retain their natural height.
 **Open last request** opens the source request if it is still retained. **← Back to projects** restores
 the overview's filters, scroll position, and focus on the originating card when
 it is still visible. The sidebar lists sessions by project name and session ID.
 The UI only shows live records; there is no Live/Demo selector.
 **Projects** and [**Daily report**](DAILY-REPORTS.md) are separate navigation views;
-project cards keep latest context, while daily reports collect work across requests.
+project cards keep latest context, while daily reports use an explicitly approved
+Pi model request to synthesize captured work across all tracked projects into one
+overall-day report. Only one Generate report button and execution session are needed. Merely viewing either screen makes no model call.
 
 ## Identity and scope
 
@@ -74,7 +79,9 @@ Each entry keeps at most 600 characters of request text, 1,000 of response text,
 20 stages with 160-character titles, identities, timestamps, and a technical
 verdict. Common secret redaction is reapplied. Existing prompt-capture settings
 are respected; omitted text cannot be recovered. No raw tool arguments, code,
-hidden reasoning, or generated AI summaries are added.
+or hidden reasoning are collected from tool payloads. Generated daily summaries
+are stored separately; their ordinary Pi requests/replies remain visible in
+normal monitoring.
 
 Summaries are written through a private temporary file, `fsync`, and atomic
 rename, at most once per 500 ms of active ingestion. They also flush at shutdown

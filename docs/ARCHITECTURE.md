@@ -75,12 +75,25 @@ rotasyondan önce kaydedilir. Canlı/demo kapasitesi ayrıdır: mod başına en 
 1.000 kayıt ve 12 MiB. İlk collector saat dilimi dosyayla korunur; özgün olay
 zamanı kullanılır, başka günün yanıtı/sonuç maddeleri bugüne taşınmaz.
 
-`workflow.updated.accomplishments` en çok beş kısa **reported** metindir;
-prompt capture kapalıysa eklenti bunları göndermez. Maddeler yoksa web arayüzü
-kaydedilmiş yanıtı gösterir, planı başarıya dönüştürmez. Teknik sonuç mevcut
-`runVerdict` kurallarıyla ayrılır; eksik ayrıntı eski hatayı başarıya yükseltmez.
-Snapshot/export içindeki `dailyReport` mevcut izleme yetkisiyle okunur; rapor
-ve kopyalama kontrol izni, model çağrısı veya yeni bir yazma API’si kullanmaz.
+Bu kayıtlar LLM özetinin girdisidir; arayüz bunları yanıt/istek listesi olarak
+sunmaz. Generate report, mevcut üç kontrol izniyle ControlBroker üzerinden
+normal Pi girdisi gönderir. `/api/control/report-preview` seçili günün bütün canlı/izlenen projelerinin
+kayıtlarını tek prompt’a toplar; current/idle execution oturumu, eklenti capability,
+tam prompt ve kaynak hash’i onayda yeniden doğrulanır. Diğer projelerde açık Pi
+şartı yoktur. Aynı gün için bekleyen üretim, başka runtime’dan da ikinci kez başlamaz. Ek provider API’si, model seçimi veya otomatik iş yoktur.
+
+PiControl callback’i yalnız birebir kabul edilen prompt’u yeni run’a
+`reportRequestId` olarak bağlar. `daily_report` aracı yalnız bu onaylı run’da
+kullanılır; `daily.reported` metni teknik tamamlanmadan önce yayımlanmaz.
+`src/report-memory.mjs`, ayrı private `generated-reports.json` dosyasında
+500 kayıt ve 2 MiB sınırıyla gün başına tek genel rapor saklar. Eski proje bazlı
+kayıtlar ayrı tutulur; `scope: 'all'` yeni günlük slot’u execution projesinden bağımsız kılar. Yeni kaynak eski
+özet uyarısı çıkarır; eski üretimin geç sonucu yeni özetin üstüne yazamaz.
+Yeniden başlatmada belirsiz istek yeniden gönderilmez. Üretim run’ları kaynak
+kayıtlarından ve coding workflow profil bağlamından hariçtir; normal Pi
+history/monitoring içinde kalır. Prompt capture kapalıysa üretim capability
+ve sonuç metni kapalıdır. Görüntüleme/kopyalama salt-okumadır, **üretim** ise
+Pi model kotasını kullanan açık onaylı bir model isteğidir.
 [Tam kapsam ve güncelleme](DAILY-REPORTS.md).
 
 ## Ölçüm (yürütme performansı)

@@ -1,10 +1,10 @@
-import { initializeControls, renderControls, modelError } from './control.js';
+import { initializeControls, renderControls, modelError, controlAvailability } from './control.js';
 import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
 let overviewScrollY = 0, returnProjectId = '', followSubmission;
-let reportView = false, detailOrigin = 'projects', reportScrollY = 0, returnReportKey = '';
+let reportView = false, detailOrigin = 'projects', reportScrollY = 0;
 const labels = { running: 'Running', starting: 'Request sent', pending: 'Waiting', idle: 'Response finished', done: 'Done', error: 'Error', blocked: 'Blocked', cancelled: 'Cancelled', unknown: 'Outcome unknown' };
 const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
 const count = n => new Intl.NumberFormat('en-US', { notation: n > 99999 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
@@ -56,7 +56,7 @@ function projectsNow() {
 }
 function openDetails(nextSessionId, nextRunId = '', projectId = '') {
   if (overview) { overviewScrollY = window.scrollY; returnProjectId = projectId; detailOrigin = 'projects'; }
-  if (reportView) { reportScrollY = window.scrollY; returnReportKey = JSON.stringify([nextSessionId, nextRunId]); detailOrigin = 'report'; }
+  if (reportView) { reportScrollY = window.scrollY; detailOrigin = 'report'; }
   reportView = false;
   sessionId = nextSessionId; runId = nextRunId; overview = false;
   render(); $('detail-heading').focus({ preventScroll: true }); window.scrollTo(0, 0);
@@ -71,8 +71,7 @@ function returnToProjects() {
 function showDailyReport() {
   if (overview) overviewScrollY = window.scrollY;
   reportView = true; overview = false; render();
-  const entry = [...$('report-list').querySelectorAll('.report-entry')].find(e => e.dataset.key === returnReportKey);
-  (entry?.querySelector('.report-open') || $('report-heading')).focus({ preventScroll: true });
+  $('report-heading').focus({ preventScroll: true });
   window.scrollTo(0, reportScrollY);
 }
 function appendProjectText(card, field, label, text, expanded) {
@@ -140,12 +139,12 @@ function renderProjects() {
     const nextLabel = { running: 'Plan: Step in progress', pending: 'Plan: Next step', blocked: 'Plan: Blocked step', error: 'Plan: Step with a reported error' }[p.nextStep?.status] || 'Plan: Next step';
     next.append(el('span', 'project-field-label', nextLabel), el('p', '', p.nextStep?.title || 'No next step reported.'));
     if (p.pendingCount > 1) next.append(el('small', '', `${p.pendingCount} unfinished stages`));
-    card.append(next);
+    const footer = el('div', 'project-card-footer'); footer.append(next); card.append(footer);
     if (p.detailAvailable) {
       const button = el('button', 'button project-open', 'Open last request ↗'); button.type = 'button'; button.setAttribute('aria-label', `${p.projectName}: open last request`);
       button.onclick = () => openDetails(p.latest.sessionId, p.latest.runId, p.projectId);
-      card.append(button);
-    } else if (p.latest) card.append(el('p', 'project-archive', 'Summary saved; detailed event history is no longer retained.'));
+      footer.append(button);
+    } else if (p.latest) footer.append(el('p', 'project-archive', 'Summary saved; detailed event history is no longer retained.'));
     list.append(card);
     if (focusedProject === p.projectId) {
       const target = focusedField ? card.querySelector(`.project-expand[data-field="${focusedField}"]`) || card.querySelector(`.project-text[data-field="${focusedField}"]`)
@@ -382,7 +381,7 @@ function render() {
   $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview || reportView);
   $('daily-report').classList.toggle('hidden', !reportView);
   $('nav-projects').setAttribute('aria-pressed', String(overview)); $('nav-report').setAttribute('aria-pressed', String(reportView));
-  if (reportView) renderDailyReport(snapshot.dailyReport);
+  if (reportView) renderDailyReport(snapshot.dailyReport, snapshot.sessions, snapshot.control);
   renderProjects();
   $('back-to-projects').classList.toggle('hidden', overview || reportView);
   $('back-to-projects').textContent = detailOrigin === 'report' ? '← Back to daily report' : '← Back to projects';
@@ -415,7 +414,7 @@ function connect() {
   eventSource.onopen = () => { $('connection-label').textContent = 'Dashboard connected'; $('connection-dot').classList.add('online'); };
   eventSource.onerror = () => { $('connection-label').textContent = 'Reconnecting'; $('connection-dot').classList.remove('online'); };
 }
-initializeDailyReport(openDetails);
+initializeDailyReport(controlAvailability);
 $('back-to-projects').onclick = () => detailOrigin === 'report' ? showDailyReport() : returnToProjects();
 $('nav-projects').onclick = returnToProjects;
 $('nav-report').onclick = showDailyReport;

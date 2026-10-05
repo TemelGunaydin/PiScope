@@ -5,6 +5,7 @@ import { redact } from './security.mjs';
 import { runVerdict } from './metrics.mjs';
 import { accomplishments } from '../extensions/agent-dashboard/events.mjs';
 import { savePrivateJSON } from './private-json.mjs';
+import { reportSourceVersion } from './report-prompt.mjs';
 
 export const DAILY_LIMIT = 1000;
 const MODE_BYTES = 12 * 1024 * 1024;
@@ -65,7 +66,7 @@ export class DailyMemory {
     return `${parts.year}-${parts.month}-${parts.day}`;
   }
   observe(e, run) {
-    if (!run || !e.runId || !workTypes.has(e.type)) return;
+    if (e.reportRequestId || !run || !e.runId || !workTypes.has(e.type)) return;
     const day = this.day(e.time), key = keyOf({ ...e, day });
     if (this.replaying && this.replayPending.has(key)) {
       if (this.replayPending.get(key) === e.id) this.replayPending.delete(key);
@@ -123,6 +124,10 @@ export class DailyMemory {
     savePrivateJSON(this.path, { schemaVersion: 1, timeZone: this.timeZone, records: retained });
     this.entries = new Map(retained.map(r => [keyOf(r), r])); this.dirty = false;
   }
+  reportRecords(day, projectId) {
+    return [...this.entries.values()].filter(r => !r.demo && r.day === day && (projectId === undefined || r.projectId === projectId)).sort((a, b) => a.lastAt.localeCompare(b.lastAt) || a.sessionId.localeCompare(b.sessionId) || a.runId.localeCompare(b.runId)).slice(-DAILY_LIMIT);
+  }
+  sourceVersion(day, projectId, projects) { return reportSourceVersion(this.reportRecords(day, projectId), projects); }
   snapshot(sessions) {
     return { limit: DAILY_LIMIT, timeZone: this.timeZone, records: [...this.entries.values()].map(r => {
       const { checkpoint, responseAt, reportAt, errorAt, ...summary } = r;

@@ -115,6 +115,10 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
       const authorizedHeader = equalSecret(headerToken, token);
       if (!authorizedHeader && !equalSecret(cookieValue(req.headers.cookie, 'agentdesk'), token)) return json(res, 401, { error: 'Open the pairing URL printed by npm start' });
       if (url.pathname === '/api/control' && req.method === 'GET') return json(res, 200, { enabled: Boolean(control), canSubmit: Boolean(control && equalSecret(cookieValue(req.headers.cookie, 'piscope-control'), controlToken)) });
+      if (url.pathname === '/api/control/report-preview' && req.method === 'GET') {
+        if (!control || !equalSecret(cookieValue(req.headers.cookie, 'piscope-control'), controlToken)) return json(res, 403, { error: 'Pair this browser with the separate control link first' });
+        return json(res, 200, control.reportPreview(Object.fromEntries(url.searchParams)));
+      }
       if (url.pathname === '/api/control/requests' && req.method === 'POST') {
         if (!control || req.headers.origin !== requestOrigin || !equalSecret(cookieValue(req.headers.cookie, 'piscope-control'), controlToken)) return json(res, 403, { error: 'Pair this browser with the separate control link first' });
         const receipt = control.submit(await body(req)); controlChanged(); return json(res, 202, receipt);

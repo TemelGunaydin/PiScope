@@ -112,6 +112,30 @@ test('brief accomplishments are reported without execution and obey disabled cap
     if (!capturePrompts) assert.ok(!JSON.stringify(store.snapshot().dailyReport).includes('PRIVATE_FEATURE'));
   }
 });
+test('approved report input binds the daily tool and only its run carries report metadata', async t => {
+  const f = setup(t, { reportSchema: {} }); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+  f.emit('before_agent_start', { prompt: 'Coding task' }); f.emit('agent_start'); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+  let delivered = false;
+  f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'report-id', reportRequestId: 'report-id', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, prompt: 'Approved report prompt' } });
+  f.pi.sendUserMessage = (prompt, options) => { assert.deepEqual(options, { expandPromptTemplates: false }); delivered = true; f.emit('before_agent_start', { prompt }); f.emit('agent_start'); };
+  const execute = requestId => f.tools.get('daily_report').execute('typed', { requestId, summary: 'Calendar and reminders improved.', remaining: 'Export blocked.' }, undefined, undefined, f.ctx);
+  assert.equal((await execute('report-id')).details.recorded, false);
+  await f.commands.get('dashboard-control').handler('on', f.ctx); assert.equal(delivered, true);
+  assert.equal((await execute('wrong-id')).details.recorded, false); assert.equal((await execute('report-id')).details.recorded, true);
+  const reported = f.client.queue.find(e => e.type === 'daily.reported'); assert.equal(reported.reportRequestId, 'report-id');
+  assert.equal(reported.data.summary, 'Calendar and reminders improved.');
+  f.emit('agent_end', { messages: [] }); f.emit('agent_settled'); f.emit('before_agent_start', { prompt: 'Ordinary work again' });
+  assert.equal(f.client.queue.at(-1).reportRequestId, undefined);
+});
+test('disabled capture rejects report commands before sending any model input', async t => {
+  const f = setup(t, { reportSchema: {}, capturePrompts: false }); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+  f.emit('before_agent_start', { prompt: 'PRIVATE_INITIAL' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+  let calls = 0; f.pi.sendUserMessage = () => calls++;
+  f.client.controlRequest = async p => { assert.equal(p.canReport, false); return { command: { id: 'report-disabled', reportRequestId: 'report-disabled', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, prompt: 'PRIVATE_REPORT' } }; };
+  await f.commands.get('dashboard-control').handler('on', f.ctx); assert.equal(calls, 0);
+  const result = await f.tools.get('daily_report').execute('typed', { requestId: 'report-disabled', summary: 'PRIVATE_SUMMARY' }, undefined, undefined, f.ctx);
+  assert.equal(result.details.recorded, false); assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_'));
+});
 test('local control opt-in is revoked on session-tree navigation', async t => {
   const f = setup(t); f.pi.sendUserMessage = () => assert.fail('No prompt is approved');
   f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;

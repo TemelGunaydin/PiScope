@@ -75,6 +75,19 @@ def assert_readable(target):
     }''')
     assert not problems, problems
 
+def assert_equal_project_rows(target):
+    cards = target.locator('.project-card').evaluate_all('''cards => cards.map(card => {
+        const rect = card.getBoundingClientRect();
+        return { top: rect.top, height: rect.height, clipped: card.scrollHeight > card.clientHeight + 1 };
+    })''')
+    rows = {}
+    for card in cards:
+        rows.setdefault(round(card['top']), []).append(card['height'])
+        assert not card['clipped'], 'Project content must not be clipped'
+    paired = [heights for heights in rows.values() if len(heights) > 1]
+    assert paired, 'Fixture must exercise multi-column project rows'
+    assert all(max(heights) - min(heights) <= 1 for heights in paired), rows
+
 with sync_playwright() as pw:
     executable = os.environ.get('BROWSER_EXECUTABLE') or shutil.which('chromium')
     browser = pw.chromium.launch(headless=True,
@@ -97,7 +110,7 @@ with sync_playwright() as pw:
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
         target.add_script_tag(content=(root / 'public/control.js').read_text().replace('export ', ''))
         target.add_script_tag(content=(root / 'public/report.js').read_text().replace('export ', ''))
-        target.add_script_tag(content=(root / 'public/app.js').read_text().replace("import { initializeControls, renderControls, modelError } from './control.js';", '').replace("import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';", ''))
+        target.add_script_tag(content=(root / 'public/app.js').read_text().replace("import { initializeControls, renderControls, modelError, controlAvailability } from './control.js';", '').replace("import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';", ''))
     if args.network:
         browser_url = config['tailscaleUrl'] if args.tailscale else config['url']
         if args.tailscale:
@@ -237,6 +250,7 @@ with sync_playwright() as pw:
         page.locator('#back-to-projects').click()
         expect(page.locator('.project-card')).to_have_count(4)
         expect(page.locator('#project-count')).to_have_text('4')
+        assert_equal_project_rows(page)
         expect(page.locator('.project-card[data-project="ui-active"]')).to_contain_text('2 active sessions')
         expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('8 days ago')
         assert page.locator('#project-list img').count() == 0
@@ -272,6 +286,7 @@ with sync_playwright() as pw:
         expect(summary_toggle).to_have_attribute('aria-expanded', 'true')
         expect(last.locator('.project-expand[data-field="prompt"]')).to_have_attribute('aria-expanded', 'false')
         expect(last.locator('.project-answer')).to_have_text(long_summary)
+        assert_equal_project_rows(page)
         summary_toggle.focus()
         batch = []
         updated_summary = 'Response updated over SSE. ' + long_summary
@@ -280,6 +295,7 @@ with sync_playwright() as pw:
         with urllib.request.urlopen(req, timeout=3) as response:
             assert response.status == 200
         expect(last.locator('.project-answer')).to_have_text(updated_summary)
+        assert_equal_project_rows(page)
         assert page.locator('.project-card').evaluate_all('(cards) => cards.map(c => c.dataset.project)') == project_order
         assert page.locator('.session-item').all_text_contents() == session_order
         expect(summary_toggle).to_have_attribute('aria-expanded', 'true')
@@ -303,6 +319,10 @@ with sync_playwright() as pw:
         expect(last.locator('.project-answer')).to_have_text('Short updated response.')
         expect(summary_toggle).to_have_count(0)
         expect(last.locator('.project-answer')).to_be_focused()
+        assert_equal_project_rows(page)
+        page.evaluate("() => document.documentElement.style.fontSize='200%'")
+        assert_equal_project_rows(page); assert_readable(page)
+        page.evaluate("() => document.documentElement.style.fontSize=''")
         page.evaluate('() => window.scrollTo(0, 0)')
         page.screenshot(path=str(output / 'projects.png'), full_page=True)
     assert page.evaluate('() => getComputedStyle(document.documentElement).colorScheme') == 'light'
@@ -312,6 +332,14 @@ with sync_playwright() as pw:
     page.set_viewport_size({'width': 390, 'height': 844})
     assert_readable(page)
     page.screenshot(path=str(output / 'mobile.png'), full_page=True)
+    # Daily generation setup remains readable; merely opening it sends no work.
+    page.locator('#nav-report').click()
+    expect(page.locator('#report-generate')).to_be_disabled()
+    for width in (1440, 1024, 768, 390, 320):
+        page.set_viewport_size({'width': width, 'height': 900}); assert_readable(page)
+    page.evaluate("() => document.documentElement.style.fontSize='200%'"); assert_readable(page)
+    page.evaluate("() => document.documentElement.style.fontSize=''")
+    page.locator('#nav-projects').click()
     # Reflow and contrast also apply to the deeper execution UI, not just overview.
     page.locator('.session-item').first.click()
     page.locator('.execution-details > summary').click()

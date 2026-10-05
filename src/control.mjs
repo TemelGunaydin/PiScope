@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { reportPrompt, validReportDay } from './report-prompt.mjs';
 
 const id = x => typeof x === 'string' && /^[a-zA-Z0-9_.:\-]{1,160}$/.test(x);
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
@@ -21,6 +22,7 @@ export class ControlBroker {
         r.reason = r.status === 'unknown' ? 'Delivery uncertain; not retried. Check Pi before resubmitting.' : 'Pi did not collect this request in time.';
         delete r.prompt;
         if (r.status === 'expired') this.release(r);
+        if (r.reportRequestId) this.store.reportMemory.delivery(r.id, r.status, r.reason);
       }
     }
     for (const [key, r] of this.requests) if (now - r.createdAt > 600000 && terminal.has(r.status)) this.requests.delete(key);
@@ -38,10 +40,20 @@ export class ControlBroker {
     if (reserved?.runId === runId) return 'A request for this run was already sent or is pending. Check Pi before trying again.';
     return '';
   }
+  reportPreview(input) {
+    if (!input || !id(input.id) || !id(input.sessionId) || !id(input.projectId) || !id(input.runId) || !validReportDay(input.reportDay)) fail(400, 'Invalid report target or date');
+    const reason = this.ready(input.sessionId, input.projectId, input.runId);
+    if (reason) fail(409, reason);
+    if (!this.agents.get(input.sessionId).canReport) fail(409, 'Update the project extension and restart Pi with prompt capture enabled to generate reports.');
+    if (input.reportDay > this.store.dailyMemory.day(this.now())) fail(400, 'Cannot report a future day');
+    if ([...this.store.reportMemory.entries.values()].some(r => r.scope === 'all' && r.day === input.reportDay && ['queued', 'generating'].includes(r.status))) fail(409, 'A daily report is already pending for this day. Check Pi before generating again.');
+    const s = this.store.sessions.get(input.sessionId);
+    return { ...reportPrompt(this.store.dailyMemory.reportRecords(input.reportDay), { id: input.id, day: input.reportDay, projects: this.store.reportProjects(), timeZone: this.store.dailyMemory.timeZone }), projectName: s.projectName, model: s.model || s.runs.at(-1).model || 'current Pi model' };
+  }
   submit(input) {
     this.sweep();
     if (!input || !id(input.id) || !id(input.sessionId) || !id(input.projectId) || !id(input.runId)) fail(400, 'Invalid request identity');
-    const signature = createHash('sha256').update(JSON.stringify([input.sessionId, input.projectId, input.runId, input.recommendationId ?? null, input.expectedPrompt ?? null, input.prompt ?? null])).digest('hex');
+    const signature = createHash('sha256').update(JSON.stringify([input.sessionId, input.projectId, input.runId, input.recommendationId ?? null, input.expectedPrompt ?? null, input.prompt ?? null, input.reportDay ?? null, input.expectedSourceHash ?? null])).digest('hex');
     const previous = this.requests.get(input.id);
     if (previous) {
       if (previous.signature !== signature) fail(409, 'Request ID already used for different input');
@@ -49,8 +61,13 @@ export class ControlBroker {
     }
     const reason = this.ready(input.sessionId, input.projectId, input.runId);
     if (reason) fail(409, reason);
-    let prompt, title = 'Other prompt';
-    if (input.recommendationId !== undefined) {
+    let prompt, report, title = 'Other prompt';
+    if (input.reportDay !== undefined) {
+      if (input.prompt !== undefined || input.recommendationId !== undefined) fail(400, 'Report generation cannot be combined with another prompt');
+      report = this.reportPreview(input);
+      if (input.expectedPrompt !== report.prompt || input.expectedSourceHash !== report.sourceHash) fail(409, 'Recorded work changed. Review a fresh report preview before sending.');
+      prompt = report.prompt; title = `Daily report · ${input.reportDay}`;
+    } else if (input.recommendationId !== undefined) {
       if (!id(input.recommendationId) || input.prompt !== undefined) fail(400, 'Choose a recommendation or an Other prompt, not both');
       const recommendation = this.store.sessions.get(input.sessionId).runs.at(-1).recommendations?.find(r => r.id === input.recommendationId);
       if (!recommendation || input.expectedPrompt !== recommendation.prompt) fail(409, 'This recommendation changed. Review the latest suggestion before sending.');
@@ -59,14 +76,15 @@ export class ControlBroker {
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 8000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(prompt)) fail(400, 'Prompt must contain 1–8000 characters without control codes');
     if (this.requests.size >= 100) fail(429, 'Control request limit reached; try again after old receipts expire');
     const a = this.agents.get(input.sessionId), now = this.now();
+    if (report) this.store.reportMemory.start({ id: input.id, scope: 'all', day: input.reportDay, projectId: input.projectId, projectName: report.projectName, sessionId: input.sessionId, baseRunId: input.runId, sourceHash: report.sourceHash, included: report.included, total: report.total, includedProjects: report.includedProjects, totalProjects: report.totalProjects, createdAt: new Date(now).toISOString() });
     const r = { id: input.id, sessionId: input.sessionId, projectId: input.projectId, runId: input.runId,
-      owner: a.owner, title, signature, prompt, status: 'queued', createdAt: now, deadline: now + 15000 };
+      ...(report ? { reportRequestId: input.id } : {}), owner: a.owner, title, signature, prompt, status: 'queued', createdAt: now, deadline: now + 15000 };
     this.requests.set(r.id, r); this.reservations.set(r.sessionId, { runId: r.runId, id: r.id });
     return this.summary(r);
   }
   agent(input) {
     this.sweep();
-    if (!input || !id(input.sessionId) || !id(input.projectId) || !id(input.owner) || (input.runId !== '' && !id(input.runId)) || typeof input.idle !== 'boolean' || (input.limited !== undefined && typeof input.limited !== 'boolean')) fail(400, 'Invalid Pi control presence');
+    if (!input || !id(input.sessionId) || !id(input.projectId) || !id(input.owner) || (input.runId !== '' && !id(input.runId)) || typeof input.idle !== 'boolean' || (input.limited !== undefined && typeof input.limited !== 'boolean') || (input.canReport !== undefined && typeof input.canReport !== 'boolean')) fail(400, 'Invalid Pi control presence');
     const s = this.store.sessions.get(input.sessionId);
     if (!s || s.demo || s.projectId !== input.projectId) fail(409, 'Pi session has not delivered its monitoring events yet');
     const old = this.agents.get(input.sessionId);
@@ -78,20 +96,21 @@ export class ControlBroker {
         r.status = input.ack.status;
         r.reason = r.status === 'submitted' ? 'Sent to Pi. Actual execution is shown by Pi events.' : 'Pi rejected the request because its session changed or was busy.';
         if (r.status === 'rejected') this.release(r);
+        if (r.reportRequestId) this.store.reportMemory.delivery(r.id, r.status, r.reason);
       }
     }
     if (input.enabled === false) {
       if (old?.owner === input.owner) this.agents.delete(input.sessionId);
       for (const r of this.requests.values()) if (r.sessionId === input.sessionId && r.owner === input.owner && r.status === 'queued') {
         r.status = 'rejected'; r.reason = 'Control disabled in Pi.'; delete r.prompt;
-        this.release(r);
+        this.release(r); if (r.reportRequestId) this.store.reportMemory.delivery(r.id, r.status, r.reason);
       }
       return { command: null };
     }
     if (!old && this.agents.size >= 80) fail(429, 'Too many opted-in Pi sessions');
     const currentRunId = input.runId || s.runs.at(-1)?.id || '';
     this.agents.set(input.sessionId, { sessionId: input.sessionId, projectId: input.projectId, runId: currentRunId,
-      owner: input.owner, idle: input.idle && !input.limited, limited: Boolean(input.limited), until: this.now() + 15000 });
+      owner: input.owner, idle: input.idle && !input.limited, limited: Boolean(input.limited), canReport: input.canReport === true, until: this.now() + 15000 });
     // A new observed request releases the old run's reservation, never a mere timeout.
     const reserved = this.reservations.get(input.sessionId);
     if (reserved && reserved.runId !== currentRunId && s.runs.at(-1)?.id === currentRunId) this.reservations.delete(input.sessionId);
@@ -99,9 +118,9 @@ export class ControlBroker {
     if (!r) return { command: null, currentRunId };
     if (!input.idle || input.limited || currentRunId !== r.runId || s.runs.at(-1)?.id !== r.runId || !s.connected || this.now() - Date.parse(s.lastSeen) >= 30000) {
       r.status = 'rejected'; r.reason = 'Pi session changed or became busy before delivery.'; delete r.prompt;
-      this.release(r); return { command: null };
+      this.release(r); if (r.reportRequestId) this.store.reportMemory.delivery(r.id, r.status, r.reason); return { command: null };
     }
-    const command = { id: r.id, sessionId: r.sessionId, projectId: r.projectId, runId: r.runId, prompt: r.prompt };
+    const command = { id: r.id, sessionId: r.sessionId, projectId: r.projectId, runId: r.runId, prompt: r.prompt, ...(r.reportRequestId ? { reportRequestId: r.id } : {}) };
     r.status = 'claimed'; r.deadline = this.now() + 15000; delete r.prompt;
     return { command, currentRunId };
   }

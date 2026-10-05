@@ -30,10 +30,20 @@
         <p class="project-scope">Status and plan steps come from the latest request's records. “Last request finished” does not mean the project is complete. Only projects recorded by the Pi monitoring extension appear.</p>
       </section>
       <section id="daily-report" class="hidden" aria-labelledby="report-heading">
-        <div class="page-heading"><div><h1 id="report-heading" tabindex="-1">What did I get done?</h1><p>A daily report of recorded work, grouped by project.</p></div></div>
-        <div class="report-toolbar"><div class="report-date-control"><label for="report-date">Report date</label><input id="report-date" type="date"></div><div class="report-actions"><button id="report-previous" class="button" type="button" aria-label="Previous day">← Previous</button><button id="report-today" class="button" type="button">Today</button><button id="report-next" class="button" type="button" aria-label="Next day">Next →</button><button id="report-copy" class="button" type="button" disabled>Copy report</button></div></div>
-        <p id="report-results" class="project-results" role="status"></p><p id="report-copy-status" class="project-results" role="status"></p>
-        <div id="report-list" class="report-list"></div><p id="report-scope" class="project-scope"></p>
+        <div class="page-heading"><div><h1 id="report-heading" tabindex="-1">What did I get done?</h1><p>Generate one daily report for all tracked projects with your current Pi model.</p></div></div>
+        <div class="report-toolbar"><div class="report-date-control"><label for="report-date">Report date</label><input id="report-date" type="date"></div><div class="report-actions"><button id="report-previous" class="button" type="button" aria-label="Previous day">← Previous</button><button id="report-today" class="button" type="button">Today</button><button id="report-next" class="button" type="button" aria-label="Next day">Next →</button></div></div>
+        <p id="report-results" class="project-results" role="status"></p>
+        <section class="report-generation" aria-labelledby="report-generation-heading">
+          <div class="report-generation-heading"><h2 id="report-generation-heading">One report. All your projects.</h2><span id="report-ready-badge" class="badge" data-state="setup">Setup needed</span></div>
+          <p class="report-label">Choose one existing Pi model to write the report. You do not need a separate session for every project.</p>
+          <div class="report-engine-grid">
+            <div class="report-runtime"><label for="report-session">Use the model from this Pi session</label><select id="report-session" class="report-session" aria-describedby="report-engine-hint report-engine-context"></select><p class="report-label">Current model</p><p id="report-model" class="report-model"></p><p id="report-engine-context" class="report-label"></p><p id="report-engine-hint" class="report-label"></p></div>
+            <div id="report-readiness" class="report-readiness" data-state="setup"><h3 id="report-readiness-title">Checking report setup</h3><p id="report-availability" class="report-label" role="status"></p><button id="report-generate" class="button primary" type="button" aria-describedby="report-availability report-quota" disabled>Generate report</button><p id="report-quota" class="report-label">One approved request uses your existing Pi model quota. No automatic generation or model switching.</p><ol id="report-setup-steps" class="report-setup-steps"></ol></div>
+          </div>
+        </section>
+        <p id="report-copy-status" class="project-results" role="status"></p>
+        <section id="report-review" class="control-review hidden" aria-labelledby="report-review-heading"><h2 id="report-review-heading">Review daily report generation</h2><p id="report-review-target"></p><p id="report-review-scope" class="report-label"></p><pre id="report-review-prompt" class="control-preview" tabindex="0" aria-label="Exact report prompt"></pre><div class="control-actions"><button id="report-confirm" class="button primary" type="button">Confirm and generate in Pi</button><button id="report-cancel" class="button" type="button">Cancel</button></div></section>
+        <div class="report-output-heading"><h2>Daily summary</h2><button id="report-copy" class="button" type="button" disabled>Copy report</button></div><div id="report-list" class="report-list"></div><p id="report-scope" class="project-scope"></p>
       </section>
       <div id="workspace-details" class="hidden">
       <section class="page-heading"><div><div class="eyebrow">OBSERVED WORKFLOW</div><h1 id="detail-heading" tabindex="-1">Workflow tracking</h1><p>Requests, models and test reports.</p></div><div class="run-select-wrap"><label for="run-select">Request history</label><select id="run-select"><option>No requests yet</option></select></div></section>

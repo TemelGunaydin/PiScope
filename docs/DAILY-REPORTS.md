@@ -1,93 +1,128 @@
-# Daily work reports
+# AI-generated daily work report
 
-**Daily report** collects captured work from all live projects for a chosen day.
-It is a read-only view: no additional model call, control pairing or task
-submission. Project names appear on the left, requests and outcomes on the
-right; narrow screens stack them vertically.
+**Daily report** has one **Generate report** button and one overall report for the
+chosen day across all tracked projects. There are no per-project generation
+buttons, requests or report cards. The LLM combines the day's captured work,
+mentions project names where helpful and separates remaining/blocked work.
 
-## Reading and sharing
+## Generate the whole day
 
-- The initial date is **Today** in the displayed report timezone. Use the
-  date picker, **Previous**, **Next** and **Today** to browse other days. Today
-  advances at midnight even without new events; a manually selected date stays put.
-- Projects use stable name order; requests use first observed work time with
-  stable identity tie-breaks. Separate sessions in one project are grouped.
-- **Reported outcomes** are up to five short, optional
-  `workflow_report.accomplishments` supplied by the agent. They describe
-  reported changes, not independently verified achievements.
-- Without those items, **Recorded response excerpt** shows the captured reply.
-  It may be a plan, a partial answer or a report of success; PiScope does not
-  reinterpret it as completed work. Long text has **Show more**.
-- **Response finished** is technical completion under the existing execution
-  rules, not proof the feature works or tests pass. **Error**, **Cancelled**
-  and **Ongoing / outcome unknown** remain distinct. Provider details appear
-  separately when recorded; child/tool failures may have no provider message.
-- **Open request** opens retained monitoring details. **Back to daily report**
-  restores the selected day and reading position. Saved excerpts remain when
-  those details have expired, without a misleading live link.
-- **Copy report** copies the chosen day's projects, prompts, reported outcome
-  lists or response excerpts, and errors as text. Review private content before sharing. Clipboard support
-  requires a compatible browser and secure context (localhost or HTTPS).
-  Original-language text is preserved and HTML-like replies render as text.
-- Unchanged request text, text selection, focus, expanded replies and native
-  response disclosures are preserved across other projects' live updates.
-
-## Sources, dates and retention
-
-Reports come from existing captured Pi events. There is no Git scan, disk scan,
-automatic summary generation or claim that all work on your computer is known.
-Connections, heartbeats, model selection and imported test metadata alone do
-not invent work for a new day. Demo records are excluded from the report view.
-
-The collector's timezone is saved on first report creation and reused across
-restarts, including after changing the machine timezone. The report labels
-this zone; a phone in another timezone still sees the same work days.
-Original event timestamps, not arrival time, determine the day. A request that
-spans midnight can appear on both days with that day's captured work: its
-prompt provides context, but response excerpts and accomplishments are never
-borrowed from another day. Outcomes reflect the last retained state observed
-for that day, not a guaranteed end-of-day audit.
-
-`daily-reports.json` lives in the existing private data directory. It retains
-at most **1,000 daily/request records and 12 MiB per live/demo mode**, independent
-of detailed session retention. Each record stores bounded/redacted project
-text, a prompt excerpt (600 characters), reply/provider-error excerpts (1,000
-each), up to five 240-character accomplishment strings, identity, timestamps
-and technical outcome. It never stores thinking, raw provider objects or
-source-file contents. The snapshot/export includes `dailyReport` under the
-existing authenticated viewing boundary; the private file is not a public
-asset. As elsewhere, redaction is best effort, not complete secret detection.
-
-Atomic private writes, replay checkpoints and flushing before journal rotation
-preserve excerpts across ordinary restarts/detail eviction. Power-loss/filesystem
-survival is not guaranteed. An unreadable file
-is quarantined, not silently deleted; retained journal events rebuild what is
-available. Write failure holds rotation until storage recovers. Very old,
-uncaptured or already-expired work cannot be reconstructed. Empty days mean
-**no retained captured work**, not “you did nothing.” There is no retention
-promise for a fixed number of days.
-
-## Activate after updating
-
-1. Restart PiScope with your existing control/Tailscale environment settings,
-   then refresh the browser. No tokens or Serve routes need changing.
-2. Existing recorded replies populate reports from retained events; project
-   extension updates are not needed for this fallback.
-3. For future brief accomplishment lists, from the PiScope directory run:
+1. Update the extension in the Pi session that will generate the report, from
+   the PiScope directory:
 
    ```bash
    npm run install:pi -- "/absolute/path/to/project" --update
    ```
 
-   Restart Pi in that project: `/reload` alone may retain imported modules.
-   Re-enable `/dashboard-control on` only if you were using control. Do not
-   interrupt active work just to upgrade. No `AGENTS.md`, model or workflow
-   configuration change is required; the updated tool has optional fields and
-   reporting guidance. The agent may still omit those fields.
+   Restart Pi; `/reload` may retain imported modules. Leave its current model,
+   permissions and workflow configuration unchanged.
+2. Restart PiScope with your existing Tailscale settings and
+   `AGENT_DASHBOARD_CONTROL=1`. Pair the browser using its separate **Control
+   pairing** link in a fresh tab; enable `/dashboard-control on` in the chosen
+   Pi session. These are the same [three control permissions](CONTROL.md).
+   Viewing pairing alone cannot generate reports.
+3. Open **Daily report**, choose the date and click the single **Generate report**
+   button. **Use the model from this Pi session** picks the execution session,
+   not which projects are included. A suitable session is selected automatically;
+   its current model and availability are shown separately. Your explicit choice
+   is retained. Disconnected historical sessions are not offered as new targets. One eligible, opted-in,
+   connected, idle, settled current session with `daily_report` and prompt capture
+   enabled is enough. Other projects do **not** need open or control-enabled Pi
+   sessions for their retained work to be summarized. Beside the button, a named
+   readiness state explains browser pairing, local Pi control, extension/prompt
+   capture requirements, busy sessions or missing captured context, with relevant
+   setup steps. These instructions never enable permissions automatically.
+4. Review the exact prompt, current model, included-project/record coverage and
+   disclosure that context from all included projects is sent to that one Pi
+   session. **Cancel** starts no work. **Confirm and generate in Pi** sends one
+   normal model request, not a series of per-project requests. A source fingerprint
+   and exact prompt are rechecked before sending; changes require a fresh preview.
+5. The model calls `daily_report` once with the overall summary and optional
+   remaining work. The typed output is published only after observed request and
+   technical completion. A normal chat reply or input receipt is not a report.
+   Failures, cancellations and missing typed output are shown honestly.
 
-When `AGENT_DASHBOARD_CAPTURE_PROMPTS=0`, the extension omits accomplishment
-strings as well as private prompt/reply content and provider-echoed details.
-Generic monitoring notices may remain. This is not a retroactive purge of
-previously captured data. Existing latest-project summaries and history files
-are preserved. See [project retention](PROJECTS.md), [control](CONTROL.md) and
-[verification scope](VERIFICATION.md).
+Generation consumes the existing model's quota. PiScope makes **no direct provider
+API call**, requires **no new API key**, changes no model and spawns no Pi process.
+It does not automatically generate or retry; Pi's own existing retry settings still
+apply. A pending report for a day blocks a second submission even from a different
+Pi session. Regenerating after completion replaces that day's overall report,
+regardless of which eligible runtime is selected.
+
+Pi keeps its existing permissions; this is **not a sandbox**. The prompt asks for
+summarization only, no commands/edits/delegation, but a prompt is not an OS permission
+boundary. The request appears in normal Pi history/monitoring in the chosen session.
+Generation jobs are excluded from daily coding-work input to prevent reports from
+summarizing themselves, and do not receive coding workflow-profile bindings.
+
+## Reading and copying
+
+The main output is one short overall account plus concrete outcome bullets, not
+raw prompts/replies or a request-by-request log. **Remaining / blocked** is
+separate. Repeated work is combined; plans, failed/cancelled attempts and uncertain
+results must not become accomplishments. Text follows the recorded work's language;
+UI labels are English. HTML-like output is literal text, not executable markup.
+AI inference is not independent verification of code changes or passing tests.
+
+Use **Previous**, **Next**, **Today** or the date picker. Today advances at saved-zone
+midnight without new events; a manually chosen date stays fixed. Desktop and phones
+use the same single-report layout. **Copy report** copies the overall generated
+report, remaining work and coverage, not raw replies. Review private content before
+sharing. Clipboard support requires localhost/HTTPS and a compatible browser.
+
+Work recorded in any project, or a changed tracked-project inventory, marks the
+report out of date; there is no silent regeneration. Failed regeneration retains
+and labels the previous good report, including when copied. Status/stale notices
+update without rebuilding unchanged summary text, preserving reading/selection.
+No report means not generated, not “nothing was done.”
+
+## Projects, dates and bounded context
+
+“Tracked projects” means live projects known to persistent project memory or
+retained daily records, not a filesystem scan or a manual configuration list.
+All are considered, including closed/inactive projects. Only their **selected-day**
+records are input: shortened prompts/replies, optional reported accomplishments,
+outcomes and errors. A project with zero retained records is marked as no captured
+work for that day; this is not proof of inactivity. Older replies or project-card
+context are never borrowed into that day. Demo data and generation jobs are excluded.
+
+Days use original event times and the saved collector timezone, including DST;
+computer and phone share boundaries. No Git/disk scan, uncaptured computer activity
+or expired-history reconstruction is performed. Midnight-spanning requests retain
+only that day's available response/accomplishment context.
+
+The single input stays within ordinary control's **8,000-character prompt limit**.
+Project names and work excerpts are shortened; active projects are considered
+first and recent records are sampled round-robin across projects. Included/total
+project and record counts disclose omitted context when a large day cannot fit.
+Zero total records and omitted excerpts are distinguished. The output is bounded
+(2,400 summary and 800 remaining characters), so this is an overview, not a complete
+audit or quality certificate.
+
+## Persistence and privacy
+
+Captured `daily-reports.json` retains its existing format and up to **1,000
+day/request records and 12 MiB per live/demo mode**. Private `generated-reports.json`
+stores one all-project report per day, with **500 entries and 2 MiB** total limits.
+Previously generated per-project entries remain stored/exportable separately rather
+than being erased or falsely merged into a new report; they share that file's
+retention budget. The UI displays the new overall-day reports. Generated text/errors
+are bounded and redacted; both files use private atomic writes, not public static assets.
+
+Authenticated state/SSE/export includes captured records, tracked project names and
+retained reports. Viewing access covers all retained projects, not per-project browser
+ACLs. Thinking/raw provider objects are not captured. Redaction is best effort.
+Source context from **all included projects** is sent to the selected Pi model/provider
+only after approval, under that model's existing usage/data handling.
+
+Restart never replays queued requests. Unfinished generation/delivery becomes uncertain;
+a matching later result can still be recorded. Reports survive ordinary restart and
+detail expiry within retention bounds. Unreadable files are preserved with an invalid-file
+suffix; captured work remains available for explicit regeneration. Filesystem/power-loss
+survival is not guaranteed. Deleting journals alone does not erase summary files.
+
+`AGENT_DASHBOARD_CAPTURE_PROMPTS=0` disables generation capability and typed text emission;
+it does not purge old captured/generated text. Installing does not modify personal
+projects, control grants, tokens, models/workflows or existing Serve routes.
+See [control setup](CONTROL.md), [project retention](PROJECTS.md),
+[security](../SECURITY.md) and [verification scope](VERIFICATION.md).

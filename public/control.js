@@ -7,17 +7,21 @@ export function modelError(run) {
   return run?.outcome === 'error' ? 'Pi reported a model/provider error. No error details were recorded.' : '';
 }
 
-function unavailable() {
-  if (!current?.control?.enabled) return 'Control is off. Start PiScope with AGENT_DASHBOARD_CONTROL=1.';
-  if (!authorized) return 'Viewing only. Open the separate control pairing link in this browser to send work.';
-  const a = current.control.agents?.find(a => a.sessionId === current.s.id && a.projectId === current.s.projectId);
-  if (!a || a.until <= Date.now()) return 'Pi control is offline. In this project’s Pi session, use /dashboard-control on.';
-  if (a.runId !== current.r.id || current.s.runs.at(-1)?.id !== current.r.id) return 'This is an older request. Open the latest request to continue.';
-  if (a.limited) return 'Pi control limit reached. Use /dashboard-control off, then on in Pi.';
-  if (!a.idle || !current.r.settled || current.r.status === 'running') return 'Pi is busy or still settling. Wait until it finishes.';
-  if (current.control.reservations?.some(r => r.sessionId === current.s.id && r.runId === current.r.id)) return 'A request was already sent for this run. Check its receipt or the latest Pi request.';
-  return '';
+export function controlAvailability(s, r, control) {
+  const result = (code, reason) => ({ code, reason });
+  if (!control?.enabled) return result('collector_off', 'Control is off. Start PiScope with AGENT_DASHBOARD_CONTROL=1.');
+  if (!authorized) return result('view_only', 'Viewing only. Open the separate control pairing link in this browser to send work.');
+  if (!s || !r) return result('no_run', 'Open Pi in this project and finish a request first.');
+  const a = control.agents?.find(a => a.sessionId === s.id && a.projectId === s.projectId);
+  if (!s.connected || Date.now() - Date.parse(s.lastSeen) >= 30000 || !a || a.until <= Date.now()) return result('offline', 'Pi control is offline. In this project’s Pi session, use /dashboard-control on.');
+  if (a.runId !== r.id || s.runs.at(-1)?.id !== r.id) return result('stale', 'This is an older request. Open the latest request to continue.');
+  if (a.limited) return result('limited', 'Pi control limit reached. Use /dashboard-control off, then on in Pi.');
+  if (!a.idle || !r.endedAt || !r.settled || r.status === 'running') return result('busy', 'Pi is busy or still settling. Wait until it finishes.');
+  if (control.reservations?.some(entry => entry.sessionId === s.id && entry.runId === r.id)) return result('reserved', 'A request was already sent for this run. Check its receipt or the latest Pi request.');
+  return result('ready', '');
 }
+export function controlReason(s, r, control) { return controlAvailability(s, r, control).reason; }
+function unavailable() { return controlReason(current?.s, current?.r, current?.control); }
 function review(prompt, recommendationId) {
   if (sending || unavailable()) return;
   receipt = undefined; controlId('control-receipt').textContent = '';

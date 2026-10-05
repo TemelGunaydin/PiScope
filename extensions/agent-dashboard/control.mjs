@@ -2,13 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 /** Per-session opt-in. No resources until explicitly enabled by a local Pi command. */
 export class PiControl {
-  constructor(pi, client, state) {
-    this.pi = pi; this.client = client; this.state = state; this.owner = randomUUID();
+  constructor(pi, client, state, onSubmit = () => {}) {
+    this.pi = pi; this.client = client; this.state = state; this.onSubmit = onSubmit; this.owner = randomUUID();
     this.generation = 0; this.enabled = false; this.seen = new Set(); this.acks = [];
   }
   presence(state, enabled = this.enabled) {
     return { ...state.identity, runId: state.runId || this.restoredRunId || '', owner: this.owner, enabled,
-      limited: this.seen.size >= 100,
+      limited: this.seen.size >= 100, canReport: state.canReport === true,
       idle: Boolean(enabled && this.seen.size < 100 && state.settled && !state.running &&
         typeof state.context?.isIdle === 'function' && typeof state.context?.hasPendingMessages === 'function' &&
         state.context.isIdle() && !state.context.hasPendingMessages()) };
@@ -31,7 +31,8 @@ export class PiControl {
       const command = response.command;
       if (!command) return;
       const latest = this.state();
-      const valid = typeof command.id === 'string' && typeof command.prompt === 'string' && command.prompt.trim() && command.prompt.length <= 8000;
+      const reportValid = command.reportRequestId === undefined || (command.reportRequestId === command.id && latest.canReport === true);
+      const valid = reportValid && typeof command.id === 'string' && typeof command.prompt === 'string' && command.prompt.trim() && command.prompt.length <= 8000;
       const same = command.sessionId === latest.identity?.sessionId && command.projectId === latest.identity?.projectId && command.runId === (latest.runId || this.restoredRunId) && leaf === latest.context?.sessionManager?.getLeafId?.();
       const idle = this.presence(latest).idle;
       if (this.seen.has(command.id)) return;
@@ -42,9 +43,10 @@ export class PiControl {
       if (valid && same && idle && this.enabled) {
         try {
           // No steering, follow-up queue, template expansion, model switch or spawned Pi.
+          this.onSubmit(command);
           this.pi.sendUserMessage(command.prompt, { expandPromptTemplates: false });
           status = 'submitted';
-        } catch { this.lastError = 'Pi did not accept the prompt; check its terminal.'; }
+        } catch { this.onSubmit(undefined); this.lastError = 'Pi did not accept the prompt; check its terminal.'; }
       }
       this.acks.push({ id: command.id, status });
     } catch { if (generation === this.generation) this.lastError = 'Control connection unavailable. Check dashboard opt-in and /dashboard-status.'; }

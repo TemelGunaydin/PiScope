@@ -39,7 +39,7 @@ test('branding assets are public, typed, and keep Host/Origin and private-file b
     });
     assert.equal(code, 403);
   }
-  for (const path of ['/icon.json', '/auth.token', '/connection.json', '/daily-reports.json', '/src/config.mjs']) {
+  for (const path of ['/icon.json', '/auth.token', '/connection.json', '/daily-reports.json', '/generated-reports.json', '/src/config.mjs']) {
     assert.equal((await f.request(path)).status, 404);
   }
 });

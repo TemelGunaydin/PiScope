@@ -27,10 +27,13 @@ function usage(u) {
 }
 
 /** Pi adapter separated from schema imports so its behavior is unit-testable. */
-export function registerMonitor(pi, { schema, client = new MonitorClient(), now = () => new Date(), capturePrompts = process.env.AGENT_DASHBOARD_CAPTURE_PROMPTS !== '0', readProfile = readWorkflowProfile } = {}) {
+export function registerMonitor(pi, { schema, reportSchema, client = new MonitorClient(), now = () => new Date(), capturePrompts = process.env.AGENT_DASHBOARD_CAPTURE_PROMPTS !== '0', readProfile = readWorkflowProfile } = {}) {
   let context; let runId; let identity; let heartbeat; let droppedReported = 0; let running = false;
   let runStartedAt; let settled = true; const reportKeys = new Set();
-  const control = new PiControl(pi, client, () => ({ context, identity: context ? identify(context) : identity, runId, running, settled }));
+  let pendingReport, activeReportId;
+  const control = new PiControl(pi, client, () => ({ context, identity: context ? identify(context) : identity, runId, running, settled, canReport: Boolean(reportSchema && capturePrompts) }), command => {
+    pendingReport = command?.reportRequestId ? { ...command, until: now().getTime() + 15000 } : undefined;
+  });
   const toolCalls = new Map(), fingerprints = new Map();
   function identify(ctx) {
     const cwd = ctx.cwd || process.cwd();
@@ -41,7 +44,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     if (!ctx) return;
     identity ||= identify(ctx);
     return client.enqueue({ schemaVersion: 1, id: randomUUID(), type, ...identity, runId: runScoped ? runId : undefined,
-      time: now().toISOString(), data });
+      time: now().toISOString(), ...(runScoped && activeReportId ? { reportRequestId: activeReportId } : {}), data });
   }
   const listen = (event, handler) => pi.on(event, (e, ctx) => {
     try { return handler(e, ctx); } catch (error) {
@@ -52,7 +55,7 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
   listen('session_start', (_e, ctx) => {
     void control.stop();
     context = ctx; identity = identify(ctx); runId = undefined; running = false; settled = true;
-    runStartedAt = undefined; reportKeys.clear();
+    runStartedAt = undefined; pendingReport = undefined; activeReportId = undefined; reportKeys.clear();
     toolCalls.clear(); fingerprints.clear(); clearInterval(heartbeat); client.start();
     emit('session.connected', { model: modelName(ctx.model) }, ctx);
     heartbeat = setInterval(() => {
@@ -65,16 +68,19 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
   });
   listen('session_tree', (_e, ctx) => {
     void control.stop(); context = ctx; identity = identify(ctx); runId = undefined; running = false; settled = true;
+    pendingReport = undefined; activeReportId = undefined;
     emit('session.connected', { model: modelName(ctx.model) }, ctx);
   });
   listen('before_agent_start', (e, ctx) => {
     context = ctx; identity = identify(ctx); runId = randomUUID(); running = true; settled = false;
     runStartedAt = now().getTime(); reportKeys.clear();
+    activeReportId = pendingReport && pendingReport.until >= runStartedAt && pendingReport.prompt === e.prompt && pendingReport.sessionId === identity.sessionId && pendingReport.projectId === identity.projectId ? pendingReport.reportRequestId : undefined;
+    pendingReport = undefined;
     toolCalls.clear(); fingerprints.clear();
     emit('prompt.received', { prompt: capturePrompts ? redact(e.prompt, 12000) : '[Prompt capture disabled]' }, ctx);
     try {
       const workflow = readProfile(ctx.cwd || process.cwd());
-      if (workflow) emit('workflow.configured', { workflow }, ctx);
+      if (workflow && !activeReportId) emit('workflow.configured', { workflow }, ctx);
     } catch {
       emit('monitor.warning', { message: 'Workflow profile invalid or unreadable; this run is excluded from workflow comparisons.' }, ctx);
     }
@@ -200,6 +206,16 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     async execute(_id, params, _signal, _update, ctx) {
       const recorded = emit('workflow.updated', { stages: params.stages, ...(capturePrompts && params.accomplishments !== undefined ? { accomplishments: params.accomplishments } : {}), recommendations: capturePrompts ? params.recommendations || [] : [], reason: redact(params.reason || '', 500), source: 'reported' }, ctx) !== false;
       return { content: [{ type: 'text', text: recorded ? 'Workflow update queued for the local monitor. No work was executed.' : 'Workflow update could not be persisted. Check /dashboard-status. No work was executed.' }], details: { recorded } };
+    }
+  });
+  if (reportSchema) pi.registerTool({
+    name: 'daily_report', label: 'Daily work report',
+    description: 'Return one overall daily summary across the tracked projects for an explicitly approved PiScope daily-report request. Reports only; never runs work or proves quality. Use only when asked by a PiScope report request.',
+    parameters: reportSchema,
+    async execute(_id, params, _signal, _update, ctx) {
+      const valid = capturePrompts && running && activeReportId && params.requestId === activeReportId && identify(ctx).sessionId === identity?.sessionId;
+      const recorded = Boolean(valid && emit('daily.reported', { summary: params.summary, remaining: params.remaining }, ctx) !== false);
+      return { content: [{ type: 'text', text: recorded ? 'Daily summary queued for PiScope. No work was executed.' : 'Daily summary not recorded: no matching approved report request or capture/storage is unavailable.' }], details: { recorded } };
     }
   });
   return { client, control };

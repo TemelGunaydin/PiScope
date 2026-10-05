@@ -43,6 +43,14 @@ publicly while arranging that channel. No response-time guarantee is offered.
   at most once during a runtime. Unknown delivery is not retried. Queued prompts
   are not in exports; normal Pi history/capture applies after delivery.
   Disabling control does not abort work already running in Pi.
+- Daily report generation uses the same control grants and ordinary Pi input,
+  not a provider API or a permission sandbox. Recorded context is scoped to the
+  chosen day across all tracked projects and sent in one request to the selected
+  Pi session's current model after exact preview/approval. The runtime's project
+  identifies the execution target, not a filter on the included report context.
+  Generated text is untrusted prose, rendered literally and not independent proof
+  of work or test quality. Generation consumes model quota; there are no automatic
+  requests/retries. [Context, retention and limits](docs/DAILY-REPORTS.md).
 - Imported JUnit summaries are report observations, not signed runner evidence
   or proof that a specific commit passed tests.
 - Event history, persistent project summaries, daily report excerpts, pending

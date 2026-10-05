@@ -24,24 +24,51 @@ kotasıyla dosya değiştirebilir veya araç çalıştırabilir. PiScope doğrud
 
 ## Bugün neler yaptım?
 
-Menüden **Daily report** ekranını aç. Solda proje adı, sağda o gün kaydedilen
-istekler ve sonuçlar görünür; telefonda alt alta yerleşir. Tarih seçerek geçmiş
-günlere bakabilir, **Today** ile bugüne dönebilir ve **Copy report** ile bütün
-günün raporunu metin olarak kopyalayabilirsin. **Previous / Next** önceki ve
-sonraki güne geçer. Raporda gösterilen saat dilimi bilgisayar ve telefonda aynı
-gün sınırlarını korur. **Open request** saklanan ayrıntıyı açar;
-**Back to daily report** seçilen güne ve okuma konumuna döner. Kopyaladığın
-raporu paylaşmadan önce özel içeriği kontrol et.
+**Daily report** ekranında tarih seç ve tek **Generate report** düğmesine bas.
+Pi oturumunu, mevcut modeli ve bütün projelerden gönderilecek bağlamı incele;
+**Confirm and generate in Pi** ile onayla. Mevcut Pi modeli tanımlı/izlenen bütün
+projelerin o günkü kayıtlarını **tek model isteğinde, tek genel günlük rapora**
+dönüştürür. Proje başına ayrı buton/üretim veya rapor kartı yoktur; prompt ve model
+yanıtları da tek tek listelenmez.
 
-Kısa sonuç maddeleri agent’ın isteğe bağlı `workflow_report.accomplishments`
-bildiriminden gelir. Bu yoksa kaydedilen yanıt özeti gösterilir; yeni başarılar
-uydurulmaz. **Response finished**, teknik tamamlanmadır; işin doğru yapıldığını
-veya testlerin geçtiğini kanıtlamaz. Hata, iptal ve sonucu bilinmeyen işler ayrıca
-işaretlenir. Ek model çağrısı veya kontrol izni gerekmez. Yalnız izlenen/kaydedilen
-işler görünür; eski günler eksik olabilir. Bu güncelleme için mevcut ayarlarını koruyarak
-PiScope’u yeniden başlatıp tarayıcıyı yenile. Kısa sonuç maddeleri için proje
-eklentisini de `--update` ile yenileyip Pi’yi yeniden başlat;
-kayıtlı yanıtları görmek için bu ikinci adım şart değildir.
+Üretim için [üç ayrı kontrol izni](docs/CONTROL.md),
+açık/boşta tek bir Pi oturumu, o oturumda güncel `daily_report` aracı ve açık prompt
+capture yeterlidir. Diğer projelerin Pi oturumları kapalı olabilir; kayıtlı günlük
+bağlamları yine rapora dahil edilir. Yeni API anahtarı gerekmez; model değişmez veya yeni Pi süreci
+başlatılmaz. **Üretim mevcut model kotasını kullanır; yalnız görüntüleme kullanmaz.**
+PiScope otomatik üretim/yeniden deneme başlatmaz; Pi’nin mevcut retry ayarları korunur.
+
+**Use the model from this Pi session**, raporu yazacak mevcut modeli seçer;
+**rapora dahil edilecek projeleri filtrelemez**. Uygun oturum varsa otomatik
+seçilir; senin açık seçimin korunur. Mevcut model ayrıca gösterilir; bağlantısı
+kesilmiş eski oturumlar yeni hedef olarak sunulmaz. Bütün projelerin tek raporu
+için yalnız bir hazır üretim oturumu yeterlidir.
+
+**Generate report pasifse**, yanındaki panel nedenini ve ilgili kurulum adımlarını
+gösterir; hiçbir izin kendiliğinden açılmaz:
+
+| Durum | Yapılacak işlem |
+|---|---|
+| Viewing only | Bu tarayıcıda ayrı **Control pairing** bağlantısını aç. İzleme eşleştirmesi iş gönderemez. |
+| Setup needed / Session needed | Collector kontrolünü etkinleştir; bitmiş isteği olan güncel Pi oturumunu aç ve o oturumda `/dashboard-control on` yaz. |
+| Update needed | PiScope klasöründen yalnız seçili projenin eklentisini güncelle, Pi’yi yeniden aç ve yerel kontrolü tekrar etkinleştir. `daily_report` ve açık prompt capture gerekir; eski eklentili oturumu seçmek tek başına yeterli değildir. |
+| Busy | Pi’nin bitmesini bekle veya başka hazır oturum seç. PiScope aktif işi kesmez. |
+| No context | Kayıtlı çalışma metni olan bir gün seç. Yakalanmamış veya süresi dolmuş geçmiş yeniden oluşturulamaz. |
+
+LLM tekrarları birleştirir; planları ve başarısız işleri yapılmış gibi sunmaması
+istenir. **Remaining / blocked** bitmeyen işleri ayrı gösterir. Özet, bağımsız
+kod/test doğrulaması değildir. Bağlam sınırlıdır ve kapsam sayısı gösterilir;
+eski/atlanmış işler eksik olabilir. Yeni kayıt gelince özetin eski olduğu belirtilir.
+Üretim başarısızsa önceki iyi özet korunur; hata veya sıradan model yanıtı yeni
+özet gibi gösterilmez. **Previous / Next / Today** ile günü değiştir,
+**Copy report** ile üretilmiş özetleri kopyala; paylaşmadan önce özel içeriği kontrol et.
+Bilgisayar ve telefonda raporun gösterdiği saat dilimi kullanılır.
+
+Güncellemeden sonra mevcut kontrol/Tailscale ayarlarını koruyarak PiScope’u
+yeniden başlatıp tarayıcıyı yenile. PiScope klasöründen yalnız raporu üretecek
+projenin eklentisini `npm run install:pi -- "/tam/yol/proje" --update` ile güncelle; o projedeki Pi’yi
+yeniden açıp hazır olduğunda `/dashboard-control on` yaz. Aktif işi yalnız
+güncelleme için kesme. Sadece izleme eşleştirmesi rapor üretemez.
 [Ayrıntılar ve saklama sınırları](docs/DAILY-REPORTS.md).
 
 ## 1. PiScope’u çalıştır
@@ -254,6 +281,9 @@ yeni gönderimleri kapatır, başlamış işi durdurmaz.
 Son istek, son yanıt, çalışma tarihi ve bildirilen ilk bitmemiş plan adımı
 saklanır. Proje/metin araması ve durum/7+ gün filtresi vardır. Kartlar proje
 adına göre sabit sırada kalır; yeni olaylarla yer değiştirmez.
+Masaüstünde aynı satırdaki kartlar eşit yüksekliktedir; sonraki adım ve işlem
+alanları alta hizalanır. Uzun metin açılınca veya yazı boyutu büyüyünce satır
+birlikte uzar, içerik kesilmez. Mobilde kartlar doğal yüksekliklerini korur.
 
 Model/sağlayıcı hatası kartta hata metniyle gösterilir. Aktif istek yoksa kırmızı
 **Error** rozeti görünür; çalışma devam ediyorsa **Running** korunur.
@@ -293,9 +323,11 @@ Sunucu kapalıyken Pi olayları diskte bekletir ve tekrar gönderir. İstemci ba
 varsayılan **5.000 olay / 20 MiB** kapasite dolunca yeni olaylar reddedilir,
 kabul edilmişler korunur. `/dashboard-status` ile kontrol et. Ayrıntılı geçmiş
 sınırlıdır; kısa proje özetleri daha uzun saklanır (canlı/demo başına **500**).
-Günlük raporlar mod başına en çok **1.000 gün/istek kaydı ve 12 MiB** tutar;
-ayrıntılı oturum geçmişi silinse veya PiScope yeniden başlasa da kısa günlük
-kayıtlar sınırlar dahilinde korunur. Yalnız journal silmek proje/günlük özetlerini
+Günlük bağlam mod başına en çok **1.000 gün/istek kaydı ve 12 MiB** tutar;
+üretilmiş raporlar ayrı dosyada gün başına tek genel rapor olarak en çok **500
+kayıt ve 2 MiB** ile saklanır. Eski proje bazlı raporlar silinmez; aynı bütçeyi paylaşır.
+Ayrıntılı oturum geçmişi silinse veya PiScope yeniden başlasa da özetler bu
+sınırlar dahilinde korunur. Yalnız journal silmek proje/günlük özetlerini
 silmez; export sonsuz arşiv değildir.
 
 İstek, yanıt ve ayrıntılı model/sağlayıcı hata metinlerini kaydetmemek için
@@ -307,7 +339,8 @@ AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
 
 Dosya adları, model kimlikleri, plan aşamaları ve genel hata bildirimi kalabilir.
 Öneri ve kısa sonuç maddeleri de kaydedilmez; önceden kaydedilmiş veriler
-silinmez. Açık kontrol üzerinden onaylanan prompt yine Pi’ye iletilir. Hata
+silinmez. Bu ayarla günlük rapor üretimi de kapanır. Açık kontrol üzerinden
+onaylanan Other prompt’u yine Pi’ye iletilir. Hata
 metinleri sınırlanır ve maskelenir; maskeleme bütün sırları bulma garantisi değildir. Aynı OS kullanıcısı yerel kayıtları okuyabilir.
 Paylaşmadan önce export’u incele. [Güvenlik politikası](SECURITY.md).
 

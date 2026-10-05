@@ -6,7 +6,7 @@ export const TYPES = new Set([
   'session.connected', 'session.disconnected', 'session.heartbeat',
   'prompt.received', 'run.started', 'run.ended', 'run.settled', 'model.selected',
   'message.completed', 'tool.started', 'tool.finished',
-  'agent.started', 'agent.progress', 'agent.finished', 'workflow.updated', 'workflow.configured', 'tests.recorded', 'monitor.warning'
+  'agent.started', 'agent.progress', 'agent.finished', 'workflow.updated', 'workflow.configured', 'tests.recorded', 'monitor.warning', 'daily.reported'
 ]);
 const statuses = new Set(['pending', 'running', 'done', 'error', 'blocked', 'cancelled']);
 const isObject = x => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -59,6 +59,10 @@ export function validateEvent(raw, now = new Date()) {
       status: t.status === 'running' ? 'running' : 'done'
     }));
   }
+  if (raw.type === 'daily.reported') {
+    if (!raw.reportRequestId || typeof d.summary !== 'string' || !d.summary.trim() || (d.remaining !== undefined && typeof d.remaining !== 'string')) throw new Error('Invalid daily summary');
+    data.summary = str(d.summary, 2400); data.remaining = str(d.remaining, 800); data.source = 'reported';
+  }
   if (raw.type === 'workflow.configured') data.workflow = workflowProfile(d.workflow);
   if (raw.type === 'tests.recorded') {
     identifier(raw.runId, 'runId');
@@ -83,6 +87,7 @@ export function validateEvent(raw, now = new Date()) {
     schemaVersion: 1, id: identifier(raw.id, 'id'), type: raw.type,
     sessionId: identifier(raw.sessionId, 'sessionId'),
     runId: raw.runId ? identifier(raw.runId, 'runId') : undefined,
+    ...(raw.reportRequestId !== undefined ? { reportRequestId: identifier(raw.reportRequestId, 'reportRequestId') } : {}),
     projectId: identifier(raw.projectId, 'projectId'), projectName: str(raw.projectName) || 'Proje',
     time: new Date(date).toISOString(), receivedAt: now.toISOString(),
     demo: raw.demo === true, recovered: raw.recovered === true, data

@@ -13,7 +13,7 @@ import { saveConnection } from '../src/config.mjs';
 const dir = mkdtempSync(join(tmpdir(), 'piscope-control-pi-'));
 const token = randomBytes(32).toString('hex'), controlToken = randomBytes(32).toString('hex');
 const dataDir = join(dir, 'dashboard'), agentDir = join(dir, 'pi'); mkdirSync(agentDir);
-let app, child, handled = 0, diagnostic = '';
+let app, child, handled = 0, reportsHandled = 0, diagnostic = '';
 const waitFor = async (fn, label) => {
   const deadline = Date.now() + 12000;
   while (!fn()) { if (Date.now() > deadline) throw new Error(`Timed out: ${label}`); await new Promise(r => setTimeout(r, 50)); }
@@ -24,7 +24,8 @@ try {
   writeFileSync(probe, `export default function(pi) {
     pi.on('input', (event, ctx) => {
       if (event.source === 'extension') {
-        ctx.ui.notify(event.text === 'PISCOPE_CONTROL_SMOKE' ? 'CONTROL_INPUT_HANDLED' : 'UNEXPECTED_CONTROL_INPUT', 'info');
+        const report = event.text.startsWith('PiScope daily work summary. Request ID: real-pi-report');
+        ctx.ui.notify(event.text === 'PISCOPE_CONTROL_SMOKE' ? 'CONTROL_INPUT_HANDLED' : report ? 'REPORT_INPUT_HANDLED' : 'UNEXPECTED_CONTROL_INPUT', 'info');
         return { action: 'handled' }; // Guarantees this check cannot reach a model.
       }
     });
@@ -38,6 +39,7 @@ try {
     let e; try { e = JSON.parse(line); } catch { return; }
     if (e.type === 'response' && e.id === 'commands' && e.success) commands = e.data.commands;
     if (e.type === 'extension_ui_request' && e.message === 'CONTROL_INPUT_HANDLED') handled++;
+    if (e.type === 'extension_ui_request' && e.message === 'REPORT_INPUT_HANDLED') reportsHandled++;
     if (e.type === 'extension_ui_request' && e.message === 'UNEXPECTED_CONTROL_INPUT') diagnostic += 'unexpected input';
   });
   const send = packet => child.stdin.write(JSON.stringify(packet) + '\n');
@@ -46,8 +48,8 @@ try {
   assert.ok(commands.some(c => c.name === 'dashboard-control'));
   const session = [...app.store.sessions.values()][0];
   // Synthetic retained terminal request proves adoption after a runtime reload.
-  const record = (type, data) => app.store.append({ schemaVersion: 1, id: randomBytes(16).toString('hex'), time: new Date().toISOString(),
-    type, data, sessionId: session.id, projectId: session.projectId, projectName: session.projectName, runId: 'synthetic-prior-run' });
+  const record = (type, data, runId = 'synthetic-prior-run') => app.store.append({ schemaVersion: 1, id: randomBytes(16).toString('hex'), time: new Date().toISOString(),
+    type, data, sessionId: session.id, projectId: session.projectId, projectName: session.projectName, runId });
   record('prompt.received', { prompt: 'Synthetic prior request' }); record('run.ended', { outcome: 'idle' }); record('run.settled', {});
   send({ id: 'enable', type: 'prompt', message: '/dashboard-control on' });
   await waitFor(() => app.control.snapshot().agents.some(a => a.idle), 'explicit local control opt-in');
@@ -61,7 +63,18 @@ try {
   assert.equal(session.runs.length, 1, 'The intercepted input must never start a model run');
   send({ id: 'disable', type: 'prompt', message: '/dashboard-control off' });
   await waitFor(() => app.control.snapshot().agents.length === 0, 'control revocation');
-  console.log('Installed Pi: explicit opt-in, retained-run adoption, real sendUserMessage/input delivery, exactly-once handoff and revocation passed. Input was intercepted; no model called.');
+  record('prompt.received', { prompt: 'Synthetic report source' }, 'synthetic-report-source');
+  record('run.ended', { outcome: 'idle', summary: 'Calendar navigation improved.' }, 'synthetic-report-source'); record('run.settled', {}, 'synthetic-report-source');
+  send({ id: 'enable-report', type: 'prompt', message: '/dashboard-control on' });
+  await waitFor(() => app.control.snapshot().agents.some(a => a.idle && a.canReport && a.runId === 'synthetic-report-source'), 'report-capable installed Pi');
+  const report = { id: 'real-pi-report', sessionId: session.id, projectId: session.projectId, runId: 'synthetic-report-source', reportDay: app.store.dailyMemory.day(Date.now()) };
+  const preview = await fetch(url + '/api/control/report-preview?' + new URLSearchParams(report), { headers }); assert.equal(preview.status, 200);
+  const reportPreview = await preview.json(); const input = { ...report, expectedPrompt: reportPreview.prompt, expectedSourceHash: reportPreview.sourceHash };
+  for (let i = 0; i < 2; i++) assert.equal((await fetch(url + '/api/control/requests', { method: 'POST', headers, body: JSON.stringify(input) })).status, 202);
+  await waitFor(() => reportsHandled === 1 && app.control.requests.get(report.id)?.status === 'submitted', 'actual approved report input');
+  assert.equal(reportsHandled, 1); assert.equal(session.runs.length, 2, 'Report input is also intercepted before any model run'); assert.equal(diagnostic, '');
+  send({ id: 'disable-report', type: 'prompt', message: '/dashboard-control off' }); await waitFor(() => app.control.snapshot().agents.length === 0, 'report control revocation');
+  console.log('Installed Pi: ordinary continuation and approved daily-report input delivered once through real sendUserMessage/input; capability, preview and revocation passed. Both inputs were intercepted; no model called.');
 } finally {
   if (child && child.exitCode === null && child.signalCode === null) {
     child.kill('SIGTERM');

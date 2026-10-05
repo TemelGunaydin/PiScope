@@ -1,5 +1,96 @@
 # Verification log / Doğrulama kaydı
 
+## Publication gates — 2026-10-05
+
+- Rechecked **197/197 tests**, **47 JavaScript modules**, shell syntax, diff
+  whitespace and **82 local Markdown links** before committing.
+- Installed **Pi 1.0.3** monitoring/recovery and approved-control smoke passed.
+  Ordinary and daily-report inputs were delivered once through real Pi input,
+  intercepted before model execution. No paid model call or physical phone test.
+- English/Turkish READMEs describe equal-height desktop rows, natural-height
+  mobile cards, the execution-model selector and disabled-Generate setup states.
+  Browser evidence is recorded below; hosted CI is checked separately after push.
+
+## Report setup UX and aligned project cards — 2026-10-05
+
+- Project cards stretch to equal heights within each desktop grid row, with
+  next-step/actions at the bottom. Browser assertions cover unequal text lengths,
+  expansion, live response replacement and 200% text without clipping. Existing
+  filters, ordering, focus and return-scroll tests remain intact.
+- Daily report separates date, execution model/readiness and output/copy. One
+  Generate button remains; named setup states explain the relevant permission,
+  update/restart, busy or missing-context action. Disconnected historical sessions
+  are excluded from new choices; explicit selection stays fixed. No guard is bypassed.
+- **197/197 unit tests**, **47 syntax-checked modules** and diff checks passed.
+  Daily, monitoring and control browser suites passed over real HTTP/SSE and a
+  disposable simulated Serve HTTPS proxy. Setup-state snapshots, keyboard focus,
+  390 px layout, 200% text and text contrast were checked; synthetic screenshots
+  were inspected. No paid model call, physical iPhone check or hosted CI was run.
+- These edits do not update personal project extensions, grant permissions,
+  alter model/workflow settings, read private history or change Serve routes.
+
+## One all-project daily report — 2026-10-05
+
+This replaces the per-project generation prototype below: one global Generate
+report button, one eligible Pi execution session, one approved model request and
+one overall report for the selected day across all tracked live projects.
+
+- `npm run check`: **47 modules**. `npm test`: **197/197 passed**, no failures/skips.
+  Shell syntax and diff whitespace checks passed.
+- Regression proof: inactive/closed projects' retained context is included without
+  their own control grants; demo and other-day work is excluded, zero-record projects
+  do not borrow old work, and bounded context is sampled across projects fairly.
+  Both exact prompt and full source hash are approval-bound, including changes
+  outside shortened excerpts. Pending-day duplicates from another runtime fail;
+  completed regeneration from another runtime replaces one day slot. Legacy
+  project reports remain separately stored/exportable, not silently deleted.
+- Installed-Pi load/monitoring and actual intercepted approved report-input delivery
+  passed. Browser report tests over real HTTP/SSE and simulated Serve HTTPS assert
+  exactly **one Generate button, no per-project cards, and one submitted request**
+  for multiple projects. Preview/cancel/confirm, output/copy, date isolation,
+  cross-project staleness, failure retention, focus/selection stability, 390 px
+  and 200% text passed. Existing monitoring/control browser suites passed in both modes.
+- Synthetic desktop/mobile screenshots inspected. No paid model call or physical
+  iPhone was tested; HTTPS uses a disposable proxy. Actual LLM tool compliance and
+  report quality remain unverified. No personal history, project installations,
+  models/permissions, tokens or Serve routes were changed; no push/hosted CI for
+  these local changes. [Activation and limits](DAILY-REPORTS.md).
+
+## Approved AI daily summaries — 2026-10-05
+
+Environment: macOS, Node.js v26.5.0, installed Pi 1.0.2, system Google Chrome.
+
+- `npm run check`: **47 JavaScript modules** passed. `npm test`:
+  **193/193 passed**, no failures or skips. Shell syntax and diff whitespace checks passed.
+- Scoped coverage: control-only exact preview, day/project/capability/idle checks,
+  unchanged-source confirmation and duplicate delivery; bound typed output plus
+  observed request/technical completion, no plain-reply fallback; capture privacy,
+  redaction, no generation-job feedback, stale source, provider failure/cancellation,
+  expired/uncertain handoff, retry draft isolation, previous good summary retention,
+  late old results, restart non-replay, corruption and failed storage. Generated
+  file count and UTF-8 byte limits were exercised with synthetic entries.
+- `npm run test:pi` and `npm run test:pi:control` passed. The actual installed Pi
+  exposed report capability and received the approved report prompt once through
+  real `sendUserMessage`/`input`, despite duplicate confirmation. Ordinary control
+  and revocation also passed. **Both inputs were intercepted before model execution**;
+  this proves loader/capability/delivery, not paid-provider synthesis or quality.
+- `test/daily-browser.py` over HTTP and simulated Serve HTTPS passed: read/control
+  separation, exact context preview/cancel/confirm, current Pi session/model display,
+  per-project/day summaries without raw request/reply listings, scoped context,
+  stale-preview rejection, failed regeneration and prior-summary copy labeling,
+  truthful ready/failure status, literal HTML-like output, unchanged reading/selection/
+  focus under unrelated SSE, date navigation, saved-zone offline midnight,
+  reload, 390 px layout and 200% text. Desktop/mobile synthetic screenshots inspected.
+- Existing monitoring and control browser suites passed over HTTP and simulated
+  HTTPS. HTTPS uses an isolated proxy, **not a physical iPhone/tailnet check**.
+  Model output is mocked; **no paid model call** was made. Real-provider tool
+  compliance, synthesis quality and compatibility with every Pi workflow remain unverified.
+- No personal history, project installations, model/workflow configuration,
+  permissions, credentials or Serve routes changed. This feature has no hosted
+  CI result yet. The published `2a2de0a` baseline's hosted run `37297983291`
+  was separately confirmed successful; that is not CI proof of these changes.
+  [Activation, quota and limitations](DAILY-REPORTS.md).
+
 ## Daily project reports — 2026-10-05
 
 Environment: macOS, Node.js v26.5.0, installed Pi 1.0.2, system Google Chrome.

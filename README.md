@@ -16,7 +16,7 @@ English · [Turkish setup guide](README.tr.md)
 *The screenshot uses synthetic data, not real prompts or measured model performance.*
 
 PiScope is a companion to Pi, not another coding agent. It **observes by default**.
-Optional [approved continuation](docs/CONTROL.md) sends your confirmed prompt to
+Optional [approved continuation](docs/CONTROL.md) and [daily report generation](docs/DAILY-REPORTS.md) send your confirmed prompt to
 an existing, idle Pi session; Pi can then edit files or run tools using its
 current model, permissions and quota. PiScope does not choose providers or call
 models directly. No additional model subscription or API key is needed.
@@ -27,8 +27,8 @@ in their original language.
 
 - **All your monitored Pi projects:** one card per project, even across several sessions.
 - **Recent context:** last request, last response, last work time and reported plan step.
-- **Daily report:** choose a date and see recorded work across projects, with
-  reported accomplishments, response excerpts, separate errors and **Copy report**.
+- **Daily report:** one **Generate report** button summarizes the selected day
+  across all tracked projects with the current Pi model, plus remaining work and **Copy report**.
 - **Response beside continuation:** read the selected request's **Last model response**
   inside **Continue this project**, alongside Recommended and Other.
 - **Provider errors:** reported model/provider failures appear on project cards and
@@ -45,6 +45,9 @@ in their original language.
 Cards stay in project-name order instead of jumping around during live updates.
 Use search and status filters, **Open last request**, and **Back to projects** to
 move between the overview and details. Long saved text expands with **Show more**.
+Cards in the same desktop row have equal heights, with next steps and actions
+aligned at the bottom. Expanded text and larger fonts grow the row without
+clipping content; mobile cards keep their natural height.
 
 **“Last request finished” does not mean the entire project is complete or tests
 passed.** Plan steps are agent reports, not proof of execution. Missing outcomes
@@ -52,28 +55,51 @@ remain unknown; missing usage is not zero, and tokens are not a cost estimate.
 
 ## Your daily work report
 
-Open **Daily report** in the navigation to answer “What did I get done today?”
-Project names sit on the left and recorded requests/outcomes on the right;
-phones stack them vertically. Choose a date, use **Previous**, **Next** or
-**Today**, and **Copy report** to collect that day's work as text.
+Open **Daily report** to answer “What did I get done today?” Choose a date, then
+click the single **Generate report** button. Review the chosen Pi session, current
+model and exact context from all included projects; **Confirm and generate in Pi**
+starts one normal model request for the entire day, not one per project. It needs
+the [three control opt-ins](#4-optional-continue-pi-from-the-dashboard) and an updated
+extension with `daily_report` and prompt capture on in just that one execution session.
+Other tracked projects can be closed/offline; their retained daily work is still included.
+No new API key, provider integration, model switch or automatically spawned Pi is used.
+Generation consumes the existing model's quota; merely viewing the report does not.
 
-Brief accomplishments come from optional `workflow_report.accomplishments`;
-otherwise PiScope displays recorded response excerpts, not invented achievements.
-Errors, cancellation and unknown outcomes stay distinct. No extra model calls
-or control permission are needed. Reports cover captured activity only, and
-older work may be missing. **Response finished** means technical completion,
-not independently verified work or passing tests. The displayed report timezone
-keeps the same day boundaries on your computer and phone. **Open request** opens
-retained details; **Back to daily report** restores the chosen day and position.
-Review private content before sharing a copied report.
+**Use the model from this Pi session** selects the report writer, **not a project
+filter**. A ready session is selected automatically when available; your explicit
+choice is retained. The current model is shown separately, and disconnected
+historical sessions are not offered as new targets. Only one ready execution
+session is needed for the overall report.
+
+**If Generate report is disabled**, the panel beside it explains why and shows
+relevant setup steps; no permissions are enabled automatically:
+
+| State | What to do |
+|---|---|
+| Viewing only | Open the separate **Control pairing** link in this browser. Viewing pairing alone cannot send work. |
+| Setup needed / Session needed | Enable collector control, open a current Pi session with a finished request, and use `/dashboard-control on` in that session. |
+| Update needed | Update only the chosen project's extension from the PiScope directory, restart Pi, and re-enable local control. Reporting requires `daily_report` and prompt capture; selecting an old extension alone cannot enable generation. |
+| Busy | Let Pi finish, or select another ready session. PiScope does not interrupt active work. |
+| No context | Choose a day with captured work text. Missing or expired history cannot be reconstructed. |
+
+The LLM combines captured work across tracked projects into one overall daily report, instead of
+listing prompts or model replies. **Remaining / blocked** is separate; plans and
+failed attempts must not be presented as accomplishments. Summaries are AI reports,
+not independent verification of changes or passing tests. Input is bounded, with
+coverage shown; old or omitted work can be missing. More work marks a summary
+out of date, without automatic regeneration. A failed generation keeps the previous
+successful summary rather than replacing it with an error or normal chat response.
+
+There are no per-project generation buttons or report cards; desktop and phones
+show one report. Use **Previous**, **Next**, **Today** and **Copy report**. Computer and phone use
+the displayed report timezone. Review private content before sharing a copied report.
 
 **After updating:** restart PiScope with your existing control/Tailscale settings,
-then refresh the browser. Retained replies populate the report without a project
-extension update. For future brief accomplishment lists, update each project's
-extension with `npm run install:pi -- "/absolute/path/to/project" --update`
-from the PiScope directory, then restart Pi in that project. Do not interrupt
-active work just to upgrade; re-enable `/dashboard-control on` only if needed.
-[Sources, timezone, retention and updates](docs/DAILY-REPORTS.md).
+refresh the browser, and update only the report-producing project's extension
+from the PiScope directory with `npm run install:pi -- "/absolute/path/to/project" --update`. Restart that
+project's Pi runtime, then explicitly re-enable `/dashboard-control on` when ready.
+Do not interrupt active work just to upgrade. Viewing pairing alone cannot generate.
+[Generation, sources, timezone, retention and limitations](docs/DAILY-REPORTS.md).
 
 ## 1. Run PiScope locally
 
@@ -328,7 +354,9 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
   are rejected at capacity; accepted history is kept. Check `/dashboard-status`.
 - The journal rotates and detailed history is bounded. Short project summaries
   survive longer (up to **500 live projects**, separately from hidden demo data).
-  Daily excerpts retain up to **1,000 day/request records and 12 MiB per mode**.
+  Daily context retains up to **1,000 day/request records and 12 MiB per mode**;
+  generated reports separately retain up to **500 entries and 2 MiB**, one overall
+  report per day; retained legacy per-project reports share that budget.
   Exports contain retained state, not an unlimited archive. Deleting journals
   alone does not erase project summaries or daily excerpts.
   [Project memory](docs/PROJECTS.md) · [Daily reports](docs/DAILY-REPORTS.md).
@@ -342,7 +370,8 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
 
   File names, model identities and reported stages may still be recorded.
   This also omits reported recommendations and accomplishments; generic error
-  notices remain visible. It does not purge previously captured data.
+  notices remain visible. Daily generation is disabled with this setting.
+  It does not purge previously captured or generated data.
   Control prompts still reach Pi when approved.
 - Same-user OS processes can read local records. Tailscale is an extra network
   boundary, not per-project or multi-user authorization. Review exports before
