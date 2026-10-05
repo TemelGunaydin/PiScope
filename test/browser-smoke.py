@@ -96,7 +96,8 @@ with sync_playwright() as pw:
             'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
         target.add_script_tag(content=(root / 'public/control.js').read_text().replace('export ', ''))
-        target.add_script_tag(content=(root / 'public/app.js').read_text().replace("import { initializeControls, renderControls, modelError } from './control.js';", ''))
+        target.add_script_tag(content=(root / 'public/report.js').read_text().replace('export ', ''))
+        target.add_script_tag(content=(root / 'public/app.js').read_text().replace("import { initializeControls, renderControls, modelError } from './control.js';", '').replace("import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';", ''))
     if args.network:
         browser_url = config['tailscaleUrl'] if args.tailscale else config['url']
         if args.tailscale:

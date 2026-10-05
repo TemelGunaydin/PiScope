@@ -100,6 +100,18 @@ test('reported recommendations obey disabled prompt capture', async t => {
   assert.deepEqual(f.client.queue.find(e => e.type === 'workflow.updated').data.recommendations, []);
   assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_'));
 });
+test('brief accomplishments are reported without execution and obey disabled capture', async t => {
+  for (const capturePrompts of [true, false]) {
+    const f = setup(t, { capturePrompts }); f.emit('before_agent_start', { prompt: 'Synthetic work' });
+    await f.tools.get('workflow_report').execute('report', { stages: [{ id: 'build', title: 'Build', status: 'done' }], accomplishments: ['Added PRIVATE_FEATURE.'] }, undefined, undefined, f.ctx);
+    const data = f.client.queue.at(-1).data;
+    if (capturePrompts) assert.deepEqual(data.accomplishments, ['Added PRIVATE_FEATURE.']);
+    else { assert.equal(data.accomplishments, undefined); assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_FEATURE')); }
+    assert.equal(data.source, 'reported');
+    const store = new EventStore(directory(t)); for (const e of f.client.queue) store.append(e); store.close();
+    if (!capturePrompts) assert.ok(!JSON.stringify(store.snapshot().dailyReport).includes('PRIVATE_FEATURE'));
+  }
+});
 test('local control opt-in is revoked on session-tree navigation', async t => {
   const f = setup(t); f.pi.sendUserMessage = () => assert.fail('No prompt is approved');
   f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;

@@ -39,7 +39,7 @@ test('branding assets are public, typed, and keep Host/Origin and private-file b
     });
     assert.equal(code, 403);
   }
-  for (const path of ['/icon.json', '/auth.token', '/connection.json', '/src/config.mjs']) {
+  for (const path of ['/icon.json', '/auth.token', '/connection.json', '/daily-reports.json', '/src/config.mjs']) {
     assert.equal((await f.request(path)).status, 404);
   }
 });
@@ -139,8 +139,13 @@ test('state snapshot exposes derived performance and project history', async t =
   assert.equal(state.projects[0].live.completed, 1);
   assert.equal(state.projects[0].live.technicalCompletionRatio, 1);
   assert.equal(state.projectOverview.items[0].status, 'finished');
+  assert.equal(state.dailyReport.records[0].verdict, 'completed');
+  const reportModule = await fetch(f.url + '/report.js');
+  assert.equal(reportModule.headers.get('content-type'), 'text/javascript; charset=utf-8');
+  assert.match(await reportModule.text(), /initializeDailyReport/);
   const exported = await (await f.request('/api/export')).json();
   assert.deepEqual(exported.projectOverview, state.projectOverview);
+  assert.deepEqual(exported.dailyReport, state.dailyReport);
 });
 
 test('oversized ingestion is refused without accepting an event', async t => {

@@ -11,6 +11,7 @@
   <aside class="sidebar">
     <a class="brand" href="/" aria-label="PiScope home"><img class="brand-icon" src="/icon-64.png" width="36" height="36" alt=""><span>Pi<span class="brand-light">Scope</span></span></a>
     <div class="workspace-summary">Projects <span id="project-count">0</span></div>
+    <nav class="view-nav" aria-label="Dashboard views"><button id="nav-projects" type="button" aria-pressed="true">Projects</button><button id="nav-report" type="button" aria-pressed="false">Daily report</button></nav>
     <div class="section-caption">SESSIONS</div>
     <nav id="sessions" aria-label="Projects and sessions"></nav>
     <div class="sidebar-bottom"><span class="shield">◇</span><strong>Your data stays on this machine.</strong><p>No model API keys are read.<br>No cloud synchronization.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Connecting</span><span class="local-tag">LOCAL</span></div></div>
@@ -27,6 +28,12 @@
         <p id="project-results" class="project-results" role="status"></p>
         <div id="project-list" class="project-list"></div>
         <p class="project-scope">Status and plan steps come from the latest request's records. “Last request finished” does not mean the project is complete. Only projects recorded by the Pi monitoring extension appear.</p>
+      </section>
+      <section id="daily-report" class="hidden" aria-labelledby="report-heading">
+        <div class="page-heading"><div><h1 id="report-heading" tabindex="-1">What did I get done?</h1><p>A daily report of recorded work, grouped by project.</p></div></div>
+        <div class="report-toolbar"><div class="report-date-control"><label for="report-date">Report date</label><input id="report-date" type="date"></div><div class="report-actions"><button id="report-previous" class="button" type="button" aria-label="Previous day">← Previous</button><button id="report-today" class="button" type="button">Today</button><button id="report-next" class="button" type="button" aria-label="Next day">Next →</button><button id="report-copy" class="button" type="button" disabled>Copy report</button></div></div>
+        <p id="report-results" class="project-results" role="status"></p><p id="report-copy-status" class="project-results" role="status"></p>
+        <div id="report-list" class="report-list"></div><p id="report-scope" class="project-scope"></p>
       </section>
       <div id="workspace-details" class="hidden">
       <section class="page-heading"><div><div class="eyebrow">OBSERVED WORKFLOW</div><h1 id="detail-heading" tabindex="-1">Workflow tracking</h1><p>Requests, models and test reports.</p></div><div class="run-select-wrap"><label for="run-select">Request history</label><select id="run-select"><option>No requests yet</option></select></div></section>

@@ -66,6 +66,32 @@ input::placeholder { color: var(--subtle); opacity: 1; }
 .workspace-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #526b8c; font-size: var(--body); }
 .workspace-summary span { font-size: var(--small); font-variant-numeric: tabular-nums; padding: 0 8px; border-radius: 4px; background: #294263; }
 
+/* Daily report: project on the left, reported outcomes on the right. */
+.view-nav { display: flex; flex-direction: column; gap: 8px; }
+.view-nav button { min-height: 48px; padding: 8px 16px; border: 0; border-radius: 8px; background: transparent; text-align: left; }
+.view-nav button:hover { background: #233650; }
+.view-nav button[aria-pressed="true"] { background: #294263; color: #fff; font-weight: 600; }
+.report-toolbar, .report-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+.report-toolbar { margin-bottom: 24px; }
+.report-date-control label { display: block; font-size: var(--small); color: var(--muted); margin-bottom: 8px; }
+#report-date { width: 100%; min-height: 48px; padding: 8px 16px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--panel); font: inherit; }
+.report-list { display: grid; gap: 24px; }
+.report-project { display: grid; grid-template-columns: minmax(160px, 240px) minmax(0, 1fr); gap: 32px; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.report-project-name h2 { font-size: 1.5rem; overflow-wrap: anywhere; }
+.report-project-name p, .report-label { font-size: var(--small); color: var(--muted); margin-top: 8px; }
+.report-work { min-width: 0; }
+.report-entry { padding: 24px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.report-entry:first-child { padding-top: 0; }
+.report-entry:last-child { padding-bottom: 0; border-bottom: 0; }
+.report-entry-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: var(--small); }
+.report-entry h3 { margin-top: 16px; font-size: 1.25rem; font-weight: 600; max-width: 65ch; }
+.report-response, .report-outcomes { margin-top: 16px; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.report-outcomes { padding-left: 24px; }
+.report-outcomes li + li { margin-top: 8px; }
+.report-recorded-response { margin-top: 16px; }
+.report-recorded-response summary { color: var(--accent); cursor: pointer; font-size: var(--small); }
+.report-open, .report-error { margin-top: 16px; }
+
 /* Shared layout and controls. */
 main { margin-left: 264px; min-width: 0; }
 .topbar { position: sticky; top: 0; z-index: 10; min-height: 80px; padding: 16px 32px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--panel); font-size: var(--body); }
@@ -282,7 +308,9 @@ footer > span:first-child { display: none; }
 }
 @media (max-width: 960px) {
   .sidebar { position: static; width: 100%; padding: 16px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 176px; gap: 16px; }
-  .workspace-summary { align-self: center; padding: 0; border: 0; }
+  .view-nav { grid-column: 1 / -1; flex-direction: row; }
+  .view-nav button { flex: 1; text-align: center; }
+  .workspace-summary { align-self: center; padding: 0; border: 0; flex-wrap: wrap; gap: 8px; }
   .section-caption, .sidebar-bottom { display: none; }
   #sessions { grid-column: 1 / -1; display: flex; gap: 8px; }
   .session-item { width: 240px; flex-shrink: 0; margin: 0; padding: 8px 16px; }
@@ -309,7 +337,9 @@ footer > span:first-child { display: none; }
   .prompt-top { align-items: flex-start; flex-wrap: wrap; }
   .panel-header { padding: 16px; flex-wrap: wrap; }
   .perf-body { padding: 0 16px 16px; }
-  .model-grid, .project-list, .project-filters { grid-template-columns: 1fr; }
+  .model-grid, .project-list, .project-filters, .report-project { grid-template-columns: 1fr; }
+  .report-project { padding: 16px; gap: 24px; }
+  .report-date-control { width: 100%; }
   .project-filters { gap: 16px; }
   .stages { padding: 0 16px 16px; }
   .stage-reason { padding: 0 16px 16px; }

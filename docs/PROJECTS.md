@@ -15,7 +15,9 @@ collapses it again. Each field keeps its expansion state across live updates.
 **Open last request** opens the source request if it is still retained. **← Back to projects** restores
 the overview's filters, scroll position, and focus on the originating card when
 it is still visible. The sidebar lists sessions by project name and session ID.
-The UI only shows live records; there is no Live/Demo or overview selector.
+The UI only shows live records; there is no Live/Demo selector.
+**Projects** and [**Daily report**](DAILY-REPORTS.md) are separate navigation views;
+project cards keep latest context, while daily reports collect work across requests.
 
 ## Identity and scope
 

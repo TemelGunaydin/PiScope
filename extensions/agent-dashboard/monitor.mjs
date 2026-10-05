@@ -195,10 +195,10 @@ export function registerMonitor(pi, { schema, client = new MonitorClient(), now 
     name: 'workflow_report', label: 'Workflow report',
     description: 'Report the real plan/stage state to the local dashboard. Observation only: does not run code, switch models, delegate, or prove tests passed. Send the full stage list when it changes. Never include secrets.',
     promptSnippet: 'Report real task stages and upcoming work to the local dashboard.',
-    promptGuidelines: ['Report the full plan before multi-step work and after stage transitions. At the end of a request, also report up to five optional recommendations with stable IDs, titles and self-contained prompts. Ask for user approval; do not execute recommendations automatically. Use an empty recommendations list when none remain. Report state only; actual delegation uses existing tools. Never imply tests passed without evidence.'],
+    promptGuidelines: ['Report the full plan before multi-step work and after stage transitions. At the end of a request, include up to five short accomplishments describing actual outcomes (for example, a feature added or a bug fixed). These are reports, not test evidence; do not list plans or failed work as achievements. Also report up to five optional recommendations with stable IDs, titles and self-contained prompts. Ask for user approval; do not execute recommendations automatically. Use an empty recommendations list when none remain. Report state only; actual delegation uses existing tools. Never imply tests passed without evidence.'],
     parameters: schema,
     async execute(_id, params, _signal, _update, ctx) {
-      const recorded = emit('workflow.updated', { stages: params.stages, recommendations: capturePrompts ? params.recommendations || [] : [], reason: redact(params.reason || '', 500), source: 'reported' }, ctx) !== false;
+      const recorded = emit('workflow.updated', { stages: params.stages, ...(capturePrompts && params.accomplishments !== undefined ? { accomplishments: params.accomplishments } : {}), recommendations: capturePrompts ? params.recommendations || [] : [], reason: redact(params.reason || '', 500), source: 'reported' }, ctx) !== false;
       return { content: [{ type: 'text', text: recorded ? 'Workflow update queued for the local monitor. No work was executed.' : 'Workflow update could not be persisted. Check /dashboard-status. No work was executed.' }], details: { recorded } };
     }
   });

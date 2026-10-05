@@ -33,6 +33,11 @@ export function recommendations(value = []) {
   });
 }
 
+export function accomplishments(value = []) {
+  if (!Array.isArray(value) || value.length > 5 || value.some(v => typeof v !== 'string')) throw new Error('At most five text accomplishments allowed');
+  return [...new Set(value.map(v => str(v, 240).trim()).filter(Boolean))];
+}
+
 /** Strict projection: unknown/sensitive fields are dropped before disk or browser. */
 export function validateEvent(raw, now = new Date()) {
   if (!isObject(raw) || raw.schemaVersion !== 1 || !TYPES.has(raw.type)) throw new Error('Unsupported event schema/type');
@@ -71,6 +76,7 @@ export function validateEvent(raw, now = new Date()) {
       return { id, title: str(stage.title), agent: str(stage.agent), model: str(stage.model, 300), status: stage.status };
     });
     data.recommendations = recommendations(d.recommendations);
+    if (d.accomplishments !== undefined) data.accomplishments = accomplishments(d.accomplishments);
     data.source = 'reported'; // Plans are assertions, never silently promoted to observations.
   }
   return {

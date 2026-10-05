@@ -1,5 +1,34 @@
 # Verification log / Doğrulama kaydı
 
+## Daily project reports — 2026-10-05
+
+Environment: macOS, Node.js v26.5.0, installed Pi 1.0.2, system Google Chrome.
+
+- `npm run check`: **44 JavaScript modules** passed syntax checks.
+  `npm test`: **176/176 passed**, no failures or skips.
+- New coverage: project/session grouping, reported accomplishments vs technical
+  outcomes, privacy/redaction and disabled capture, saved timezone/DST/midnight,
+  no cross-day response borrowing, metadata-only activity, response ordering,
+  cancellation/unknown outcomes, detail eviction, rotation/restart, checkpoints,
+  corrupt-file preservation, write failure and UTF-8 count/byte bounds. Existing
+  project memory tests bracket the shared atomic-writer extraction.
+- `test/daily-browser.py` and `--tailscale`: date filtering, Copy report,
+  source labels, provider failures and unresolved work, literal HTML-like text,
+  selected-request/back navigation with focus/scroll, stable text selection and
+  native/explicit expansion across unrelated same-day SSE, date stability across
+  other-day updates, offline clock rollover, 390 px layout and 200% text passed.
+  These use disposable synthetic history with real HTTP/SSE or an isolated proxy
+  simulating Serve HTTPS, **not a physical iPhone**. Desktop/mobile screenshots
+  were inspected; records are not real achievements or model performance.
+- Existing monitoring and control browser suites passed over HTTP and simulated
+  Serve HTTPS. Installed-Pi monitoring and control smoke passed, including actual
+  intercepted input delivery; **no model called**. A live paid-provider run and
+  hosted CI for this feature were not performed.
+- No personal collector history, project installations, model/workflow settings,
+  permissions, tokens or Serve routes changed. Restart the collector and refresh
+  the browser to activate; optional brief accomplishments additionally require
+  project extension update/Pi restart. [Sources and limitations](DAILY-REPORTS.md).
+
 ## CI SSE shutdown ordering — 2026-10-04
 
 - Hosted CI for `3e71799` passed on Node 22 but failed two SSE tests on

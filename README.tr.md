@@ -22,6 +22,28 @@ açık ve boşta olan Pi oturumuna prompt gönderir; Pi mevcut modeli, izinleri 
 kotasıyla dosya değiştirebilir veya araç çalıştırabilir. PiScope doğrudan model
 çağırmaz veya model/sağlayıcı seçmez. Ek abonelik veya API anahtarı gerekmez.
 
+## Bugün neler yaptım?
+
+Menüden **Daily report** ekranını aç. Solda proje adı, sağda o gün kaydedilen
+istekler ve sonuçlar görünür; telefonda alt alta yerleşir. Tarih seçerek geçmiş
+günlere bakabilir, **Today** ile bugüne dönebilir ve **Copy report** ile bütün
+günün raporunu metin olarak kopyalayabilirsin. **Previous / Next** önceki ve
+sonraki güne geçer. Raporda gösterilen saat dilimi bilgisayar ve telefonda aynı
+gün sınırlarını korur. **Open request** saklanan ayrıntıyı açar;
+**Back to daily report** seçilen güne ve okuma konumuna döner. Kopyaladığın
+raporu paylaşmadan önce özel içeriği kontrol et.
+
+Kısa sonuç maddeleri agent’ın isteğe bağlı `workflow_report.accomplishments`
+bildiriminden gelir. Bu yoksa kaydedilen yanıt özeti gösterilir; yeni başarılar
+uydurulmaz. **Response finished**, teknik tamamlanmadır; işin doğru yapıldığını
+veya testlerin geçtiğini kanıtlamaz. Hata, iptal ve sonucu bilinmeyen işler ayrıca
+işaretlenir. Ek model çağrısı veya kontrol izni gerekmez. Yalnız izlenen/kaydedilen
+işler görünür; eski günler eksik olabilir. Bu güncelleme için mevcut ayarlarını koruyarak
+PiScope’u yeniden başlatıp tarayıcıyı yenile. Kısa sonuç maddeleri için proje
+eklentisini de `--update` ile yenileyip Pi’yi yeniden başlat;
+kayıtlı yanıtları görmek için bu ikinci adım şart değildir.
+[Ayrıntılar ve saklama sınırları](docs/DAILY-REPORTS.md).
+
 ## 1. PiScope’u çalıştır
 
 **Node.js 22+**, tarayıcı ve canlı izleme için mevcut Pi kurulumu gerekir.
@@ -271,7 +293,10 @@ Sunucu kapalıyken Pi olayları diskte bekletir ve tekrar gönderir. İstemci ba
 varsayılan **5.000 olay / 20 MiB** kapasite dolunca yeni olaylar reddedilir,
 kabul edilmişler korunur. `/dashboard-status` ile kontrol et. Ayrıntılı geçmiş
 sınırlıdır; kısa proje özetleri daha uzun saklanır (canlı/demo başına **500**).
-Yalnız journal silmek bütün özetleri silmez; export sonsuz arşiv değildir.
+Günlük raporlar mod başına en çok **1.000 gün/istek kaydı ve 12 MiB** tutar;
+ayrıntılı oturum geçmişi silinse veya PiScope yeniden başlasa da kısa günlük
+kayıtlar sınırlar dahilinde korunur. Yalnız journal silmek proje/günlük özetlerini
+silmez; export sonsuz arşiv değildir.
 
 İstek, yanıt ve ayrıntılı model/sağlayıcı hata metinlerini kaydetmemek için
 Pi’yi şöyle başlat:
@@ -281,9 +306,9 @@ AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
 ```
 
 Dosya adları, model kimlikleri, plan aşamaları ve genel hata bildirimi kalabilir.
-Öneri metinleri de kaydedilmez; açık kontrol üzerinden onaylanan prompt yine
-Pi’ye iletilir. Hata metinleri sınırlanır ve maskelenir; maskeleme bütün sırları
-bulma garantisi değildir. Aynı OS kullanıcısı yerel kayıtları okuyabilir.
+Öneri ve kısa sonuç maddeleri de kaydedilmez; önceden kaydedilmiş veriler
+silinmez. Açık kontrol üzerinden onaylanan prompt yine Pi’ye iletilir. Hata
+metinleri sınırlanır ve maskelenir; maskeleme bütün sırları bulma garantisi değildir. Aynı OS kullanıcısı yerel kayıtları okuyabilir.
 Paylaşmadan önce export’u incele. [Güvenlik politikası](SECURITY.md).
 
 ```bash
@@ -297,6 +322,8 @@ python test/browser-smoke.py --network
 python test/browser-smoke.py --tailscale
 python test/control-browser.py
 python test/control-browser.py --tailscale
+python test/daily-browser.py
+python test/daily-browser.py --tailscale
 ```
 
 Tarayıcı testleri kendi geçici sunucusunu ve sentetik kayıtlarını kullanır;

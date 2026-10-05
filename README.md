@@ -27,6 +27,8 @@ in their original language.
 
 - **All your monitored Pi projects:** one card per project, even across several sessions.
 - **Recent context:** last request, last response, last work time and reported plan step.
+- **Daily report:** choose a date and see recorded work across projects, with
+  reported accomplishments, response excerpts, separate errors and **Copy report**.
 - **Response beside continuation:** read the selected request's **Last model response**
   inside **Continue this project**, alongside Recommended and Other.
 - **Provider errors:** reported model/provider failures appear on project cards and
@@ -47,6 +49,31 @@ move between the overview and details. Long saved text expands with **Show more*
 **“Last request finished” does not mean the entire project is complete or tests
 passed.** Plan steps are agent reports, not proof of execution. Missing outcomes
 remain unknown; missing usage is not zero, and tokens are not a cost estimate.
+
+## Your daily work report
+
+Open **Daily report** in the navigation to answer “What did I get done today?”
+Project names sit on the left and recorded requests/outcomes on the right;
+phones stack them vertically. Choose a date, use **Previous**, **Next** or
+**Today**, and **Copy report** to collect that day's work as text.
+
+Brief accomplishments come from optional `workflow_report.accomplishments`;
+otherwise PiScope displays recorded response excerpts, not invented achievements.
+Errors, cancellation and unknown outcomes stay distinct. No extra model calls
+or control permission are needed. Reports cover captured activity only, and
+older work may be missing. **Response finished** means technical completion,
+not independently verified work or passing tests. The displayed report timezone
+keeps the same day boundaries on your computer and phone. **Open request** opens
+retained details; **Back to daily report** restores the chosen day and position.
+Review private content before sharing a copied report.
+
+**After updating:** restart PiScope with your existing control/Tailscale settings,
+then refresh the browser. Retained replies populate the report without a project
+extension update. For future brief accomplishment lists, update each project's
+extension with `npm run install:pi -- "/absolute/path/to/project" --update`
+from the PiScope directory, then restart Pi in that project. Do not interrupt
+active work just to upgrade; re-enable `/dashboard-control on` only if needed.
+[Sources, timezone, retention and updates](docs/DAILY-REPORTS.md).
 
 ## 1. Run PiScope locally
 
@@ -301,8 +328,10 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
   are rejected at capacity; accepted history is kept. Check `/dashboard-status`.
 - The journal rotates and detailed history is bounded. Short project summaries
   survive longer (up to **500 live projects**, separately from hidden demo data).
+  Daily excerpts retain up to **1,000 day/request records and 12 MiB per mode**.
   Exports contain retained state, not an unlimited archive. Deleting journals
-  alone does not erase project summaries. [Project memory](docs/PROJECTS.md).
+  alone does not erase project summaries or daily excerpts.
+  [Project memory](docs/PROJECTS.md) · [Daily reports](docs/DAILY-REPORTS.md).
 - Prompt/response excerpts and provider error messages can contain private
   information. Error details are bounded and redacted; secret redaction is not
   complete data-loss prevention. To omit prompt, task, response and detailed error text:
@@ -312,7 +341,8 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
   ```
 
   File names, model identities and reported stages may still be recorded.
-  This also omits reported recommendations; generic error notices remain visible.
+  This also omits reported recommendations and accomplishments; generic error
+  notices remain visible. It does not purge previously captured data.
   Control prompts still reach Pi when approved.
 - Same-user OS processes can read local records. Tailscale is an extra network
   boundary, not per-project or multi-user authorization. Review exports before
@@ -337,6 +367,8 @@ python test/browser-smoke.py --network
 python test/browser-smoke.py --tailscale
 python test/control-browser.py
 python test/control-browser.py --tailscale
+python test/daily-browser.py
+python test/daily-browser.py --tailscale
 ```
 
 The Tailscale test simulates an HTTPS proxy; real phone access must still be

@@ -5,6 +5,11 @@
 Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
+- Read-only Daily report with date navigation, project-grouped accomplishments
+  or recorded reply excerpts, honest error/cancelled/unknown outcomes, Copy report,
+  responsive layout and preserved reading under unrelated live updates. Bounded
+  private daily excerpts survive detail expiry and ordinary collector restarts;
+  optional workflow reports add short accomplishments without extra model calls.
 - Last model response inside Continue this project, with selection/scroll
   preserved under live updates. Bounded, redacted Pi provider errors appear
   in project Error badges, detail alerts and the activity feed; recovery clears

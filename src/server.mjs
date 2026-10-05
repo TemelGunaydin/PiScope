@@ -11,6 +11,7 @@ const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/control.js', ['control.js', 'text/javascript; charset=utf-8']],
+  ['/report.js', ['report.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
   ['/icon.png', ['icon.png', 'image/png']],
   ['/icon-64.png', ['icon-64.png', 'image/png']],

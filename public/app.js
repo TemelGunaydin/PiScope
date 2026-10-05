@@ -1,8 +1,10 @@
 import { initializeControls, renderControls, modelError } from './control.js';
+import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
 let overviewScrollY = 0, returnProjectId = '', followSubmission;
+let reportView = false, detailOrigin = 'projects', reportScrollY = 0, returnReportKey = '';
 const labels = { running: 'Running', starting: 'Request sent', pending: 'Waiting', idle: 'Response finished', done: 'Done', error: 'Error', blocked: 'Blocked', cancelled: 'Cancelled', unknown: 'Outcome unknown' };
 const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
 const count = n => new Intl.NumberFormat('en-US', { notation: n > 99999 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
@@ -53,15 +55,25 @@ function projectsNow() {
   });
 }
 function openDetails(nextSessionId, nextRunId = '', projectId = '') {
-  if (overview) { overviewScrollY = window.scrollY; returnProjectId = projectId; }
+  if (overview) { overviewScrollY = window.scrollY; returnProjectId = projectId; detailOrigin = 'projects'; }
+  if (reportView) { reportScrollY = window.scrollY; returnReportKey = JSON.stringify([nextSessionId, nextRunId]); detailOrigin = 'report'; }
+  reportView = false;
   sessionId = nextSessionId; runId = nextRunId; overview = false;
   render(); $('detail-heading').focus({ preventScroll: true }); window.scrollTo(0, 0);
 }
 function returnToProjects() {
-  overview = true; render();
+  if (reportView) reportScrollY = window.scrollY;
+  overview = true; reportView = false; render();
   const card = [...$('project-list').children].find(c => c.dataset.project === returnProjectId);
   (card?.querySelector('.project-open') || $('overview-heading')).focus({ preventScroll: true });
   window.scrollTo(0, overviewScrollY);
+}
+function showDailyReport() {
+  if (overview) overviewScrollY = window.scrollY;
+  reportView = true; overview = false; render();
+  const entry = [...$('report-list').querySelectorAll('.report-entry')].find(e => e.dataset.key === returnReportKey);
+  (entry?.querySelector('.report-open') || $('report-heading')).focus({ preventScroll: true });
+  window.scrollTo(0, reportScrollY);
 }
 function appendProjectText(card, field, label, text, expanded) {
   const paragraph = el('p', `project-text ${field === 'prompt' ? 'project-prompt' : field === 'error' ? 'project-error' : 'project-answer'}`, text);
@@ -157,7 +169,7 @@ function renderSidebar() {
   $('sessions').replaceChildren();
   if (!all.length) $('sessions').append(el('p', 'sessions-empty', 'No sessions connected yet.'));
   for (const s of all) {
-    const button = el('button', `session-item ${!overview && s.id === sessionId ? 'active' : ''}`); button.type = 'button';
+    const button = el('button', `session-item ${!overview && !reportView && s.id === sessionId ? 'active' : ''}`); button.type = 'button';
     button.append(el('strong', '', s.projectName), el('small', '', `${s.id.slice(0, 7)} · ${s.runs.length} ${s.runs.length === 1 ? 'request' : 'requests'}`));
     button.addEventListener('click', () => openDetails(s.id));
     $('sessions').append(button);
@@ -367,10 +379,14 @@ function render() {
     if (latest && latest.id !== followSubmission.runId) { runId = latest.id; followSubmission = undefined; }
   }
   const { s, r } = selected(); renderSidebar();
-  $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview);
+  $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview || reportView);
+  $('daily-report').classList.toggle('hidden', !reportView);
+  $('nav-projects').setAttribute('aria-pressed', String(overview)); $('nav-report').setAttribute('aria-pressed', String(reportView));
+  if (reportView) renderDailyReport(snapshot.dailyReport);
   renderProjects();
-  $('back-to-projects').classList.toggle('hidden', overview);
-  $('project-name').textContent = overview ? 'My projects' : s?.projectName || 'Pi sessions';
+  $('back-to-projects').classList.toggle('hidden', overview || reportView);
+  $('back-to-projects').textContent = detailOrigin === 'report' ? '← Back to daily report' : '← Back to projects';
+  $('project-name').textContent = reportView ? 'Daily report' : overview ? 'My projects' : s?.projectName || 'Pi sessions';
   $('empty').classList.toggle('hidden', Boolean(r)); $('run-content').classList.toggle('hidden', !r);
   const options = s ? [...s.runs].reverse() : [];
   const select = $('run-select'); select.replaceChildren();
@@ -399,14 +415,17 @@ function connect() {
   eventSource.onopen = () => { $('connection-label').textContent = 'Dashboard connected'; $('connection-dot').classList.add('online'); };
   eventSource.onerror = () => { $('connection-label').textContent = 'Reconnecting'; $('connection-dot').classList.remove('online'); };
 }
-$('back-to-projects').onclick = returnToProjects;
+initializeDailyReport(openDetails);
+$('back-to-projects').onclick = () => detailOrigin === 'report' ? showDailyReport() : returnToProjects();
+$('nav-projects').onclick = returnToProjects;
+$('nav-report').onclick = showDailyReport;
 $('project-search').oninput = renderProjects;
 $('project-filter').onchange = renderProjects;
 $('run-select').onchange = e => { followSubmission = undefined; runId = e.target.value; render(); };
 $('event-search').oninput = () => { const { r } = selected(); if (r) renderTimeline(r); };
 $('workflow-task-set').onchange = () => { const { s, r } = selected(); if (r) renderWorkflowComparison(s, r); };
 setInterval(updateDuration, 1000);
-setInterval(renderProjects, 1000);
+setInterval(() => { renderProjects(); if (reportView) refreshDailyReport(); }, 1000);
 async function boot() {
   const fragment = new URLSearchParams(location.hash.slice(1));
   const controlToken = fragment.get('control-token');

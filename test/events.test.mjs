@@ -18,6 +18,15 @@ test('provider error projection is type-bound, redacted, bounded and rejects raw
   }
   assert.equal(validateEvent(event('tool.started', { errorMessage: 'UNRELATED' })).data.errorMessage, undefined);
 });
+test('reported accomplishments are bounded text, not observed completion', () => {
+  const stages = [{ id: 'build', title: 'Build', status: 'done' }];
+  const value = validateEvent(event('workflow.updated', { stages, accomplishments: ['Added a feature. api_key=PRIVATE_VALUE', 'x'.repeat(400), 'x'.repeat(400)], output: 'RAW_OUTPUT' }));
+  assert.equal(value.data.source, 'reported'); assert.equal(value.data.accomplishments.length, 2);
+  assert.equal(value.data.accomplishments[1].length, 240); assert.ok(!JSON.stringify(value).includes('PRIVATE_VALUE')); assert.equal(value.data.output, undefined);
+  assert.throws(() => validateEvent(event('workflow.updated', { stages, accomplishments: [{}] })), /text accomplishments/);
+  assert.throws(() => validateEvent(event('workflow.updated', { stages, accomplishments: Array(6).fill('Outcome') })), /five/);
+  assert.equal(validateEvent(event('tool.finished', { accomplishments: ['Unrelated'] })).data.accomplishments, undefined);
+});
 test('common credentials are redacted from prompt text', () => {
   const s = redact('Authorization: Bearer abcdefghijkl API_KEY=hello sk-12345678901234567890123');
   assert.ok(!s.includes('abcdefghijkl')); assert.ok(!s.includes('hello')); assert.ok(!s.includes('sk-123'));

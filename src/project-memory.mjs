@@ -1,9 +1,10 @@
-import { existsSync, readFileSync, statSync, openSync, writeFileSync, fsyncSync, closeSync, renameSync, unlinkSync, chmodSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, renameSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { redact } from './security.mjs';
 import { runVerdict } from './metrics.mjs';
 import { recommendations } from '../extensions/agent-dashboard/events.mjs';
+import { savePrivateJSON } from './private-json.mjs';
 
 export const PROJECT_LIMIT = 500;
 const keyOf = p => `${p.demo ? 'demo' : 'live'}:${p.projectId}`;
@@ -120,17 +121,8 @@ export class ProjectMemory {
   flush() {
     clearTimeout(this.timer); this.timer = undefined;
     if (!this.dirty) return;
-    const temporary = `${this.path}.${randomUUID()}.tmp`; let fd;
-    try {
-      fd = openSync(temporary, 'wx', 0o600);
-      writeFileSync(fd, JSON.stringify({ schemaVersion: 1, projects: [...this.entries.values()] }) + '\n');
-      fsyncSync(fd); closeSync(fd); fd = undefined;
-      renameSync(temporary, this.path); this.dirty = false;
-    } catch (error) {
-      if (fd !== undefined) closeSync(fd);
-      try { unlinkSync(temporary); } catch {}
-      throw error;
-    }
+    savePrivateJSON(this.path, { schemaVersion: 1, projects: [...this.entries.values()] });
+    this.dirty = false;
   }
   snapshot(sessions, now = Date.now()) {
     const active = new Map();

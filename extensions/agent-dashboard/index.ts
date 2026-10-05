@@ -11,6 +11,7 @@ export default async function (pi: any) {
     const T = module.Type;
     schema = T.Object({
       reason: T.Optional(T.String({ description: 'Why the workflow changed; no secrets' })),
+      accomplishments: T.Optional(T.Array(T.String({ minLength: 1, maxLength: 240, description: 'Brief outcome actually achieved; an agent report, not independent verification' }), { maxItems: 5 })),
       recommendations: T.Optional(T.Array(T.Object({
         id: T.String(), title: T.String({ maxLength: 240 }), prompt: T.String({ minLength: 1, maxLength: 4000 })
       }), { maxItems: 5 })),

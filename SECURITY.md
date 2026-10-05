@@ -45,8 +45,8 @@ publicly while arranging that channel. No response-time guarantee is offered.
   Disabling control does not abort work already running in Pi.
 - Imported JUnit summaries are report observations, not signed runner evidence
   or proof that a specific commit passed tests.
-- Event history, persistent project summaries, pending queues, quarantine files,
-  and exports may be private.
+- Event history, persistent project summaries, daily report excerpts, pending
+  queues, quarantine files, clipboard copies and exports may be private.
   Keep them outside the repository and review anything you intend to share.
 
 Maintainers should enable GitHub private vulnerability reporting before a

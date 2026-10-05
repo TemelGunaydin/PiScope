@@ -36,6 +36,8 @@ credentials, or an account.
   python3 test/browser-smoke.py --network
   # Simulated Tailscale Serve HTTPS proxy; also requires openssl:
   python3 test/browser-smoke.py --tailscale
+  python3 test/daily-browser.py
+  python3 test/daily-browser.py --tailscale
   ```
 
   Tests start their own disposable collector and use synthetic records, not

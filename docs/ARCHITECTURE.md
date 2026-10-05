@@ -17,6 +17,7 @@ Kod projesi / Mac
     ├─ idempotent event IDs
     ├─ private rotating JSONL journal
     ├─ private project summaries · survive detailed history retention
+    ├─ private per-day/request excerpts · saved report timezone
     ├─ in-memory bounded session/run view
     └─ authenticated SSE snapshots
                 │
@@ -65,6 +66,22 @@ bir paketin sonucuna hayalî agent/model etiketleri takılmaz.
 ile araç gözlemi birbirinin yerine geçmez. Kullanıcı notu veya agent raporu
 bağımsız bir doğrulama sonucuymuş gibi yükseltilmez. `tests.recorded` ise açık
 kullanıcı komutuyla okunan JUnit raporu özetidir; yürütme doğrulaması değildir.
+
+## Günlük çalışma raporu
+
+`src/daily-memory.mjs`, aynı journal olaylarından gün/oturum/istek başına küçük
+raporlar tutar. `daily-reports.json` dosyası atomik ve `0600` izinli yazılır;
+rotasyondan önce kaydedilir. Canlı/demo kapasitesi ayrıdır: mod başına en çok
+1.000 kayıt ve 12 MiB. İlk collector saat dilimi dosyayla korunur; özgün olay
+zamanı kullanılır, başka günün yanıtı/sonuç maddeleri bugüne taşınmaz.
+
+`workflow.updated.accomplishments` en çok beş kısa **reported** metindir;
+prompt capture kapalıysa eklenti bunları göndermez. Maddeler yoksa web arayüzü
+kaydedilmiş yanıtı gösterir, planı başarıya dönüştürmez. Teknik sonuç mevcut
+`runVerdict` kurallarıyla ayrılır; eksik ayrıntı eski hatayı başarıya yükseltmez.
+Snapshot/export içindeki `dailyReport` mevcut izleme yetkisiyle okunur; rapor
+ve kopyalama kontrol izni, model çağrısı veya yeni bir yazma API’si kullanmaz.
+[Tam kapsam ve güncelleme](DAILY-REPORTS.md).
 
 ## Ölçüm (yürütme performansı)
 
