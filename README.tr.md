@@ -42,7 +42,9 @@ PiScope otomatik üretim/yeniden deneme başlatmaz; Pi’nin mevcut retry ayarla
 **rapora dahil edilecek projeleri filtrelemez**. Uygun oturum varsa otomatik
 seçilir; senin açık seçimin korunur. Mevcut model ayrıca gösterilir; bağlantısı
 kesilmiş eski oturumlar yeni hedef olarak sunulmaz. Bütün projelerin tek raporu
-için yalnız bir hazır üretim oturumu yeterlidir.
+için yalnız bir hazır üretim oturumu yeterlidir. Onay ekranı kapsamı, günü,
+modeli ve Pi oturumunu ayrı gösterir. **View exact prompt and context** tam girdiyi
+açar; kota kullanımı ve izin uyarıları onay düğmesinin yanında görünür kalır.
 
 **Generate report pasifse**, yanındaki panel nedenini ve ilgili kurulum adımlarını
 gösterir; hiçbir izin kendiliğinden açılmaz:

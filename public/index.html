@@ -42,7 +42,20 @@
           </div>
         </section>
         <p id="report-copy-status" class="project-results" role="status"></p>
-        <section id="report-review" class="control-review hidden" aria-labelledby="report-review-heading"><h2 id="report-review-heading">Review daily report generation</h2><p id="report-review-target"></p><p id="report-review-scope" class="report-label"></p><pre id="report-review-prompt" class="control-preview" tabindex="0" aria-label="Exact report prompt"></pre><div class="control-actions"><button id="report-confirm" class="button primary" type="button">Confirm and generate in Pi</button><button id="report-cancel" class="button" type="button">Cancel</button></div></section>
+        <section id="report-review" class="control-review hidden" aria-labelledby="report-review-heading">
+          <h2 id="report-review-heading" tabindex="-1">Generate one daily report?</h2>
+          <p class="report-review-intro">One summary for the selected day across all tracked projects — not just the selected session’s project.</p>
+          <dl class="report-review-facts">
+            <div class="report-review-all"><dt>Report scope</dt><dd id="report-review-target"></dd></div>
+            <div><dt>Report day</dt><dd id="report-review-date"></dd></div>
+            <div><dt>Model that writes the report</dt><dd id="report-review-model"></dd></div>
+            <div class="report-review-all"><dt>Pi session used</dt><dd><span id="report-review-session"></span><p class="report-label">This session supplies the model. It does not filter the projects.</p></dd></div>
+          </dl>
+          <p id="report-review-scope" class="report-label"></p>
+          <details id="report-review-details" class="report-review-details"><summary>View exact prompt and context</summary><pre id="report-review-prompt" tabindex="0" aria-label="Exact report prompt"></pre></details>
+          <div class="report-review-consent"><p id="report-review-cost">Confirming sends ONE request with the included projects’ captured context to this Pi session and uses its existing model quota.</p><p id="report-review-permissions" class="report-label">Only summarization is requested. Pi keeps its existing permissions and can still use tools; this is not a sandbox.</p></div>
+          <div class="control-actions report-review-actions"><button id="report-cancel" class="button" type="button">Cancel</button><button id="report-confirm" class="button primary" type="button" aria-describedby="report-review-target report-review-cost report-review-permissions">Confirm and generate in Pi</button></div>
+        </section>
         <div class="report-output-heading"><h2>Daily summary</h2><button id="report-copy" class="button" type="button" disabled>Copy report</button></div><div id="report-list" class="report-list"></div><p id="report-scope" class="project-scope"></p>
       </section>
       <div id="workspace-details" class="hidden">

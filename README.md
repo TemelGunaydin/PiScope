@@ -69,7 +69,9 @@ Generation consumes the existing model's quota; merely viewing the report does n
 filter**. A ready session is selected automatically when available; your explicit
 choice is retained. The current model is shown separately, and disconnected
 historical sessions are not offered as new targets. Only one ready execution
-session is needed for the overall report.
+session is needed for the overall report. The confirmation panel separates report
+scope, day, model and Pi session. **View exact prompt and context** expands the
+full input; model-quota and permission warnings stay visible beside confirmation.
 
 **If Generate report is disabled**, the panel beside it explains why and shows
 relevant setup steps; no permissions are enabled automatically:

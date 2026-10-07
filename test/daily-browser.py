@@ -116,14 +116,45 @@ with sync_playwright() as pw:
     page.locator('#report-session').focus(); page.keyboard.press('Tab')
     expect(page.locator('#report-generate')).to_be_focused()
     page.locator('#report-generate').click(); expect(page.locator('#report-review')).to_be_visible()
-    expect(page.locator('#report-review-target')).to_contain_text('All tracked projects'); expect(page.locator('#report-review-target')).to_contain_text('synthetic/current-model')
+    expect(page.locator('#report-review-heading')).to_be_focused()
+    expect(page.locator('#report-review-target')).to_have_text('All tracked projects (3)')
+    expect(page.locator('#report-review-model')).to_have_text('synthetic/current-model')
+    expect(page.locator('#report-review-date')).to_contain_text(initial['dailyReport']['timeZone'])
+    expect(page.locator('#report-review-session')).to_contain_text('Control-Fixture')
+    expect(page.locator('#report-review-session')).to_contain_text(session['id'][:7])
+    expect(page.locator('#report-review-scope')).to_contain_text('3 of 3 tracked projects')
+    expect(page.locator('#report-review-scope')).to_contain_text('4 of 4 retained work records')
+    expect(page.locator('#report-review-cost')).to_contain_text('ONE request')
+    expect(page.locator('#report-review-cost')).to_contain_text('existing model quota')
+    expect(page.locator('#report-review-permissions')).to_be_visible()
+    expect(page.locator('#report-review-permissions')).to_contain_text('not a sandbox')
+    expect(page.locator('#report-review-prompt')).to_be_hidden(); assert not writes
+    page.locator('#report-review').screenshot(path=str(output / ('https-confirm-desktop.png' if args.tailscale else 'confirm-desktop.png')))
+    page.set_viewport_size({'width':390,'height':844}); assert page.evaluate('() => document.documentElement.scrollWidth <= innerWidth')
+    page.locator('#report-review').screenshot(path=str(output / ('https-confirm-mobile.png' if args.tailscale else 'confirm-mobile.png')))
+    page.evaluate("() => document.documentElement.style.fontSize='200%'"); assert page.evaluate('() => document.documentElement.scrollWidth <= innerWidth')
+    page.evaluate("() => document.documentElement.style.fontSize=''"); page.set_viewport_size({'width':1440,'height':1150})
+    page.locator('#report-review-details > summary').focus(); page.keyboard.press('Enter')
+    expect(page.locator('#report-review-prompt')).to_be_visible()
     preview = page.locator('#report-review-prompt').inner_text()
     assert 'ORIGINAL_CALENDAR_PROMPT' in preview and 'ORIGINAL_MODEL_RESPONSE' in preview
     assert 'Provider export failure' in preview and 'OTHER_PROJECT_CONTEXT' in preview and 'DEMO_CONTEXT' not in preview and 'Yesterday response' not in preview
     assert 'Inactive Project' in preview and '3 of 3 tracked projects' in preview and '4 of 4 retained records' in preview and 'not independent verification' in preview
-    expect(page.locator('#report-review-scope')).to_contain_text('ONE request'); assert not writes
+    assert page.locator('#report-review-prompt').evaluate('e => e.scrollHeight > e.clientHeight && e.clientHeight <= 320')
+    page.locator('#report-review-prompt').focus()
+    page.evaluate('''() => {
+        window.savedPrompt = document.querySelector('#report-review-prompt');
+        const range = document.createRange(); range.setStart(savedPrompt.firstChild, 0); range.setEnd(savedPrompt.firstChild, 15);
+        getSelection().removeAllRanges(); getSelection().addRange(range); window.savedPromptSelection = getSelection().toString();
+        window.previewUpdates = 0; window.previewObserver = new EventSource('/api/events');
+        previewObserver.addEventListener('snapshot', () => previewUpdates++);
+    }''')
+    page.wait_for_function('() => previewUpdates >= 2', timeout=10000); page.evaluate('previewObserver.close()')
+    assert page.evaluate('''() => savedPrompt === document.querySelector('#report-review-prompt') && getSelection().toString() === savedPromptSelection && document.querySelector('#report-review-details').open''')
+    expect(page.locator('#report-review-prompt')).to_be_focused(); assert not writes
     page.locator('#report-cancel').click(); expect(page.locator('#report-review')).to_be_hidden(); expect(page.locator('#report-generate')).to_be_focused(); assert not writes
     page.locator('#report-generate').click(); expect(page.locator('#report-review')).to_be_visible()
+    expect(page.locator('#report-review-prompt')).to_be_hidden()
     page.locator('#report-confirm').evaluate('(e) => {e.click(); e.click();}')
     expect(row).to_contain_text('Waiting for Pi'); expect(row).to_contain_text('Calendar navigation and reminder handling', timeout=15000)
     expect(row).to_contain_text('Other Project'); expect(page.locator('#report-copy-status')).to_have_text('Generated daily report is ready.')

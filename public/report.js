@@ -70,10 +70,15 @@ async function reviewReport() {
     const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Preview unavailable');
     if (reportId('report-date').value !== day || reportTargetId !== request.sessionId) return;
     reportDraft = { ...request, expectedPrompt: result.prompt, expectedSourceHash: result.sourceHash };
-    reportId('report-review-target').textContent = `All tracked projects · ${day} · ${result.model} in ${result.projectName} · session ${request.sessionId.slice(0, 7)}`;
-    reportId('report-review-scope').textContent = `Includes ${result.includedProjects} of ${result.totalProjects} tracked projects and ${result.included} of ${result.total} retained records, with shortened excerpts. Context from all included projects is sent in ONE request to the selected Pi session and consumes its model quota. Pi keeps its existing permissions; this is not a sandbox.`;
+    reportText('report-review-target', `All tracked projects (${result.totalProjects})`);
+    reportText('report-review-date', `${reportDateLabel(day)} · ${reportSource.timeZone}`);
+    reportText('report-review-model', result.model);
+    reportText('report-review-session', `${result.projectName} · session ${request.sessionId.slice(0, 7)}`);
+    reportText('report-review-scope', `Context included: ${result.includedProjects} of ${result.totalProjects} tracked projects · ${result.included} of ${result.total} retained work records. Excerpts are shortened; omitted work may not appear in the report.`);
     reportId('report-review-prompt').textContent = result.prompt;
-    reportId('report-review').classList.remove('hidden'); reportId('report-confirm').focus();
+    reportId('report-review-prompt').scrollTop = 0; reportId('report-review-details').open = false;
+    reportId('report-review').classList.remove('hidden');
+    reportId('report-review').scrollIntoView({ block: 'start' }); reportId('report-review-heading').focus({ preventScroll: true });
   } catch (error) { reportId('report-copy-status').textContent = `Could not prepare report: ${error.message}`; }
   finally { reportLoading = false; reportState(); }
 }

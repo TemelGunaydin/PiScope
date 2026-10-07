@@ -1,5 +1,20 @@
 # Verification log / Doğrulama kaydı
 
+## Clear daily-report confirmation — 2026-10-06
+
+- Scope, day/timezone, execution model and Pi session have separate labels.
+  Context coverage, quota use and existing-permission warnings remain visible.
+  The complete unchanged prompt is available in a collapsed native details block;
+  exact-prompt/source-hash approval binding and all control opt-ins are unchanged.
+- HTTP/SSE and simulated Serve HTTPS report tests passed: heading focus on review,
+  keyboard prompt expansion, bounded scrolling, selection/focus/open-state retention
+  across live snapshots, cancel without submission, collapsed-prompt confirmation,
+  duplicate protection and cross-project stale rejection. 390 px and 200% text passed;
+  synthetic desktop/mobile confirmation screenshots were inspected.
+- **197/197 tests**, **47 syntax-checked modules**, **82 local Markdown links**,
+  unique HTML IDs and diff checks passed. No paid model call or physical iPhone
+  test; these local confirmation edits have no hosted CI result yet.
+
 ## Publication gates — 2026-10-05
 
 - Rechecked **197/197 tests**, **47 JavaScript modules**, shell syntax, diff

@@ -32,9 +32,11 @@ mentions project names where helpful and separates remaining/blocked work.
    readiness state explains browser pairing, local Pi control, extension/prompt
    capture requirements, busy sessions or missing captured context, with relevant
    setup steps. These instructions never enable permissions automatically.
-4. Review the exact prompt, current model, included-project/record coverage and
-   disclosure that context from all included projects is sent to that one Pi
-   session. **Cancel** starts no work. **Confirm and generate in Pi** sends one
+4. Review the separately labelled report scope, day/timezone, current model and
+   execution session. The scope is **all tracked projects**, not a filter for
+   the execution session's project. Included-project/record coverage, quota use
+   and permission warnings stay visible. **View exact prompt and context** opens
+   the complete unchanged input before approval. **Cancel** starts no work. **Confirm and generate in Pi** sends one
    normal model request, not a series of per-project requests. A source fingerprint
    and exact prompt are rechecked before sending; changes require a fresh preview.
 5. The model calls `daily_report` once with the overall summary and optional
