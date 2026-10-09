@@ -1,5 +1,5 @@
 // Isolated collector for browser-smoke.py. Never writes to the user's dashboard.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -15,6 +15,17 @@ import { registerMonitor } from '../extensions/agent-dashboard/monitor.mjs';
 const dir = mkdtempSync(join(tmpdir(), 'agentdesk-browser-'));
 const token = randomBytes(32).toString('hex');
 const controlToken = process.argv.includes('--control') ? randomBytes(32).toString('hex') : undefined;
+const todosFile = process.argv.includes('--todos') ? join(dir, 'terminal-todos', 'todos.json') : undefined;
+if (todosFile) {
+  mkdirSync(join(dir, 'terminal-todos'));
+  writeFileSync(todosFile, JSON.stringify({ version: 2, next_id: 6, tasks: [
+    { id: 1, title: 'Türkçe not 🦀: inspect <img src=x onerror=alert(1)> literally.', completed: false, created_at: 1720000000, project: 'Control-Fixture' },
+    { id: 2, title: 'A note completed only by its owner.', completed: true, created_at: 1720000001, project: 'Control-Fixture' },
+    { id: 3, title: 'An unassigned note needs an explicit target.', completed: false, created_at: 1720000002 },
+    { id: 4, title: 'Long note: ' + 'Full text retained. '.repeat(450), completed: false, created_at: 1720000003, project: 'Control-Fixture' },
+    { id: 5, title: 'A separate project note must not be bundled.', completed: false, created_at: 1720000004, project: 'Other label' }
+  ] }), { mode: 0o600 });
+}
 let app, proxy, url, tailscaleOrigin, mockShutdown;
 let closing = false;
 async function close() {
@@ -46,7 +57,7 @@ try {
     await new Promise((resolve, reject) => { proxy.once('error', reject); proxy.listen(0, '127.0.0.1', resolve); });
     tailscaleOrigin = `https://dashboard.test-tailnet.ts.net:${proxy.address().port}`;
   }
-  app = createDashboard({ dataDir: dir, token, tailscaleOrigin, controlToken });
+  app = createDashboard({ dataDir: dir, token, tailscaleOrigin, controlToken, todosFile, todosPollMs: 100 });
   url = await app.listen(0);
   saveConnection(dir, url, token, tailscaleOrigin, Boolean(controlToken));
   if (controlToken) {
@@ -91,7 +102,7 @@ try {
   for (const event of events) app.store.append(event);
   }
   // Read only by the parent test process; never uses the user's access token.
-  console.log(JSON.stringify({ url, token, tailscaleUrl: tailscaleOrigin, controlToken }));
+  console.log(JSON.stringify({ url, token, tailscaleUrl: tailscaleOrigin, controlToken, todosFile }));
 } catch (error) {
   await close();
   throw error;

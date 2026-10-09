@@ -1,10 +1,11 @@
-import { initializeControls, renderControls, modelError, controlAvailability } from './control.js';
+import { initializeControls, renderControls, modelError, controlAvailability, canControl, prepareOtherPrompt } from './control.js';
 import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';
+import { initializeProjectNotes, renderProjectNotes, filterProjectNotes, projectNoteCount } from './notes.js';
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
 let overviewScrollY = 0, returnProjectId = '', followSubmission;
-let reportView = false, detailOrigin = 'projects', reportScrollY = 0;
+let reportView = false, notesView = false, detailOrigin = 'projects', reportScrollY = 0, notesScrollY = 0;
 const labels = { running: 'Running', starting: 'Request sent', pending: 'Waiting', idle: 'Response finished', done: 'Done', error: 'Error', blocked: 'Blocked', cancelled: 'Cancelled', unknown: 'Outcome unknown' };
 const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
 const count = n => new Intl.NumberFormat('en-US', { notation: n > 99999 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(n);
@@ -57,22 +58,46 @@ function projectsNow() {
 function openDetails(nextSessionId, nextRunId = '', projectId = '') {
   if (overview) { overviewScrollY = window.scrollY; returnProjectId = projectId; detailOrigin = 'projects'; }
   if (reportView) { reportScrollY = window.scrollY; detailOrigin = 'report'; }
-  reportView = false;
+  if (notesView) { notesScrollY = window.scrollY; detailOrigin = 'notes'; }
+  reportView = false; notesView = false;
   sessionId = nextSessionId; runId = nextRunId; overview = false;
   render(); $('detail-heading').focus({ preventScroll: true }); window.scrollTo(0, 0);
 }
 function returnToProjects() {
   if (reportView) reportScrollY = window.scrollY;
-  overview = true; reportView = false; render();
+  if (notesView) notesScrollY = window.scrollY;
+  overview = true; reportView = false; notesView = false; render();
   const card = [...$('project-list').children].find(c => c.dataset.project === returnProjectId);
   (card?.querySelector('.project-open') || $('overview-heading')).focus({ preventScroll: true });
   window.scrollTo(0, overviewScrollY);
 }
 function showDailyReport() {
   if (overview) overviewScrollY = window.scrollY;
-  reportView = true; overview = false; render();
+  if (notesView) notesScrollY = window.scrollY;
+  reportView = true; notesView = false; overview = false; render();
   $('report-heading').focus({ preventScroll: true });
   window.scrollTo(0, reportScrollY);
+}
+function showProjectNotes(projectId) {
+  if (overview) overviewScrollY = window.scrollY;
+  if (reportView) reportScrollY = window.scrollY;
+  if (projectId !== undefined) { filterProjectNotes(projectId); notesScrollY = 0; }
+  notesView = true; reportView = false; overview = false; render();
+  $('notes-heading').focus({ preventScroll: true }); window.scrollTo(0, notesScrollY);
+}
+function useNotePrompt(projectId, prompt) {
+  const targets = filteredSessions().filter(s => s.projectId === projectId);
+  const s = targets.find(s => !controlAvailability(s, s.runs.at(-1), snapshot.control).reason);
+  if (!s) return targets.length ? controlAvailability(targets[0], targets[0].runs.at(-1), snapshot.control).reason : 'No Pi session is available in this project. Open Pi there, finish a request and explicitly enable /dashboard-control on.';
+  openDetails(s.id, s.runs.at(-1).id, projectId);
+  if (!prepareOtherPrompt(s, s.runs.at(-1), prompt)) return 'Pi availability changed. Nothing was sent; check the target session.';
+  $('control-other-form').scrollIntoView({ block: 'center' }); return '';
+}
+function refreshNoteButtons() {
+  for (const card of $('project-list').children) {
+    const button = card.querySelector('.project-notes-open');
+    if (button) button.textContent = `Project notes (${projectNoteCount(snapshot.terminalTodos, card.dataset.project)})`;
+  }
 }
 function appendProjectText(card, field, label, text, expanded) {
   const paragraph = el('p', `project-text ${field === 'prompt' ? 'project-prompt' : field === 'error' ? 'project-error' : 'project-answer'}`, text);
@@ -98,8 +123,9 @@ function renderProjects() {
   const projects = projectsNow(), query = $('project-search').value.trim().toLocaleLowerCase('en'), filter = $('project-filter').value;
   // Heartbeats should not replace focused cards or collapse their saved summaries.
   const key = JSON.stringify([query, filter, projects.map(({ activeUntil, ...p }) => p)]);
-  if (key === projectRenderKey) return;
+  if (key === projectRenderKey) { refreshNoteButtons(); return; }
   projectRenderKey = key;
+  const names = new Map(); for (const p of projects) names.set(p.projectName, (names.get(p.projectName) || 0) + 1);
   $('project-totals').replaceChildren();
   for (const [status, label, total] of [['all', 'Recorded projects', projects.length], ['running', 'Running', projects.filter(p => p.status === 'running').length], ['waiting', 'Unfinished work', projects.filter(p => p.status === 'waiting').length], ['stale', 'Inactive for 7+ days', projects.filter(p => p.stale).length]]) {
     const metric = el('article'); metric.dataset.status = status;
@@ -112,7 +138,7 @@ function renderProjects() {
     .map(button => JSON.stringify([button.closest('.project-card').dataset.project, button.dataset.field])));
   const focus = document.activeElement, focusedProject = list.contains(focus) ? focus.closest('.project-card')?.dataset.project : undefined;
   const focusedField = focus?.classList.contains('project-expand') ? focus.dataset.field : undefined;
-  const focusedOpen = focus?.classList.contains('project-open');
+  const focusedOpen = focus?.classList.contains('project-open'), focusedNotes = focus?.classList.contains('project-notes-open');
   list.replaceChildren();
   if (!matches.length) {
     const empty = el('div', 'empty-state');
@@ -132,6 +158,7 @@ function renderProjects() {
     else when.textContent = p.ago;
     if (p.activeSessions) when.append(el('span', '', ` · ${p.activeSessions} active ${p.activeSessions === 1 ? 'session' : 'sessions'}`));
     card.append(heading, when);
+    if (names.get(p.projectName) > 1) card.append(el('p', 'project-when', `Project ID: ${p.projectId}`));
     appendProjectText(card, 'prompt', 'Last request', p.latest?.prompt || 'Request text not recorded.', expanded);
     if (error) appendProjectText(card, 'error', 'Model/provider error', error, expanded);
     appendProjectText(card, 'summary', 'Last response', p.latest?.summary || 'Response summary not recorded.', expanded);
@@ -145,13 +172,16 @@ function renderProjects() {
       button.onclick = () => openDetails(p.latest.sessionId, p.latest.runId, p.projectId);
       footer.append(button);
     } else if (p.latest) footer.append(el('p', 'project-archive', 'Summary saved; detailed event history is no longer retained.'));
+    const notes = el('button', 'button project-notes-open', 'Project notes'); notes.type = 'button';
+    notes.setAttribute('aria-label', `${p.projectName}: project notes`); notes.onclick = () => { returnProjectId = p.projectId; showProjectNotes(p.projectId); }; footer.append(notes);
     list.append(card);
     if (focusedProject === p.projectId) {
       const target = focusedField ? card.querySelector(`.project-expand[data-field="${focusedField}"]`) || card.querySelector(`.project-text[data-field="${focusedField}"]`)
-        : focusedOpen ? card.querySelector('.project-open') : undefined;
+        : focusedOpen ? card.querySelector('.project-open') : focusedNotes ? card.querySelector('.project-notes-open') : undefined;
       target?.focus({ preventScroll: true });
     }
   }
+  refreshNoteButtons();
 }
 function selected() {
   const sessions = filteredSessions();
@@ -168,7 +198,7 @@ function renderSidebar() {
   $('sessions').replaceChildren();
   if (!all.length) $('sessions').append(el('p', 'sessions-empty', 'No sessions connected yet.'));
   for (const s of all) {
-    const button = el('button', `session-item ${!overview && !reportView && s.id === sessionId ? 'active' : ''}`); button.type = 'button';
+    const button = el('button', `session-item ${!overview && !reportView && !notesView && s.id === sessionId ? 'active' : ''}`); button.type = 'button';
     button.append(el('strong', '', s.projectName), el('small', '', `${s.id.slice(0, 7)} · ${s.runs.length} ${s.runs.length === 1 ? 'request' : 'requests'}`));
     button.addEventListener('click', () => openDetails(s.id));
     $('sessions').append(button);
@@ -378,14 +408,16 @@ function render() {
     if (latest && latest.id !== followSubmission.runId) { runId = latest.id; followSubmission = undefined; }
   }
   const { s, r } = selected(); renderSidebar();
-  $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview || reportView);
+  $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview || reportView || notesView);
   $('daily-report').classList.toggle('hidden', !reportView);
   $('nav-projects').setAttribute('aria-pressed', String(overview)); $('nav-report').setAttribute('aria-pressed', String(reportView));
+  $('project-notes').classList.toggle('hidden', !notesView); $('nav-notes').setAttribute('aria-pressed', String(notesView));
   if (reportView) renderDailyReport(snapshot.dailyReport, snapshot.sessions, snapshot.control);
+  if (notesView) renderProjectNotes(snapshot.terminalTodos, snapshot.dailyReport?.projects, snapshot.control);
   renderProjects();
-  $('back-to-projects').classList.toggle('hidden', overview || reportView);
-  $('back-to-projects').textContent = detailOrigin === 'report' ? '← Back to daily report' : '← Back to projects';
-  $('project-name').textContent = reportView ? 'Daily report' : overview ? 'My projects' : s?.projectName || 'Pi sessions';
+  $('back-to-projects').classList.toggle('hidden', overview || reportView || notesView);
+  $('back-to-projects').textContent = detailOrigin === 'report' ? '← Back to daily report' : detailOrigin === 'notes' ? '← Back to project notes' : '← Back to projects';
+  $('project-name').textContent = reportView ? 'Daily report' : notesView ? 'Project notes' : overview ? 'My projects' : s?.projectName || 'Pi sessions';
   $('empty').classList.toggle('hidden', Boolean(r)); $('run-content').classList.toggle('hidden', !r);
   const options = s ? [...s.runs].reverse() : [];
   const select = $('run-select'); select.replaceChildren();
@@ -415,9 +447,11 @@ function connect() {
   eventSource.onerror = () => { $('connection-label').textContent = 'Reconnecting'; $('connection-dot').classList.remove('online'); };
 }
 initializeDailyReport(controlAvailability);
-$('back-to-projects').onclick = () => detailOrigin === 'report' ? showDailyReport() : returnToProjects();
+initializeProjectNotes({ authorized: canControl, usePrompt: useNotePrompt });
+$('back-to-projects').onclick = () => detailOrigin === 'report' ? showDailyReport() : detailOrigin === 'notes' ? showProjectNotes() : returnToProjects();
 $('nav-projects').onclick = returnToProjects;
 $('nav-report').onclick = showDailyReport;
+$('nav-notes').onclick = () => showProjectNotes('');
 $('project-search').oninput = renderProjects;
 $('project-filter').onchange = renderProjects;
 $('run-select').onchange = e => { followSubmission = undefined; runId = e.target.value; render(); };

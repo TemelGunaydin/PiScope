@@ -1,5 +1,63 @@
 # Verification log / Doğrulama kaydı
 
+## Terminal Todos publication gates — 2026-10-09
+
+- Rechecked **209/209 tests**, **50 JavaScript modules**, shell syntax and diff
+  whitespace before publication. The existing browser/Pi results below remain
+  current; no product code changed after those checks. Earlier entries describe
+  their pre-publication state, not a claim about the eventual hosted CI result.
+- Only source, synthetic tests and English/Turkish documentation are included.
+  Private notes/history, credentials, generated screenshots and personal paths
+  are excluded. Terminal Todos itself, runtime permissions and Serve routes were
+  not modified. The bridge stays disabled until explicitly enabled by its user.
+
+## Local Edit prompt drafts — 2026-10-09 (local pre-publication)
+
+- Note cards offer Edit prompt with an inline, labelled draft and Cancel edit.
+  Extra instructions can precede the copied note; the original remains visible
+  and unchanged. Editing alone needs no send grant, makes no submission and saves
+  nothing to Terminal Todos or a draft database. Use as prompt copies the exact
+  edited text into Other; existing Review/Confirm and target safeguards remain.
+- HTTP/SSE and simulated Serve HTTPS browser proof passed: view-only editing
+  cannot send, empty drafts are blocked, cancel restores focus/original flow,
+  cursor selection and draft nodes survive live updates, filters/navigation keep
+  the draft, source updates do not replace it, reload drops it, and confirmed
+  prefix-plus-note input arrives once only at the selected mock Pi project.
+  Source bytes/mtime/mode and completion stay unchanged. Keyboard and 320/390 px,
+  200% reflow passed; synthetic editor screenshots were inspected.
+- Focused 32 tests, all **209 tests**, **50 syntax-checked modules**, continuation
+  and monitoring HTTP browser regressions, and diff checks passed. No new backend
+  or extension changes, personal-note reads, paid calls, physical-phone test or
+  commit/push; hosted CI has not run for these local edits.
+
+## Read-only Terminal Todos bridge — 2026-10-09 (local pre-publication)
+
+- Optional bounded source adapter supports v1/v2 and absolute HOME/XDG/explicit
+  paths without source writes, locks, migrations or discovery. Synthetic tests
+  cover invalid/oversized/unsafe data, symlinks, source/link-file aliases,
+  corruption preservation, safe IDs and full-capacity private link reload.
+- Explicit hashed-label → project-ID links and one-time unassigned targets do
+  not guess by name. Notes stay out of automatic daily-report context and history
+  export. Saving links uses separate browser/collector control and starts no work.
+- Mock-Pi browser suites passed real HTTP/SSE and simulated Serve HTTPS: literal
+  non-English notes, same-name targets, no cross-project fallback, full-note copy,
+  over-limit manual editing, exact edited preview/input, cancel without work,
+  duplicate confirmation delivered once, unchanged source bytes/mtime/mode and
+  completion state, retained links and stale-source blocking. Unrelated SSE
+  preserves body nodes, text selection, focus, scroll, chosen targets and drafts.
+  Mobile 320/390 px and 200% text passed; synthetic screenshots were inspected.
+- Monitoring, continuation and daily-report browser regressions passed HTTP and
+  simulated HTTPS. Replay tests were updated to load the new module and remove
+  import declarations rather than matching a stale exact import string; no
+  production failure was hidden.
+- **209/209 tests**, **50 syntax-checked modules**, **89 local Markdown links**,
+  **119 unique HTML IDs**, shell syntax and diff whitespace checks passed.
+- Installed **Pi 1.1.0** monitoring/recovery and existing ordinary/report control
+  input smoke passed. Inputs were intercepted before model execution; this is
+  independent of the todo-specific UI's mock runtime proof.
+- No personal todos/history read, paid provider call, real Tailscale route change,
+  physical-phone test, commit/push or hosted CI for this uncommitted integration.
+
 ## Clear daily-report confirmation — 2026-10-06
 
 - Scope, day/timezone, execution model and Pi session have separate labels.

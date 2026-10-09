@@ -11,7 +11,7 @@
   <aside class="sidebar">
     <a class="brand" href="/" aria-label="PiScope home"><img class="brand-icon" src="/icon-64.png" width="36" height="36" alt=""><span>Pi<span class="brand-light">Scope</span></span></a>
     <div class="workspace-summary">Projects <span id="project-count">0</span></div>
-    <nav class="view-nav" aria-label="Dashboard views"><button id="nav-projects" type="button" aria-pressed="true">Projects</button><button id="nav-report" type="button" aria-pressed="false">Daily report</button></nav>
+    <nav class="view-nav" aria-label="Dashboard views"><button id="nav-projects" type="button" aria-pressed="true">Projects</button><button id="nav-report" type="button" aria-pressed="false">Daily report</button><button id="nav-notes" type="button" aria-pressed="false">Project notes</button></nav>
     <div class="section-caption">SESSIONS</div>
     <nav id="sessions" aria-label="Projects and sessions"></nav>
     <div class="sidebar-bottom"><span class="shield">◇</span><strong>Your data stays on this machine.</strong><p>No model API keys are read.<br>No cloud synchronization.</p><div class="server-pill"><span id="connection-dot" class="dot"></span><span id="connection-label">Connecting</span><span class="local-tag">LOCAL</span></div></div>
@@ -58,6 +58,19 @@
         </section>
         <div class="report-output-heading"><h2>Daily summary</h2><button id="report-copy" class="button" type="button" disabled>Copy report</button></div><div id="report-list" class="report-list"></div><p id="report-scope" class="project-scope"></p>
       </section>
+      <section id="project-notes" class="hidden" aria-labelledby="notes-heading">
+        <div class="page-heading"><div><h1 id="notes-heading" tabindex="-1">Project notes</h1><p>Read Terminal Todos notes and turn one into an approved Pi prompt.</p></div></div>
+        <div id="notes-disabled" class="notice"><strong>Optional integration is off.</strong><p>On the dashboard machine, restart PiScope with <code>AGENT_DASHBOARD_TODOS=1 npm start</code>, keeping your existing control and Tailscale settings. Reads <code>$XDG_DATA_HOME/terminal-todos/todos.json</code> (absolute XDG path), otherwise <code>~/.local/share/terminal-todos/todos.json</code>. Use <code>AGENT_DASHBOARD_TODOS_FILE</code> for an explicit absolute file.</p><p>No source file is read until you enable this integration.</p></div>
+        <div id="notes-content" class="hidden">
+          <p id="notes-warning" class="notice hidden" role="status"></p>
+          <p id="notes-permission" class="project-scope"></p>
+          <details id="notes-links" class="notes-links"><summary>Link Terminal Todos project labels</summary><p class="report-label">Labels are not folder identities. Choose the exact PiScope project; similar names are never matched automatically. Saved links only set a default target. A note without a label needs a one-time target below.</p><div id="notes-link-list"></div><p id="notes-links-empty" class="report-label">No project labels in these notes. Choose a target on each note instead.</p></details>
+          <div class="notes-filters"><div><label for="notes-project">PiScope project</label><select id="notes-project"><option value="">All notes</option></select></div><div><label for="notes-status">Note status</label><select id="notes-status"><option value="open">Open notes</option><option value="done">Completed notes</option><option value="all">All notes</option></select></div></div>
+          <p id="notes-action-status" class="project-results" role="status"></p><p id="notes-results" class="project-results"></p>
+          <div id="notes-list" class="notes-list"></div><p id="notes-empty" class="project-scope">No notes match this filter. Link a label above, choose All notes, or add notes in Terminal Todos.</p>
+          <p class="project-scope">Viewing notes uses no model quota. Confirmed prompts go only to the selected project’s existing Pi session, with its current model and permissions — not a sandbox. Sent does not mean completed: PiScope never edits, completes or deletes a source note. Unchanged text is copied as displayed, with best-effort secret redaction; drafts over 8,000 characters must be shortened before review.</p>
+        </div>
+      </section>
       <div id="workspace-details" class="hidden">
       <section class="page-heading"><div><div class="eyebrow">OBSERVED WORKFLOW</div><h1 id="detail-heading" tabindex="-1">Workflow tracking</h1><p>Requests, models and test reports.</p></div><div class="run-select-wrap"><label for="run-select">Request history</label><select id="run-select"><option>No requests yet</option></select></div></section>
       <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>Waiting for the first Pi signal.</h2><p>Keep PiScope running. Install the monitoring extension in your project and start a task in Pi.</p><code>npm run install:pi -- /absolute/path/to/your/project</code><p class="small">Then use <code>/reload</code> and <code>/dashboard-status</code> in Pi.</p></section>
@@ -71,7 +84,7 @@
             <section class="control-response" aria-labelledby="control-response-heading"><h3 id="control-response-heading">Last model response</h3><div id="control-response-text" class="control-response-text" role="region" aria-labelledby="control-response-heading" tabindex="0"></div></section>
             <h3>Recommended</h3><div id="control-recommendations"></div>
             <form id="control-other-form"><h3>Other</h3><label for="control-other-prompt">What should Pi do next?</label><textarea id="control-other-prompt" rows="4" maxlength="8000" placeholder="Write a prompt for this project…"></textarea><button id="control-other-review" class="button" type="submit">Review prompt</button></form>
-            <section id="control-review" class="control-review hidden" aria-labelledby="control-review-target"><h3 id="control-review-target"></h3><p id="control-review-prompt"></p><p class="control-note">This can modify files or run tools with your existing Pi permissions and model usage.</p><div class="control-actions"><button id="control-confirm" class="button" type="button">Confirm and send to Pi</button><button id="control-cancel" class="button" type="button">Cancel</button></div></section>
+            <section id="control-review" class="control-review hidden" aria-labelledby="control-review-target"><h3 id="control-review-target"></h3><p id="control-review-identity" class="control-note"></p><p id="control-review-prompt"></p><p id="control-review-consent" class="control-note">Only this project’s Pi session receives the exact prompt above — not an all-project report request. This uses its current model quota and can modify files or run tools with its existing permissions; it is not a sandbox. Sent does not mean completed; source notes are never updated.</p><div class="control-actions"><button id="control-confirm" class="button" type="button" aria-describedby="control-review-identity control-review-consent">Confirm and send to Pi</button><button id="control-cancel" class="button" type="button">Cancel</button></div></section>
             <p id="control-receipt" class="control-note" role="status" aria-live="polite"></p>
           </div>
         </section>

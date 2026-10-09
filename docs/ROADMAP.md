@@ -34,6 +34,11 @@ Kısa özetler ayrıntılı kayıtların saklama sınırından bağımsız korun
 projenin tamamlandığını veya bildirilmemiş bir sonraki görevi tahmin etmez.
 [Kapsam ve saklama kuralları](PROJECTS.md).
 
+Terminal Todos ilk dilimi tamamlandı: opt-in salt okunur not görüntüleme, açık
+etiket → proje kimliği bağı, tek kullanımlık hedef ve Other üzerinden düzenleme/
+onaylı tek-proje gönderimi. Kaynak notlar değiştirilmez veya otomatik tamamlanmaz;
+[kurulum ve sınırlar](TERMINAL-TODOS.md).
+
 ## Sonraki işler
 
 Yürütme performansı ölçümünün ilk dilimi eklendi (teknik tamamlanma / sonuçsuz
@@ -42,8 +47,8 @@ ayrımı, çağrı bazlı süre, proje geçmişi toplamı). Sıradaki adımlar:
 - Test runner/exit-code ve commit bağlamıyla yürütme kanıtını güçlendirme; gerekirse xcresult adapter'ı.
 - Yeni Pi/alt agent sürümleri ve farklı sağlayıcı hata biçimleri için uyumluluk fixture’larını genişletme.
 - Ayrı tüm-journal dışa aktarma, arama ve saklama sınırı arayüzü.
-- Proje bazlı TODO düzenleme (Recommended/Other ile açık, boşta Pi oturumuna
-  kullanıcı onaylı prompt gönderimi eklendi; [güven sınırı](CONTROL.md)).
+- İhtiyaç ve açık onayla telefondan not ekleme veya iki yönlü TODO düzenleme;
+  mevcut Terminal Todos dilimi yalnız okuma ve düzenlenebilir/onaylı prompt gönderimidir.
 - Gerekiyorsa deterministik workflow state machine; sınırlı retry ve iptal.
 - Workflow karşılaştırmasına doğrulanabilir maliyet verisi ekleme.
 - Ayrı testlerle OpenCode/OMP adapter’ları.

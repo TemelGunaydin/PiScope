@@ -192,8 +192,8 @@ select { max-width: 100%; width: 100%; min-height: 48px; background: var(--panel
 .control-recommendation p, #control-review-prompt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 16px 0; }
 #control-other-form { display: grid; gap: 16px; }
 #control-other-form label { font-size: var(--small); }
-#control-other-prompt { display: block; width: 100%; min-width: 0; resize: vertical; padding: 16px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--panel); font: inherit; color: inherit; }
-#control-other-prompt:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+#control-other-prompt, .notes-prompt-draft { display: block; width: 100%; min-width: 0; resize: vertical; padding: 16px; border: 1px solid var(--control-line); border-radius: 8px; background: var(--panel); font: inherit; color: inherit; }
+#control-other-prompt:focus-visible, .notes-prompt-draft:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 #control-other-form button { justify-self: start; }
 .control-review { padding: 16px; border-left: 4px solid var(--accent); background: var(--blue-bg); border-radius: 8px; }
 .control-actions { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
@@ -230,6 +230,24 @@ select { max-width: 100%; width: 100%; min-height: 48px; background: var(--panel
 .project-open:hover { background: var(--accent); color: #fff; }
 .project-archive, .project-scope { font-size: var(--small); color: var(--muted); line-height: 1.7; margin-top: 24px; }
 .project-scope { max-width: 75ch; }
+
+/* Optional, read-only project notes. Native controls keep approval explicit. */
+.project-notes-open { align-self: flex-start; margin-top: 16px; }
+.notes-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.notes-card { display: grid; align-content: start; gap: 16px; min-width: 0; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.notes-card .button { justify-self: start; }
+.notes-editor { display: grid; gap: 16px; min-width: 0; padding: 16px; background: var(--panel-alt); border: 1px solid var(--line); border-radius: 8px; }
+.notes-prompt-actions { display: flex; flex-wrap: wrap; gap: 16px; }
+.notes-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; min-width: 0; }
+.notes-links { margin: 24px 0; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.notes-links > summary { cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+#notes-link-list { display: grid; gap: 16px; margin-top: 24px; }
+.notes-link { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: center; gap: 16px; }
+.notes-link label { overflow-wrap: anywhere; }
+.notes-link-meta { grid-column: 1 / -1; margin: 0; }
+.notes-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin: 24px 0; }
+.notes-filters label { display: block; margin-bottom: 8px; }
+#control-review-identity { white-space: pre-wrap; overflow-wrap: anywhere; margin: 16px 0; }
 
 /* Request details. */
 .prompt-card { padding: 24px; border: 1px solid var(--blue-line); border-left: 4px solid var(--accent); background: var(--panel); border-radius: 8px; margin-bottom: 24px; }
@@ -355,8 +373,8 @@ footer > span:first-child { display: none; }
 @media (max-width: 960px) {
   .report-engine-grid { grid-template-columns: 1fr; gap: 24px; }
   .sidebar { position: static; width: 100%; padding: 16px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 176px; gap: 16px; }
-  .view-nav { grid-column: 1 / -1; flex-direction: row; }
-  .view-nav button { flex: 1; text-align: center; }
+  .view-nav { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; }
+  .view-nav button { flex: 1 1 140px; text-align: center; }
   .workspace-summary { align-self: center; padding: 0; border: 0; flex-wrap: wrap; gap: 8px; }
   .section-caption, .sidebar-bottom { display: none; }
   #sessions { grid-column: 1 / -1; display: flex; gap: 8px; }
@@ -384,7 +402,9 @@ footer > span:first-child { display: none; }
   .prompt-top { align-items: flex-start; flex-wrap: wrap; }
   .panel-header { padding: 16px; flex-wrap: wrap; }
   .perf-body { padding: 0 16px 16px; }
-  .model-grid, .project-list, .project-filters, .report-project { grid-template-columns: 1fr; }
+  .model-grid, .project-list, .project-filters, .report-project, .notes-list, .notes-filters, .notes-link { grid-template-columns: 1fr; }
+  .notes-card, .notes-links { padding: 16px; }
+  .notes-link .button { justify-self: start; }
   .report-project { padding: 16px; gap: 24px; }
   .report-generation, .report-readiness, .report-summary, #report-review, .report-review-facts { padding: 16px; }
   .report-review-facts { grid-template-columns: 1fr; }

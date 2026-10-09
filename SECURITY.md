@@ -51,6 +51,13 @@ publicly while arranging that channel. No response-time guarantee is offered.
   Generated text is untrusted prose, rendered literally and not independent proof
   of work or test quality. Generation consumes model quota; there are no automatic
   requests/retries. [Context, retention and limits](docs/DAILY-REPORTS.md).
+- Terminal Todos imports are explicitly opt-in and read-only. Notes are private,
+  authenticated, bounded and best-effort redacted, not journaled or included in
+  history exports. Explicit project-ID links are private PiScope metadata, not
+  source edits. Only a reviewed, confirmed editable prompt uses existing control
+  and Pi permissions; it is single-project scope, not automatic execution or
+  completion. Approved prompts may subsequently be captured as normal Pi work.
+  [Source, targeting and limits](docs/TERMINAL-TODOS.md).
 - Imported JUnit summaries are report observations, not signed runner evidence
   or proof that a specific commit passed tests.
 - Event history, persistent project summaries, daily report excerpts, pending

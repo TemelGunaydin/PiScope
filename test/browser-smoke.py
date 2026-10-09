@@ -110,7 +110,9 @@ with sync_playwright() as pw:
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
         target.add_script_tag(content=(root / 'public/control.js').read_text().replace('export ', ''))
         target.add_script_tag(content=(root / 'public/report.js').read_text().replace('export ', ''))
-        target.add_script_tag(content=(root / 'public/app.js').read_text().replace("import { initializeControls, renderControls, modelError, controlAvailability } from './control.js';", '').replace("import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';", ''))
+        target.add_script_tag(content=(root / 'public/notes.js').read_text().replace('export ', ''))
+        # Replay module bodies as classic scripts; import declarations cannot run here.
+        target.add_script_tag(content='\n'.join(line for line in (root / 'public/app.js').read_text().splitlines() if not line.startswith('import ')))
     if args.network:
         browser_url = config['tailscaleUrl'] if args.tailscale else config['url']
         if args.tailscale:
@@ -336,6 +338,12 @@ with sync_playwright() as pw:
     page.locator('#nav-report').click()
     expect(page.locator('#report-generate')).to_be_disabled()
     for width in (1440, 1024, 768, 390, 320):
+        page.set_viewport_size({'width': width, 'height': 900}); assert_readable(page)
+    page.evaluate("() => document.documentElement.style.fontSize='200%'"); assert_readable(page)
+    page.evaluate("() => document.documentElement.style.fontSize=''")
+    page.locator('#nav-notes').click()
+    expect(page.locator('#notes-disabled')).to_be_visible()
+    for width in (1440, 768, 390, 320):
         page.set_viewport_size({'width': width, 'height': 900}); assert_readable(page)
     page.evaluate("() => document.documentElement.style.fontSize='200%'"); assert_readable(page)
     page.evaluate("() => document.documentElement.style.fontSize=''")

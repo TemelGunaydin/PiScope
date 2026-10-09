@@ -39,6 +39,7 @@ in their original language.
 - **Test reports:** explicitly attached JUnit summaries, separate from execution status.
 - **Persistent history:** short project summaries survive dashboard restarts.
 - **Phone access:** private HTTPS viewing over Tailscale, including outside your home Wi-Fi.
+- **Optional project notes:** read [Terminal Todos](docs/TERMINAL-TODOS.md), explicitly link project labels, and turn one note into an editable, reviewed Pi prompt. Source notes are never changed or marked complete.
 - **Optional continuation:** review **Recommended** suggestions or write **Other**;
   confirm before sending to an open, idle Pi session. Separate control pairing is required.
 
@@ -102,6 +103,30 @@ from the PiScope directory with `npm run install:pi -- "/absolute/path/to/projec
 project's Pi runtime, then explicitly re-enable `/dashboard-control on` when ready.
 Do not interrupt active work just to upgrade. Viewing pairing alone cannot generate.
 [Generation, sources, timezone, retention and limitations](docs/DAILY-REPORTS.md).
+
+## Terminal Todos project notes
+
+Enable the read-only bridge with `AGENT_DASHBOARD_TODOS=1 npm start`, preserving
+existing control/Tailscale settings. **Project notes** reads the standard local
+Terminal Todos JSON, or an explicit absolute `AGENT_DASHBOARD_TODOS_FILE`.
+No personal note file is read by default.
+
+Use **Link Terminal Todos project labels → Save link** to explicitly associate
+labels with PiScope project identities; identical names are never matched
+implicitly. A project's **Project notes** button filters its mapped notes.
+Unassigned/unlinked notes need a one-time target. **Edit prompt** opens a local
+inline draft: prepend instructions or edit the copy without changing the note.
+**Cancel edit** discards the draft. **Use as prompt** copies the edited draft
+(or original note) into **Other**: edit further, **Review prompt**, check the
+target project/session and current model, then **Confirm and send to Pi**.
+Cancel starts nothing; drafts are not persisted across browser reloads.
+
+Unlike daily reports, a todo prompt goes **only to that confirmed project/session**;
+other projects' notes are not bundled. The same three control opt-ins and ordinary
+Pi input safeguards apply. Viewing uses no quota; confirmed input uses the existing
+Pi model and permissions. No automatic execution, busy queuing, model switching,
+source editing or completion. **Sent is not completed.** Phone note creation and
+two-way editing/sync are deferred. [Setup, privacy and limits](docs/TERMINAL-TODOS.md).
 
 ## 1. Run PiScope locally
 

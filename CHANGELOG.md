@@ -5,6 +5,7 @@
 Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
+- Optional read-only Terminal Todos project notes: explicit label-to-project-ID links, unassigned one-time targets, local in-card Edit prompt drafts (including extra instructions), editable Other copies and existing single-project review/confirmation. No source writes, automatic completion, model switching or busy queuing; imports stay out of history exports and automatic daily-report context.
 - Daily report with one Generate report button and one AI-generated overall-day
   report across all tracked projects, not per-project buttons or raw request/reply
   lists. Generate report uses an existing idle Pi session's current model through the three control opt-ins and exact preview/confirmation, with no

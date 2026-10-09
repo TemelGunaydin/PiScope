@@ -73,6 +73,36 @@ yeniden açıp hazır olduğunda `/dashboard-control on` yaz. Aktif işi yalnız
 güncelleme için kesme. Sadece izleme eşleştirmesi rapor üretemez.
 [Ayrıntılar ve saklama sınırları](docs/DAILY-REPORTS.md).
 
+## Terminal Todos proje notları
+
+Salt okunur entegrasyonu `AGENT_DASHBOARD_TODOS=1 npm start` ile etkinleştir;
+mevcut kontrol/Tailscale ayarlarını koru. **Project notes**, Terminal Todos’un
+standart yerel JSON dosyasını okur; farklı konum için mutlak
+`AGENT_DASHBOARD_TODOS_FILE` kullanılabilir. Varsayılan durumda kişisel not
+dosyası okunmaz. PiScope’u yeniden başlatıp tarayıcıyı yenilemen yeterlidir;
+sıradan prompt gönderimi için yeni bir raporlama aracı veya model anahtarı gerekmez.
+
+**Link Terminal Todos project labels → Save link** ile etiketi doğru PiScope
+projesine açıkça bağla. Aynı ad otomatik eşleştirilmez; aynı adlı projelerde karttaki
+proje kimliği ve son isteği karşılaştır. Proje kartının **Project notes** düğmesi
+bağlı notları filtreler. Etiketsiz/bağlanmamış not için tek kullanımlık hedef seç.
+**Edit prompt**, not kartında yerel taslak açar: başına ek talimat yaz veya
+kopyayı düzenle; asıl Terminal Todos notu değişmez. **Cancel edit** yalnız bu
+taslağı iptal eder. **Use as prompt**, düzenlenmiş taslağı (düzenleme yoksa asıl
+notu) **Other** alanına kopyalar. Orada da düzenleyebilir, **Review prompt** ile
+proje/oturum/mevcut model ve tam metni inceleyip **Confirm and send to Pi** ile
+onaylayabilirsin. Düzenleme/kopyalama/Cancel model işi başlatmaz; canlı güncellemeler
+ve sonraki not değişiklikleri taslağı silmez. Taslak diske yazılmaz; tarayıcı
+yenilemesinden sonra geri yüklenmez.
+
+Günlük raporun aksine prompt **yalnız onaylanan proje/oturuma** gider; başka
+projelerin notları birleştirilmez. Aynı üç kontrol izni gerekir. Okuma kota
+kullanmaz; onaylı gönderim Pi’nin mevcut modelini, kotasını ve izinlerini kullanır.
+Otomatik çalışma, meşgul işe kuyruklama, model değiştirme, kaynak notu düzenleme veya
+otomatik tamamlama yoktur. **Gönderildi ≠ tamamlandı.** Telefondan not ekleme ve
+iki yönlü düzenleme/senkronizasyon sonraki dilime bırakıldı.
+[Kurulum, gizlilik ve sınırlar](docs/TERMINAL-TODOS.md).
+
 ## 1. PiScope’u çalıştır
 
 **Node.js 22+**, tarayıcı ve canlı izleme için mevcut Pi kurulumu gerekir.

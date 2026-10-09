@@ -32,6 +32,25 @@ API’si yoktur. Varsayılan web arayüzü yalnızca gözlem ve dışa aktarma y
 İsteğe bağlı kontrol, kullanıcı onaylı prompt’u mevcut Pi oturumuna iletir;
 dosya değişikliği, araçlar, model kullanımı ve izinler Pi’de kalır.
 
+## İsteğe bağlı Terminal Todos köprüsü
+
+`src/todos.mjs`, yalnız açık `AGENT_DASHBOARD_TODOS=1` opt-in ile yapılandırılmış
+tek JSON dosyasını salt okunur ve sınırlı okur. Terminal Todos CLI/lock/migration
+çalıştırılmaz; kaynak asla yazılmaz. Sürümler 1/2 doğrulanır; hatalı/büyük kaynakta
+son okunan notlar yalnız stale görünür ve yeni taslak/bağ oluşturamaz. İçeriğin
+journal veya history export kopyası tutulmaz; günlük rapor kaynağına kendiliğinden
+eklenmez. Normal onaylı Pi girdisi daha sonra sıradan prompt capture’a girebilir.
+
+Kaynak etiket hash’i → PiScope proje kimliği bağı yalnız dashboard’un özel
+`todo-links.json` dosyasına açık Save link ile yazılır. İzleme eşleştirmesi bu
+metadata’yı yazamaz; collector + ayrı browser control izni ve exact Origin gerekir.
+Kaynak bu yazılabilir dosyayla aynı veya directory alias’ı olamaz. Etiketsiz not
+tek kullanımlık hedef ister; ad eşleştirme ve yanlış projeye fallback yoktur.
+`public/notes.js`, Project notes görünümünü ve hedef seçimlerini korur; bir not
+`prepareOtherPrompt` ile mevcut Other alanına kopyalanır. Review/Confirm ve aşağıdaki
+Pi kontrol sınırı yeniden kullanılır; ek sağlayıcı, otomasyon veya tamamlanma
+mekanizması yoktur. [Detaylar](TERMINAL-TODOS.md).
+
 ## Onaylı devam sınırı
 
 `src/control.mjs` yalnız bellekte sınırlı komut/teslimat ve kısa süreli sahiplik

@@ -21,13 +21,23 @@ export function controlAvailability(s, r, control) {
   return result('ready', '');
 }
 export function controlReason(s, r, control) { return controlAvailability(s, r, control).reason; }
+export function canControl() { return authorized; }
+export function prepareOtherPrompt(s, r, prompt) {
+  if (sending || !current || current.s.id !== s.id || current.r.id !== r.id || typeof prompt !== 'string' || unavailable()) return false;
+  draft = undefined; receipt = undefined; controlId('control-review').classList.add('hidden');
+  controlId('control-other-prompt').value = prompt; controlId('control-other-prompt').focus();
+  controlId('control-receipt').textContent = 'Note copied into Other. Edit and review it before sending; later note changes do not update this draft.';
+  return true;
+}
 function unavailable() { return controlReason(current?.s, current?.r, current?.control); }
 function review(prompt, recommendationId) {
   if (sending || unavailable()) return;
+  if (prompt.length > 8000) { controlId('control-receipt').textContent = 'Shorten this draft to 8,000 characters before reviewing. Nothing was sent.'; return; }
   receipt = undefined; controlId('control-receipt').textContent = '';
   draft = { id: crypto.randomUUID(), sessionId: current.s.id, projectId: current.s.projectId, runId: current.r.id,
     ...(recommendationId ? { recommendationId, expectedPrompt: prompt } : { prompt }) };
   controlId('control-review-target').textContent = `Send to ${current.s.projectName} · ${current.s.model || current.r.model || 'current Pi model'} · session ${current.s.id.slice(0, 7)}`;
+  controlId('control-review-identity').textContent = `Project ID: ${current.s.projectId}\nPi session: ${current.s.id}\nLatest request: ${current.r.id}`;
   controlId('control-review-prompt').textContent = prompt;
   controlId('control-review').classList.remove('hidden');
   controlId('control-confirm').disabled = false;
