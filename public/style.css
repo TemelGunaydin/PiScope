@@ -236,9 +236,13 @@ select { max-width: 100%; width: 100%; min-height: 48px; background: var(--panel
 .notes-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 .notes-card { display: grid; align-content: start; gap: 16px; min-width: 0; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
 .notes-card .button { justify-self: start; }
+.notes-activity { display: grid; gap: 16px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-alt); }
+.notes-activity .badge { justify-self: start; }
+.notes-activity .report-label { white-space: pre-wrap; overflow-wrap: anywhere; }
+.notes-reply { line-height: 1.7; }
 .notes-editor { display: grid; gap: 16px; min-width: 0; padding: 16px; background: var(--panel-alt); border: 1px solid var(--line); border-radius: 8px; }
 .notes-prompt-actions { display: flex; flex-wrap: wrap; gap: 16px; }
-.notes-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; min-width: 0; }
+.notes-text, .notes-reply { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; min-width: 0; }
 .notes-links { margin: 24px 0; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
 .notes-links > summary { cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
 #notes-link-list { display: grid; gap: 16px; margin-top: 24px; }

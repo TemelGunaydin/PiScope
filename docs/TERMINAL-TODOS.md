@@ -44,7 +44,10 @@ it does not enable the bridge by itself. There is no folder discovery, legacy
    (or displayed note if not editing) into **Other**. You can edit further there.
    Copying is not submitting; later source changes never replace either draft.
 5. Press **Review prompt**, check the project ID, Pi session, current model and
-   exact edited text, then **Confirm and send to Pi**. Cancel sends nothing.
+   exact input, then **Confirm and send to Pi**. A tracked note adds a visible
+   `PiScope note request. Request ID: …` header to this preview; the edited draft
+   follows it unchanged. The 8,000-character input limit includes this header;
+   over-limit drafts must be shortened manually. Cancel sends nothing.
 
 Open notes are the default; **Completed notes** and **All notes** show source
 completion metadata, not independently verified work. Notes stay in ID order.
@@ -67,10 +70,57 @@ checks and at-most-once handoff. It is **not a sandbox**. Sent is not completed:
 source tasks remain unchanged even after a model reply or delivery receipt.
 
 Unlike a [daily report](DAILY-REPORTS.md), a todo prompt is **not all-project scope**.
-Only the selected note's edited text goes to the confirmed project/session. Other
-notes are not bundled. Imported notes are not daily work evidence or automatically
+Only the selected note's edited text and its visible request-ID header go to the
+confirmed project/session. Other notes are not bundled. Imported notes are not daily work evidence or automatically
 added to report context; a confirmed Pi request can subsequently be captured as
 ordinary work by the monitoring extension.
+
+## Follow the request on its note card
+
+Terminal Todos still runs in the terminal. These cards belong to the **PiScope
+browser dashboard**, usable on desktop; private phone access is optional.
+No Terminal Todos update is required.
+
+After confirmation, **Latest Pi request** shows only that note's most recently
+approved request:
+
+- **Pending:** the collector accepted it; Pi has not confirmed delivery.
+- **Sent:** Pi accepted the input, but no bound run has been observed yet.
+- **Running:** the matching Pi request started with a fresh monitoring signal.
+- **Reply ready:** Pi ended with a captured response, without a reported execution
+  failure. This is **not verification of task success or source-note completion**.
+- **Error:** definite handoff rejection/expiry or a reported execution failure.
+- **Unknown:** uncertain delivery, stale/offline execution, collector restart,
+  cancellation or no completed captured response. **Check Pi; nothing is retried.**
+
+The card retains a bounded, redacted response excerpt. **View Pi request** opens
+the exact linked session/request while its detail is retained; once detail expires,
+the button is disabled and only the saved excerpt remains. Merely editing, copying
+or cancelling creates no tracking record. Unrelated or identically worded prompts
+cannot supply a result: correlation uses the approved ID included in the exact
+reviewed input, one observed extension-input ticket, session, project and new run
+ID. A second input invalidates that ticket even if its text is identical. If an
+earlier hook handles input before the monitor sees it, bare draft text from another
+extension cannot borrow its marked request ID. Later source text/label changes
+do not retarget an already sent request. A replacement source identity does not
+inherit old results. Ordinary Other and Recommended inputs are not implicitly
+associated with a note.
+
+Update the selected project's PiScope extension, restart Pi, and explicitly
+re-enable `/dashboard-control on` if **Use as prompt** reports missing result-link
+support. From PiScope's directory:
+
+```bash
+npm run install:pi -- "/absolute/path/to/selected-project" --update
+```
+
+No model, quota, keys, permissions or Serve route is changed. Transformed/handled
+extension inputs fail closed for correlation; they may stay Sent and then Unknown.
+With prompt capture disabled, observed failures remain visible but reply text is
+not collected and cannot become Reply ready. An unfinished tracked note blocks a
+second tracked send, even from another session. A restart marks unfinished activity
+uncertain rather than replaying commands; new matching terminal evidence can resolve
+it. An already retained request ID cannot be replayed after restart.
 
 ## Privacy, storage and limits
 
@@ -79,9 +129,23 @@ ordinary work by the monitoring extension.
 - Imported note text stays in memory, not in PiScope's journal or new note database;
   it is excluded from **Export history**. Approved prompts can be recorded by Pi
   and normal prompt capture, subject to its existing settings.
-- Only label hashes → project-ID links are saved in PiScope's private `0600`
-  `todo-links.json`. Source titles, label text and paths are not stored there.
-  The configured source must not alias that writable link file.
+- Label hashes → project-ID links are saved in PiScope's private `0600`
+  `todo-links.json`. Latest-request metadata and reply/error excerpts are saved in
+  private `0600` `todo-activity.json`: at most **500 notes / 2 MiB**, **1,000
+  characters per reply/error**. No separate copy of original titles, prompt drafts,
+  label text or source paths is imported into either file. Returned model text
+  may quote the approved input and is private. The opaque source identity includes the configured
+  path, task ID and creation timestamp. Changing the configured path changes that
+  identity. Activity is excluded from history export and automatic report context;
+  normal approved Pi work still follows normal capture/export rules. Unreadable
+  activity is preserved separately with a warning, not guessed from prompt text.
+  The source must not alias **any collector-owned file**: tokens, `server.lock`,
+  `connection.json`, project/daily/generated-report memories, note links/activity,
+  or the active/rotated event journals. A conflict rejects startup **before**
+  token/lock writes or EventStore initialization. Existing inode/hard-link,
+  symlink/parent aliases and missing target paths are checked without scanning
+  directories or modifying the source. Normal `todos.json` alongside collector
+  data remains supported; link saves recheck the boundary.
 - Versions **1 and 2** are supported, with validated fields, unique positive safe
   integer IDs below `next_id`, completion booleans and valid timestamps. Version 1
   has no project labels. Rust u64 values beyond JavaScript's safe integer range
@@ -96,6 +160,6 @@ ordinary work by the monitoring extension.
   draft or save a link until the source is available again. A damaged link file
   is preserved and cannot be overwritten with guessed defaults.
 
-Phone access uses the existing private Tailscale Serve route and separate browser
-pairing. This slice does not add phone note creation, two-way editing/sync,
-automatic completion, per-todo execution tracking or autonomous task scheduling.
+Optional phone access uses the existing private Tailscale Serve route and separate
+browser pairing. This slice does not add note creation, two-way source editing/sync,
+automatic completion, full task execution history or autonomous task scheduling.

@@ -88,6 +88,9 @@ with sync_playwright() as pw:
     # Full long notes are not silently cut or sent; require manual shortening.
     page.locator('[data-note="4"]').get_by_role('button', name='Use as prompt', exact=True).click(); expect(page.locator('#control-other-prompt')).to_have_value(raw['tasks'][3]['title'])
     page.locator('#control-other-review').click(); expect(page.locator('#control-receipt')).to_contain_text('8,000'); expect(page.locator('#control-review')).to_be_hidden(); assert not writes
+    page.locator('#control-other-prompt').fill('x' * 8000); page.locator('#control-other-review').click()
+    expect(page.locator('#control-receipt')).to_contain_text('including its visible request ID'); expect(page.locator('#control-review')).to_be_hidden()
+    expect(page.locator('#control-other-prompt')).to_have_value('x' * 8000); assert not writes
     page.locator('#back-to-projects').click()
     first.get_by_role('button', name='Edit prompt', exact=True).click()
     draft = first.locator('.notes-prompt-draft'); expect(draft).to_have_value(raw['tasks'][0]['title']); expect(draft).to_be_focused()
@@ -114,21 +117,43 @@ with sync_playwright() as pw:
     expect(page.locator('#control-other-prompt')).to_be_focused(); assert not writes
     pulse(6); page.wait_for_timeout(300)
     expect(page.locator('#control-other-prompt')).to_have_value(edited); expect(page.locator('#control-other-prompt')).to_be_focused()
-    page.locator('#control-other-review').click(); expect(page.locator('#control-review-prompt')).to_have_text(edited)
+    page.locator('#control-other-review').click()
+    preview = page.locator('#control-review-prompt').inner_text()
+    assert preview.startswith('PiScope note request. Request ID: ') and preview.split('\n\n', 1)[1] == edited
+    expect(page.locator('#control-other-prompt')).to_have_value(edited)
     expect(page.locator('#control-review-identity')).to_contain_text(project); expect(page.locator('#control-review-identity')).to_contain_text(session['id'])
     expect(page.locator('#control-review-target')).to_contain_text('synthetic/current-model'); expect(page.locator('#control-review-consent')).to_contain_text('Only this project')
-    pulse(6); page.wait_for_timeout(350); expect(page.locator('#control-review-prompt')).to_have_text(edited)
+    pulse(6); page.wait_for_timeout(350); expect(page.locator('#control-review-prompt')).to_have_text(preview)
     page.locator('#control-cancel').click(); expect(page.locator('#control-review')).to_be_hidden(); expect(page.locator('#control-other-prompt')).to_have_value(edited); assert not writes
-    page.locator('#control-other-review').click(); page.locator('#control-confirm').evaluate('(e) => { e.click(); e.click(); }')
-    expect(page.locator('#prompt')).to_have_text(edited); expect(page.locator('#control-other-review')).to_be_enabled(timeout=10000)
-    assert len(writes) == 1 and writes[0]['projectId'] == project and writes[0]['sessionId'] == session['id'] and writes[0]['prompt'] == edited
+    page.locator('#control-other-review').click(); preview = page.locator('#control-review-prompt').inner_text()
+    assert preview.split('\n\n', 1)[1] == edited
+    page.locator('#control-confirm').evaluate('(e) => { e.click(); e.click(); }')
+    expect(page.locator('#prompt')).to_have_text(preview); expect(page.locator('#control-other-review')).to_be_enabled(timeout=10000)
+    assert len(writes) == 1 and writes[0]['projectId'] == project and writes[0]['sessionId'] == session['id'] and writes[0]['prompt'] == preview
+    assert preview == 'PiScope note request. Request ID: ' + writes[0]['id'] + '\n\n' + edited
     assert 'reportDay' not in writes[0]; assert 'separate project note' not in writes[0]['prompt']
+    assert writes[0]['todoRef'] == next(t['ref'] for t in state()['terminalTodos']['tasks'] if t['id'] == '1')
+    page.locator('#nav-notes').click()
+    expect(first.locator('.notes-activity .badge')).to_have_text('Reply ready')
+    expect(first.locator('.notes-reply')).to_have_text('Synthetic response; no model called.')
+    expect(first.locator('.notes-activity')).to_contain_text('not verification')
+    expect(page.locator('[data-note="3"] .notes-activity')).to_be_hidden()  # Merely copying a draft starts no tracking.
+    reply = first.locator('.notes-reply'); reply_node = reply.element_handle(); reply.focus()
+    reply.evaluate('e => { const r=document.createRange(); r.selectNodeContents(e); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }')
+    response_selection = page.evaluate('getSelection().toString()'); response_y = page.evaluate('scrollY')
+    for n in range(7, 10): pulse(n); page.wait_for_timeout(300)
+    assert reply_node.evaluate('e => e === document.querySelector("[data-note=\\\"1\\\"] .notes-reply")')
+    assert page.evaluate('getSelection().toString()') == response_selection; expect(reply).to_be_focused(); assert abs(page.evaluate('scrollY') - response_y) < 2
+    first.get_by_role('button', name='View Pi request', exact=True).click()
+    expect(page.locator('#prompt')).to_have_text(preview); expect(page.locator('#control-response-text')).to_have_text('Synthetic response; no model called.')
+    page.locator('#back-to-projects').click(); expect(page.locator('#notes-heading')).to_be_focused(); expect(first.locator('.notes-activity .badge')).to_have_text('Reply ready')
     after = state(); assert len(next(s for s in after['sessions'] if s['id'] == 'offline-other-session')['runs']) == 1
     assert source.read_bytes() == approved_source and source.stat().st_mtime_ns == approved_mtime and source.stat().st_mode == source_mode; assert not raw['tasks'][0]['completed']; assert sorted(p.name for p in source.parent.iterdir()) == ['todos.json']
     # Reload retains explicit links; no task text is persisted in PiScope's link metadata.
     page.reload(); expect(page.locator('#connection-label')).to_have_text('Dashboard connected'); page.locator('#nav-notes').click()
     expect(first.locator('select')).to_have_value(project); expect(first.locator('.notes-text')).to_have_text(raw['tasks'][0]['title'])
     expect(first.locator('.notes-prompt-draft')).to_be_hidden()  # No draft persisted through reload.
+    expect(first.locator('.notes-activity .badge')).to_have_text('Reply ready'); expect(first.locator('.notes-reply')).to_have_text('Synthetic response; no model called.')
     first.get_by_role('button', name='Edit prompt', exact=True).focus(); page.keyboard.press('Enter')
     expect(first.locator('.notes-prompt-draft')).to_be_focused(); expect(first.locator('.notes-prompt-draft')).to_have_value(raw['tasks'][0]['title'])
     for width in (1440, 768, 390, 320):
@@ -149,6 +174,20 @@ with sync_playwright() as pw:
     busy.route('**/api/events', lambda route: route.abort())
     busy.goto(url); expect(busy.locator('.project-notes-open').first).to_be_visible(); busy.locator('#nav-notes').click(); busy.locator('[data-note="1"]').get_by_role('button', name='Use as prompt', exact=True).click()
     expect(busy.locator('#notes-action-status')).to_contain_text('busy'); expect(busy.locator('#project-notes')).to_be_visible(); assert len(writes) == 1
-    busy.close(); assert not errors, errors
+    busy.close()
+    outdated = context.new_page(); old = copy.deepcopy(state()); next(a for a in old['control']['agents'] if a['projectId'] == project)['canTrack'] = False
+    outdated.route('**/api/state', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps(old))); outdated.route('**/api/events', lambda route: route.abort())
+    outdated.goto(url); expect(outdated.locator('.project-notes-open').first).to_be_visible(); outdated.locator('#nav-notes').click(); outdated.locator('[data-note="1"]').get_by_role('button', name='Use as prompt', exact=True).click()
+    expect(outdated.locator('#notes-action-status')).to_contain_text('Update this project'); assert len(writes) == 1; outdated.close()
+    for status, label in [('queued', 'Pending'), ('sent', 'Sent'), ('running', 'Running'), ('error', 'Error'), ('unknown', 'Unknown')]:
+        simulated = context.new_page(); frozen_status = copy.deepcopy(state()); activity = frozen_status['terminalTodos']['activity'][0]
+        activity.update(status=status, reason='Synthetic status only; not a completion claim.', summary='Literal <img src=x onerror=alert(1)> response excerpt.', detailAvailable=False, runId='expired-bound-run')
+        simulated.route('**/api/state', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps(frozen_status))); simulated.route('**/api/events', lambda route: route.abort())
+        simulated.goto(url); expect(simulated.locator('.project-notes-open').first).to_be_visible(); simulated.locator('#nav-notes').click()
+        item = simulated.locator('[data-note="1"]'); expect(item.locator('.notes-activity .badge')).to_have_text(label)
+        expect(item.locator('.notes-reply')).to_have_text('Literal <img src=x onerror=alert(1)> response excerpt.'); assert item.locator('img').count() == 0
+        expect(item.locator('.notes-result-open')).to_be_disabled(); expect(item.locator('.notes-activity')).to_contain_text('no longer retained'); expect(item.locator('.report-label').first).to_contain_text('Open note')
+        simulated.set_viewport_size({'width':320, 'height':844}); simulated.evaluate("document.documentElement.style.fontSize='200%'"); readable(simulated); simulated.close()
+    assert len(writes) == 1 and not errors, errors
     browser.close()
 print('Project notes passed: HTTP/SSE, explicit links and one-time targets, local-only Edit prompt, prefix/exact edited text, cancel, stable drafts/selection, exact single-project delivery once, no source mutation/completion, mobile/200%; no model API or physical phone.')

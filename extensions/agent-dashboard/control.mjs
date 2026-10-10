@@ -1,4 +1,13 @@
 import { randomUUID } from 'node:crypto';
+import { isNoteRequestPrompt } from './note-request.mjs';
+import { redact } from './privacy.mjs';
+
+function currentModel(state) {
+  const m = state.context?.model;
+  if (typeof m?.id !== 'string' || (m.provider !== undefined && typeof m.provider !== 'string')) return '';
+  const name = m.provider ? `${m.provider}/${m.id}` : m.id;
+  return name.trim() && name.length <= 300 && !/[\u0000-\u001f\u007f]/.test(name) && redact(name, 300) === name ? name : '';
+}
 
 /** Per-session opt-in. No resources until explicitly enabled by a local Pi command. */
 export class PiControl {
@@ -8,8 +17,8 @@ export class PiControl {
   }
   presence(state, enabled = this.enabled) {
     return { ...state.identity, runId: state.runId || this.restoredRunId || '', owner: this.owner, enabled,
-      limited: this.seen.size >= 100, canReport: state.canReport === true,
-      idle: Boolean(enabled && this.seen.size < 100 && state.settled && !state.running &&
+      model: currentModel(state), limited: this.seen.size >= 100, canReport: state.canReport === true, canTrack: state.canTrack === true,
+      idle: Boolean(enabled && currentModel(state) && this.seen.size < 100 && state.settled && !state.running &&
         typeof state.context?.isIdle === 'function' && typeof state.context?.hasPendingMessages === 'function' &&
         state.context.isIdle() && !state.context.hasPendingMessages()) };
   }
@@ -32,7 +41,8 @@ export class PiControl {
       if (!command) return;
       const latest = this.state();
       const reportValid = command.reportRequestId === undefined || (command.reportRequestId === command.id && latest.canReport === true);
-      const valid = reportValid && typeof command.id === 'string' && typeof command.prompt === 'string' && command.prompt.trim() && command.prompt.length <= 8000;
+      const trackValid = command.controlRequestId === undefined || (command.controlRequestId === command.id && latest.canTrack === true && command.reportRequestId === undefined && isNoteRequestPrompt(command.id, command.prompt));
+      const valid = reportValid && trackValid && currentModel(latest) && command.expectedModel === currentModel(latest) && typeof command.id === 'string' && typeof command.prompt === 'string' && command.prompt.trim() && command.prompt.length <= 8000;
       const same = command.sessionId === latest.identity?.sessionId && command.projectId === latest.identity?.projectId && command.runId === (latest.runId || this.restoredRunId) && leaf === latest.context?.sessionManager?.getLeafId?.();
       const idle = this.presence(latest).idle;
       if (this.seen.has(command.id)) return;

@@ -21,7 +21,7 @@ function project(raw) {
   for (const name of ['sourceHash', 'contentSourceHash']) if (raw[name] !== undefined) {
     if (typeof raw[name] !== 'string' || !/^[a-f0-9]{64}$/.test(raw[name])) throw new Error('Invalid report source'); value[name] = raw[name];
   }
-  for (const name of ['createdAt', 'generatedAt']) if (raw[name] !== undefined) {
+  for (const name of ['createdAt', 'generatedAt', 'submittedAt']) if (raw[name] !== undefined) {
     if (typeof raw[name] !== 'string' || !Number.isFinite(Date.parse(raw[name]))) throw new Error('Invalid report time'); value[name] = new Date(raw[name]).toISOString();
   }
   for (const name of ['included', 'total', 'contentIncluded', 'contentTotal']) if (raw[name] !== undefined) {
@@ -65,14 +65,20 @@ export class ReportMemory {
   }
   start(input) {
     const key = keyOf(input), old = this.entries.get(key), wasDirty = this.dirty;
-    const r = project({ ...old, ...input, status: 'queued', summary: old?.summary || '', remaining: old?.remaining || '', errorMessage: '', draftSummary: '', draftRemaining: '', runId: undefined, checkpoint: undefined });
+    const r = project({ ...old, ...input, status: 'queued', summary: old?.summary || '', remaining: old?.remaining || '', errorMessage: '', draftSummary: '', draftRemaining: '', submittedAt: undefined, runId: undefined, checkpoint: undefined });
     this.entries.set(key, r); this.dirty = true;
     try { this.flush(); } catch (error) { if (old) this.entries.set(key, old); else this.entries.delete(key); this.dirty = wasDirty; throw error; }
   }
-  delivery(id, status, reason) {
+  delivery(id, status, reason, now = Date.now()) {
     const r = [...this.entries.values()].find(r => r.id === id);
     if (!r || r.runId || !['queued', 'unknown'].includes(r.status)) return;
+    if (status === 'submitted' && r.status === 'queued' && !r.submittedAt) { r.submittedAt = new Date(now).toISOString(); this.changed(); }
     if (['expired', 'rejected', 'unknown'].includes(status)) { r.status = status === 'unknown' ? 'unknown' : 'failed'; r.errorMessage = redact(reason, 1000); this.changed(); }
+  }
+  sweep(now = Date.now()) {
+    for (const r of this.entries.values()) if (r.status === 'queued' && !r.runId && now - Date.parse(r.submittedAt || r.createdAt) > 30000) {
+      r.status = 'unknown'; r.errorMessage = 'No bound Pi request was observed. Check Pi before approving another report; nothing was retried.'; this.changed();
+    }
   }
   observe(e, run) {
     if (!e.reportRequestId || e.demo) return;
@@ -117,7 +123,8 @@ export class ReportMemory {
     }
     savePrivateJSON(this.path, { schemaVersion: 1, reports: retained }); this.entries = new Map(retained.map(r => [keyOf(r), r])); this.dirty = false;
   }
-  snapshot(daily, projects) {
+  snapshot(daily, projects, now = Date.now()) {
+    this.sweep(now);
     return [...this.entries.values()].map(r => {
       const { checkpoint, draftSummary, draftRemaining, sourceHash, contentSourceHash, ...publicReport } = r;
       return { ...publicReport, stale: Boolean(r.summary && r.contentSourceHash !== daily.sourceVersion(r.day, r.scope === 'all' ? undefined : r.projectId, r.scope === 'all' ? projects : undefined)) };

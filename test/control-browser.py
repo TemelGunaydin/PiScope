@@ -54,6 +54,28 @@ with sync_playwright() as pw:
     expect(page.locator('#control-review-prompt')).to_have_text('Run the relevant tests.')
     expect(page.locator('#control-review-target')).to_contain_text('Control-Fixture')
     expect(page.locator('#control-review-target')).to_contain_text('synthetic/current-model')
+    # R6: a model change over SSE invalidates consent, never retargets it silently.
+    import uuid
+    from datetime import datetime, timezone
+    def model_event(model):
+        request = urllib.request.Request(config['url'] + '/api/state', headers={'Authorization': 'Bearer ' + config['token']})
+        with urllib.request.urlopen(request) as response: active = json.load(response)['sessions'][0]
+        payload = {'schemaVersion': 1, 'id': str(uuid.uuid4()), 'type': 'model.selected', 'time': datetime.now(timezone.utc).isoformat(),
+            'sessionId': active['id'], 'projectId': active['projectId'], 'projectName': active['projectName'], 'data': {'model': model}}
+        request = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(payload).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(request) as response: assert response.status == 200
+    model_event('synthetic/changed-model')
+    expect(page.locator('#control-review')).to_be_hidden()
+    expect(page.locator('#control-confirm')).to_be_disabled()
+    expect(page.locator('#control-receipt')).to_contain_text('model changed'); expect(page.locator('#control-receipt')).to_be_focused()
+    model_event('synthetic/current-model')
+    expect(page.locator('.control-start')).to_be_enabled()
+    other_draft = 'Unsent exact draft must survive a model change.'
+    page.locator('#control-other-prompt').fill(other_draft); page.locator('#control-other-review').click()
+    model_event('synthetic/changed-model')
+    expect(page.locator('#control-review')).to_be_hidden(); expect(page.locator('#control-other-prompt')).to_have_value(other_draft)
+    model_event('synthetic/current-model'); expect(page.locator('#control-other-review')).to_be_enabled()
+    page.locator('#control-other-review').click(); expect(page.locator('#control-review-prompt')).to_have_text(other_draft)
     page.locator('#control-cancel').click()
     expect(page.locator('#control-review')).to_be_hidden()
     expect(page.locator('#run-select option')).to_have_count(1)
@@ -165,4 +187,4 @@ with sync_playwright() as pw:
     assert page.evaluate('() => document.documentElement.scrollWidth <= innerWidth')
     assert not errors, errors
     browser.close()
-print('Approval UI passed: read/control separation, mobile confirmation/cancel, Recommended + Other, preserved draft under SSE, selected-request response/selection/scroll preservation, literal reply text, provider Error card/alert/recovery, exact prompt/model/session, duplicate-click protection, current-run targeting and ' + ('simulated Serve HTTPS Secure cookies.' if args.tailscale else 'real HTTP/SSE.'))
+print('Approval UI passed: read/control separation, mobile confirmation/cancel, Recommended + Other, preserved draft under SSE, selected-request response/selection/scroll preservation, literal reply text, provider Error card/alert/recovery, exact prompt/model/session, stale-model approval invalidation with draft/focus preserved, duplicate-click protection, current-run targeting and ' + ('simulated Serve HTTPS Secure cookies.' if args.tailscale else 'real HTTP/SSE.'))

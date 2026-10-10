@@ -36,7 +36,9 @@ projenin tamamlandığını veya bildirilmemiş bir sonraki görevi tahmin etmez
 
 Terminal Todos ilk dilimi tamamlandı: opt-in salt okunur not görüntüleme, açık
 etiket → proje kimliği bağı, tek kullanımlık hedef ve Other üzerinden düzenleme/
-onaylı tek-proje gönderimi. Kaynak notlar değiştirilmez veya otomatik tamamlanmaz;
+onaylı tek-proje gönderimi. Son onaylı isteğin Pending/Sent/Running/Reply ready/
+Error/Unknown durumu, sınırlı yanıtı ve tam ilgili Pi isteğine bağlantısı da kartta
+korunur; kaynak notlar değiştirilmez veya otomatik tamamlanmaz;
 [kurulum ve sınırlar](TERMINAL-TODOS.md).
 
 ## Sonraki işler
@@ -48,7 +50,8 @@ ayrımı, çağrı bazlı süre, proje geçmişi toplamı). Sıradaki adımlar:
 - Yeni Pi/alt agent sürümleri ve farklı sağlayıcı hata biçimleri için uyumluluk fixture’larını genişletme.
 - Ayrı tüm-journal dışa aktarma, arama ve saklama sınırı arayüzü.
 - İhtiyaç ve açık onayla telefondan not ekleme veya iki yönlü TODO düzenleme;
-  mevcut Terminal Todos dilimi yalnız okuma ve düzenlenebilir/onaylı prompt gönderimidir.
+  mevcut Terminal Todos dilimi yalnız okuma, düzenlenebilir/onaylı prompt gönderimi
+  ve son isteğin gözlenen sonucu ile sınırlıdır.
 - Gerekiyorsa deterministik workflow state machine; sınırlı retry ve iptal.
 - Workflow karşılaştırmasına doğrulanabilir maliyet verisi ekleme.
 - Ayrı testlerle OpenCode/OMP adapter’ları.

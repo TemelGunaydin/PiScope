@@ -152,6 +152,13 @@ with sync_playwright() as pw:
     page.wait_for_function('() => previewUpdates >= 2', timeout=10000); page.evaluate('previewObserver.close()')
     assert page.evaluate('''() => savedPrompt === document.querySelector('#report-review-prompt') && getSelection().toString() === savedPromptSelection && document.querySelector('#report-review-details').open''')
     expect(page.locator('#report-review-prompt')).to_be_focused(); assert not writes
+    # R6: daily confirmation must also discard stale model consent without work.
+    post('model.selected', {'model': 'synthetic/report-model-changed'}, run=None, session_id=session['id'])
+    expect(page.locator('#report-review')).to_be_hidden(); expect(page.locator('#report-confirm')).to_be_disabled()
+    expect(page.locator('#report-copy-status')).to_contain_text('model changed'); expect(page.locator('#report-copy-status')).to_be_focused(); assert not writes
+    post('model.selected', {'model': 'synthetic/current-model'}, run=None, session_id=session['id'])
+    expect(page.locator('#report-generate')).to_be_enabled()
+    page.locator('#report-generate').click(); expect(page.locator('#report-review')).to_be_visible()
     page.locator('#report-cancel').click(); expect(page.locator('#report-review')).to_be_hidden(); expect(page.locator('#report-generate')).to_be_focused(); assert not writes
     page.locator('#report-generate').click(); expect(page.locator('#report-review')).to_be_visible()
     expect(page.locator('#report-review-prompt')).to_be_hidden()
@@ -200,4 +207,4 @@ with sync_playwright() as pw:
     page.locator('#report-date').fill(today); page.clock.fast_forward(24*60*60*1000); expect(page.locator('#report-date')).to_have_value(today)
     assert not errors, errors
     browser.close()
-print('Daily report passed: ONE Generate button and ONE approved request for all tracked projects, closed/inactive context, read/control separation, preview/cancel/confirm, duplicate prevention, typed output, cross-project stale protection, retained report on failure, copy, dates, stable reading, mobile/200% and '+('simulated Serve HTTPS.' if args.tailscale else 'HTTP/SSE.'))
+print('Daily report passed: ONE Generate button and ONE approved request for all tracked projects, closed/inactive context, read/control separation, preview/cancel/confirm, stale-model consent invalidation without a write, duplicate prevention, typed output, cross-project stale protection, retained report on failure, copy, dates, stable reading, mobile/200% and '+('simulated Serve HTTPS.' if args.tailscale else 'HTTP/SSE.'))

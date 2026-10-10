@@ -119,7 +119,18 @@ inline draft: prepend instructions or edit the copy without changing the note.
 **Cancel edit** discards the draft. **Use as prompt** copies the edited draft
 (or original note) into **Other**: edit further, **Review prompt**, check the
 target project/session and current model, then **Confirm and send to Pi**.
-Cancel starts nothing; drafts are not persisted across browser reloads.
+Cancel starts nothing; drafts are not persisted across browser reloads. Tracked
+notes include a visible request-ID header in the reviewed input; the draft stays
+unchanged and the 8,000-character total includes this header.
+After sending, the note card shows **Pending / Sent / Running / Reply ready /
+Error / Unknown**, a saved response excerpt and **View Pi request** for the exact
+linked session/request. These are observed request states, not task-completion
+proof. Missing result-link capability requires updating that project's extension
+and restarting Pi. Ordinary Other inputs need no note-result capability, but
+**all new sends require model-bound approval**: update/restart older project
+extensions and explicitly re-enable `/dashboard-control on`. Monitoring remains
+available; PiScope never switches models. Desktop use is supported; Tailscale
+phone access is optional.
 
 Unlike daily reports, a todo prompt goes **only to that confirmed project/session**;
 other projects' notes are not bundled. The same three control opt-ins and ordinary

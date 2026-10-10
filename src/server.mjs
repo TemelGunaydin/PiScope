@@ -14,6 +14,7 @@ const assets = new Map([
   ['/control.js', ['control.js', 'text/javascript; charset=utf-8']],
   ['/report.js', ['report.js', 'text/javascript; charset=utf-8']],
   ['/notes.js', ['notes.js', 'text/javascript; charset=utf-8']],
+  ['/note-request.js', ['../extensions/agent-dashboard/note-request.mjs', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
   ['/icon.png', ['icon.png', 'image/png']],
   ['/icon-64.png', ['icon-64.png', 'image/png']],
@@ -52,10 +53,10 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
   if (!token || token.length < 24) throw new Error('A strong local access token is required');
   const remoteOrigin = parseTailscaleOrigin(tailscaleOrigin);
   if (controlToken !== undefined && (!/^[a-f0-9]{64}$/.test(controlToken) || equalSecret(controlToken, token))) throw new Error('Control requires a separate strong token');
-  const store = new EventStore(dataDir, { maxBytes });
-  const control = controlToken ? new ControlBroker(store) : undefined;
   const todos = new TerminalTodos(dataDir, todosFile);
-  const snapshot = () => ({ ...store.snapshot(), control: control?.snapshot() || { enabled: false, agents: [], requests: [] }, terminalTodos: todos.snapshot() });
+  const store = new EventStore(dataDir, { maxBytes });
+  const control = controlToken ? new ControlBroker(store, { validTodo: ref => { todos.refresh(); return todos.available && todos.tasks.some(t => t.ref === ref); } }) : undefined;
+  const snapshot = () => ({ ...store.snapshot(), control: control?.snapshot() || { enabled: false, agents: [], requests: [] }, terminalTodos: { ...todos.snapshot(), activity: todos.file ? store.todoMemory.snapshot(store.sessions) : [] } });
   const clients = new Set(); let updateTimer; let origins = new Map();
   function sendSnapshot(client) {
     if (client.destroyed) return;
@@ -68,7 +69,7 @@ export function createDashboard({ dataDir, token, maxBytes, heartbeatMs = 15000,
     updateTimer = setTimeout(() => { updateTimer = null; for (const client of clients) sendSnapshot(client); }, 180);
     updateTimer.unref();
   }
-  const controlView = () => JSON.stringify(control?.snapshot(), (key, value) => key === 'until' ? undefined : value);
+  const controlView = () => JSON.stringify([control?.snapshot(), store.todoMemory.snapshot(store.sessions), [...store.reportMemory.entries.values()].map(r => [r.id, r.status])], (key, value) => key === 'until' ? undefined : value);
   let controlSignature = controlView();
   function controlChanged() {
     const next = controlView();

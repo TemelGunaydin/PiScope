@@ -1,6 +1,8 @@
+import { noteRequestHeader, noteRequestPrompt } from './note-request.js';
+
 const controlEl = (tag, className, text) => { const e = document.createElement(tag); e.className = className; e.textContent = text; return e; };
 const controlId = id => document.getElementById(id);
-let authorized = false, current, draft, sending = false, receipt, recommendationsKey = '';
+let authorized = false, current, draft, sending = false, receipt, noteRef, recommendationsKey = '';
 
 export function modelError(run) {
   if (typeof run?.errorMessage === 'string') return run.errorMessage;
@@ -15,6 +17,8 @@ export function controlAvailability(s, r, control) {
   const a = control.agents?.find(a => a.sessionId === s.id && a.projectId === s.projectId);
   if (!s.connected || Date.now() - Date.parse(s.lastSeen) >= 30000 || !a || a.until <= Date.now()) return result('offline', 'Pi control is offline. In this project’s Pi session, use /dashboard-control on.');
   if (a.runId !== r.id || s.runs.at(-1)?.id !== r.id) return result('stale', 'This is an older request. Open the latest request to continue.');
+  if (!a.model) return result('extension', 'Update this project’s PiScope extension and restart Pi for model-bound approval. Nothing was sent.');
+  if (a.model !== (s.model || r.model)) return result('model_changed', 'Pi model changed or its monitoring signal is not current. Wait for Pi, then review again before sending.');
   if (a.limited) return result('limited', 'Pi control limit reached. Use /dashboard-control off, then on in Pi.');
   if (!a.idle || !r.endedAt || !r.settled || r.status === 'running') return result('busy', 'Pi is busy or still settling. Wait until it finishes.');
   if (control.reservations?.some(entry => entry.sessionId === s.id && entry.runId === r.id)) return result('reserved', 'A request was already sent for this run. Check its receipt or the latest Pi request.');
@@ -22,9 +26,9 @@ export function controlAvailability(s, r, control) {
 }
 export function controlReason(s, r, control) { return controlAvailability(s, r, control).reason; }
 export function canControl() { return authorized; }
-export function prepareOtherPrompt(s, r, prompt) {
+export function prepareOtherPrompt(s, r, prompt, todoRef) {
   if (sending || !current || current.s.id !== s.id || current.r.id !== r.id || typeof prompt !== 'string' || unavailable()) return false;
-  draft = undefined; receipt = undefined; controlId('control-review').classList.add('hidden');
+  draft = undefined; receipt = undefined; noteRef = todoRef; controlId('control-review').classList.add('hidden');
   controlId('control-other-prompt').value = prompt; controlId('control-other-prompt').focus();
   controlId('control-receipt').textContent = 'Note copied into Other. Edit and review it before sending; later note changes do not update this draft.';
   return true;
@@ -32,13 +36,21 @@ export function prepareOtherPrompt(s, r, prompt) {
 function unavailable() { return controlReason(current?.s, current?.r, current?.control); }
 function review(prompt, recommendationId) {
   if (sending || unavailable()) return;
-  if (prompt.length > 8000) { controlId('control-receipt').textContent = 'Shorten this draft to 8,000 characters before reviewing. Nothing was sent.'; return; }
+  const id = crypto.randomUUID(), tracked = Boolean(noteRef && !recommendationId);
+  const exactPrompt = tracked ? noteRequestPrompt(id, prompt) : prompt;
+  if (exactPrompt.length > 8000) {
+    controlId('control-receipt').textContent = tracked
+      ? `Shorten this draft to ${8000 - noteRequestHeader(id).length} characters before reviewing. The exact input has an 8,000-character limit including its visible request ID. Nothing was sent.`
+      : 'Shorten this draft to 8,000 characters before reviewing. Nothing was sent.';
+    return;
+  }
   receipt = undefined; controlId('control-receipt').textContent = '';
-  draft = { id: crypto.randomUUID(), sessionId: current.s.id, projectId: current.s.projectId, runId: current.r.id,
-    ...(recommendationId ? { recommendationId, expectedPrompt: prompt } : { prompt }) };
+  draft = { id, sessionId: current.s.id, projectId: current.s.projectId, runId: current.r.id, expectedModel: current.s.model || current.r.model,
+    ...(recommendationId ? { recommendationId, expectedPrompt: prompt } : { prompt: exactPrompt, ...(tracked ? { todoRef: noteRef } : {}) }) };
   controlId('control-review-target').textContent = `Send to ${current.s.projectName} · ${current.s.model || current.r.model || 'current Pi model'} · session ${current.s.id.slice(0, 7)}`;
   controlId('control-review-identity').textContent = `Project ID: ${current.s.projectId}\nPi session: ${current.s.id}\nLatest request: ${current.r.id}`;
-  controlId('control-review-prompt').textContent = prompt;
+  controlId('control-review-note').classList.toggle('hidden', !draft.todoRef);
+  controlId('control-review-prompt').textContent = exactPrompt;
   controlId('control-review').classList.remove('hidden');
   controlId('control-confirm').disabled = false;
   controlId('control-confirm').focus();
@@ -58,7 +70,7 @@ export async function initializeControls(onSubmitted) {
       if (!response.ok) throw new Error(result.error || 'Request rejected');
       receipt = result; draft = undefined;
       controlId('control-review').classList.add('hidden');
-      controlId('control-other-prompt').value = '';
+      controlId('control-other-prompt').value = ''; noteRef = undefined;
       onSubmitted(result);
     } catch (error) {
       // Preserve the same id and preview on network uncertainty; retries are idempotent.
@@ -69,12 +81,19 @@ export async function initializeControls(onSubmitted) {
 export function renderControls(s, r, control) {
   if (!s || !r) return;
   if (current && (current.s.id !== s.id || current.r.id !== r.id)) {
-    draft = undefined; controlId('control-review').classList.add('hidden');
+    draft = undefined; noteRef = undefined; controlId('control-review').classList.add('hidden');
     controlId('control-other-prompt').value = ''; recommendationsKey = '';
     controlId('control-response-text').scrollTop = 0;
     controlId('control-receipt').textContent = ''; if (!sending) receipt = undefined;
   }
   current = { s, r, control };
+  const agent = control?.agents?.find(a => a.sessionId === s.id && a.projectId === s.projectId);
+  if (draft && !sending && (draft.expectedModel !== (s.model || r.model) || agent?.model && agent.model !== draft.expectedModel)) {
+    const focused = controlId('control-review').contains(document.activeElement);
+    draft = undefined; controlId('control-review').classList.add('hidden');
+    controlId('control-receipt').textContent = 'Pi model changed. This preview is no longer valid. Check Pi and its receipt if you already confirmed; review again before sending.';
+    if (focused) controlId('control-receipt').focus({ preventScroll: true });
+  }
   const response = r.summary || (r.status === 'running' ? 'Pi is working. Its response will appear here.' : 'No model response recorded for this request.');
   const responseText = controlId('control-response-text');
   if (responseText.textContent !== response) responseText.textContent = response;

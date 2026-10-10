@@ -5,6 +5,7 @@ const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
 let overviewScrollY = 0, returnProjectId = '', followSubmission;
+const projectCardKeys = new WeakMap();
 let reportView = false, notesView = false, detailOrigin = 'projects', reportScrollY = 0, notesScrollY = 0;
 const labels = { running: 'Running', starting: 'Request sent', pending: 'Waiting', idle: 'Response finished', done: 'Done', error: 'Error', blocked: 'Blocked', cancelled: 'Cancelled', unknown: 'Outcome unknown' };
 const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
@@ -85,12 +86,13 @@ function showProjectNotes(projectId) {
   notesView = true; reportView = false; overview = false; render();
   $('notes-heading').focus({ preventScroll: true }); window.scrollTo(0, notesScrollY);
 }
-function useNotePrompt(projectId, prompt) {
+function useNotePrompt(projectId, prompt, todoRef) {
   const targets = filteredSessions().filter(s => s.projectId === projectId);
   const s = targets.find(s => !controlAvailability(s, s.runs.at(-1), snapshot.control).reason);
   if (!s) return targets.length ? controlAvailability(targets[0], targets[0].runs.at(-1), snapshot.control).reason : 'No Pi session is available in this project. Open Pi there, finish a request and explicitly enable /dashboard-control on.';
+  if (!snapshot.control.agents.find(a => a.sessionId === s.id)?.canTrack) return 'Update this project’s PiScope extension and restart Pi to link note results. Ordinary Other prompts still work.';
   openDetails(s.id, s.runs.at(-1).id, projectId);
-  if (!prepareOtherPrompt(s, s.runs.at(-1), prompt)) return 'Pi availability changed. Nothing was sent; check the target session.';
+  if (!prepareOtherPrompt(s, s.runs.at(-1), prompt, todoRef)) return 'Pi availability changed. Nothing was sent; check the target session.';
   $('control-other-form').scrollIntoView({ block: 'center' }); return '';
 }
 function refreshNoteButtons() {
@@ -134,23 +136,35 @@ function renderProjects() {
   const matches = projects.filter(p => (!filter || (filter === 'stale' ? p.stale : p.status === filter)) &&
     `${p.projectName} ${p.latest?.prompt || ''} ${p.latest?.summary || ''} ${p.nextStep?.title || ''}`.toLocaleLowerCase('en').includes(query));
   $('project-results').textContent = `${matches.length} ${matches.length === 1 ? 'project' : 'projects'} shown · Project name (A–Z)`;
-  const list = $('project-list'), expanded = new Set([...list.querySelectorAll('.project-expand[aria-expanded="true"]')]
+  const list = $('project-list'), cards = [], previous = new Map([...list.children].map(card => [card.dataset.project, card]));
+  const expanded = new Set([...list.querySelectorAll('.project-expand[aria-expanded="true"]')]
     .map(button => JSON.stringify([button.closest('.project-card').dataset.project, button.dataset.field])));
   const focus = document.activeElement, focusedProject = list.contains(focus) ? focus.closest('.project-card')?.dataset.project : undefined;
   const focusedField = focus?.classList.contains('project-expand') ? focus.dataset.field : undefined;
   const focusedOpen = focus?.classList.contains('project-open'), focusedNotes = focus?.classList.contains('project-notes-open');
-  list.replaceChildren();
   if (!matches.length) {
     const empty = el('div', 'empty-state');
     empty.append(el('h2', '', projects.length ? 'No matching projects.' : 'Your projects will appear here.'),
       el('p', '', projects.length ? 'Try a different search or status filter.' : 'Install the monitoring extension in a Pi project and start working. Your latest request and reported plan will stay here when you return.'));
     if (!projects.length) empty.append(el('code', '', 'npm run install:pi -- /absolute/path/to/your/project'));
-    list.append(empty);
+    cards.push(empty);
   }
   for (const p of matches) {
-    const card = el('article', 'project-card'); card.dataset.project = p.projectId; card.dataset.status = p.status;
     const recorded = snapshot.sessions.find(s => s.id === p.latest?.sessionId)?.runs.find(r => r.id === p.latest.runId);
     const error = p.latest?.errorMessage || modelError(recorded);
+    // Key only this card's content/actions. Relative age updates its time node,
+    // not the reader's response node; another project's changes cannot replace it.
+    const cardKey = JSON.stringify([p.projectName, p.status, p.activeSessions, p.lastWorkedAt, names.get(p.projectName) > 1,
+      p.latest?.prompt, error, p.latest?.summary, p.nextStep?.title, p.nextStep?.status, p.pendingCount,
+      p.detailAvailable, Boolean(p.latest), p.latest?.sessionId, p.latest?.runId]);
+    const old = previous.get(p.projectId);
+    if (old && projectCardKeys.get(old) === cardKey) {
+      const date = old.querySelector('time');
+      if (date) { const text = `${p.ago} · ${fullDate(p.lastWorkedAt)}`; if (date.textContent !== text) date.textContent = text; }
+      cards.push(old); continue;
+    }
+    const card = el('article', 'project-card'); card.dataset.project = p.projectId; card.dataset.status = p.status;
+    projectCardKeys.set(card, cardKey);
     const heading = el('div', 'project-card-head'), [tone, label] = error && !p.activeSessions ? ['error', 'Error'] : projectStates[p.status] || projectStates.unknown;
     heading.append(el('h2', '', p.projectName), el('span', `badge ${tone}`, label));
     const when = el('p', 'project-when');
@@ -174,12 +188,18 @@ function renderProjects() {
     } else if (p.latest) footer.append(el('p', 'project-archive', 'Summary saved; detailed event history is no longer retained.'));
     const notes = el('button', 'button project-notes-open', 'Project notes'); notes.type = 'button';
     notes.setAttribute('aria-label', `${p.projectName}: project notes`); notes.onclick = () => { returnProjectId = p.projectId; showProjectNotes(p.projectId); }; footer.append(notes);
-    list.append(card);
-    if (focusedProject === p.projectId) {
-      const target = focusedField ? card.querySelector(`.project-expand[data-field="${focusedField}"]`) || card.querySelector(`.project-text[data-field="${focusedField}"]`)
-        : focusedOpen ? card.querySelector('.project-open') : focusedNotes ? card.querySelector('.project-notes-open') : undefined;
-      target?.focus({ preventScroll: true });
-    }
+    cards.push(card);
+  }
+  // Remove obsolete cards first. Otherwise inserting a replacement before its
+  // old node would needlessly move later unchanged cards and erase selection.
+  const retained = new Set(cards);
+  for (const card of [...list.children]) if (!retained.has(card)) card.remove();
+  for (let i = 0; i < cards.length; i++) if (list.children[i] !== cards[i]) list.insertBefore(cards[i], list.children[i] || null);
+  const focusedCard = cards.find(card => card.dataset.project === focusedProject);
+  if (focusedCard && !focusedCard.contains(document.activeElement)) {
+    const target = focusedField ? focusedCard.querySelector(`.project-expand[data-field="${focusedField}"]`) || focusedCard.querySelector(`.project-text[data-field="${focusedField}"]`)
+      : focusedOpen ? focusedCard.querySelector('.project-open') : focusedNotes ? focusedCard.querySelector('.project-notes-open') : undefined;
+    target?.focus({ preventScroll: true });
   }
   refreshNoteButtons();
 }
@@ -195,14 +215,30 @@ function selected() {
 function renderSidebar() {
   const all = filteredSessions();
   $('project-count').textContent = (snapshot.projectOverview?.items || []).filter(p => !p.demo).length;
-  $('sessions').replaceChildren();
-  if (!all.length) $('sessions').append(el('p', 'sessions-empty', 'No sessions connected yet.'));
+  const list = $('sessions'), previous = new Map([...list.children].map(button => [button.dataset.session, button]));
+  const focused = list.contains(document.activeElement) ? document.activeElement : undefined, buttons = [];
   for (const s of all) {
-    const button = el('button', `session-item ${!overview && !reportView && !notesView && s.id === sessionId ? 'active' : ''}`); button.type = 'button';
-    button.append(el('strong', '', s.projectName), el('small', '', `${s.id.slice(0, 7)} · ${s.runs.length} ${s.runs.length === 1 ? 'request' : 'requests'}`));
-    button.addEventListener('click', () => openDetails(s.id));
-    $('sessions').append(button);
+    let button = previous.get(s.id);
+    if (!button) {
+      button = el('button', 'session-item'); button.type = 'button'; button.dataset.session = s.id;
+      button.append(el('strong'), el('small'));
+      // Resolve the latest snapshot when clicked; only the exact ID is captured.
+      button.addEventListener('click', () => openDetails(s.id));
+    }
+    button.classList.toggle('active', !overview && !reportView && !notesView && s.id === sessionId);
+    const label = button.querySelector('strong'), detail = button.querySelector('small');
+    const text = `${s.id.slice(0, 7)} · ${s.runs.length} ${s.runs.length === 1 ? 'request' : 'requests'}`;
+    if (label.textContent !== s.projectName) label.textContent = s.projectName;
+    if (detail.textContent !== text) detail.textContent = text;
+    buttons.push(button);
   }
+  if (!all.length) buttons.push(list.querySelector('.sessions-empty') || el('p', 'sessions-empty', 'No sessions connected yet.'));
+  // Keep unchanged buttons connected on heartbeats; remove old nodes first so
+  // inserting an earlier session does not needlessly move the remaining ones.
+  const retained = new Set(buttons);
+  for (const button of [...list.children]) if (!retained.has(button)) button.remove();
+  for (let i = 0; i < buttons.length; i++) if (list.children[i] !== buttons[i]) list.insertBefore(buttons[i], list.children[i] || null);
+  if (focused && document.activeElement !== focused) (retained.has(focused) ? focused : $('nav-projects')).focus({ preventScroll: true });
 }
 function renderStages(r) {
   $('stages').replaceChildren();
@@ -447,7 +483,11 @@ function connect() {
   eventSource.onerror = () => { $('connection-label').textContent = 'Reconnecting'; $('connection-dot').classList.remove('online'); };
 }
 initializeDailyReport(controlAvailability);
-initializeProjectNotes({ authorized: canControl, usePrompt: useNotePrompt });
+initializeProjectNotes({ authorized: canControl, usePrompt: useNotePrompt, openResult: activity => {
+  const s = snapshot.sessions.find(s => s.id === activity.sessionId && s.projectId === activity.projectId);
+  if (!s?.runs.some(r => r.id === activity.runId && r.controlRequestId === activity.id)) return 'The linked Pi request is no longer retained. Only the saved excerpt is available.';
+  followSubmission = undefined; openDetails(s.id, activity.runId, activity.projectId); $('control-response-heading').scrollIntoView({ block: 'start' }); return '';
+} });
 $('back-to-projects').onclick = () => detailOrigin === 'report' ? showDailyReport() : detailOrigin === 'notes' ? showProjectNotes() : returnToProjects();
 $('nav-projects').onclick = returnToProjects;
 $('nav-report').onclick = showDailyReport;

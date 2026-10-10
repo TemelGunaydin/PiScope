@@ -49,7 +49,27 @@ tek kullanımlık hedef ister; ad eşleştirme ve yanlış projeye fallback yokt
 `public/notes.js`, Project notes görünümünü ve hedef seçimlerini korur; bir not
 `prepareOtherPrompt` ile mevcut Other alanına kopyalanır. Review/Confirm ve aşağıdaki
 Pi kontrol sınırı yeniden kullanılır; ek sağlayıcı, otomasyon veya tamamlanma
-mekanizması yoktur. [Detaylar](TERMINAL-TODOS.md).
+mekanizması yoktur. `src/todo-memory.mjs`, notun son onaylı isteğinin kimliğini,
+hedefini ve sınırlı yanıt/hata parçasını özel `todo-activity.json` içinde korur;
+not/prompt taslağı veya yürütülecek komut saklamaz (500 not / 2 MiB). Kaynak yolu,
+task ID ve oluşturma zamanının opak hash’i kimliği belirler; metin/ad eşleştirme
+sonuç ilişkisi kuramaz. Broker exact isteğe `todoRef` bağlar; güncel adapter
+`canTrack` bildirir ve yalnız eşleşen extension input + before_agent_start üzerinden
+`controlRequestId` üretir. `note-request.mjs` ortak helper’ı onayda görünen request-ID
+başlığını üretir/doğrular; 8.000 karakter sınırı bu başlığı içerir, düzenlenen taslak
+aynen korunur. Browser aynı helper’ı salt-okunur `/note-request.js` asset’inden
+alır. Yalnız tek input bileti eşleşebilir; ikinci input aynı metin olsa bile onu
+geçersiz kılar. Böylece monitor’dan önce handled olan girişin kimliği de başka
+extension’ın aynı yalın taslağına aktarılamaz. Session/project/run bağları doğrulanır; unrelated run,
+human input, handled/transformed input ve geç eski sonuç yeni kaydı değiştiremez.
+Restart bekleyen durumu Unknown yapar, komut tekrar gönderilmez. Son yanıt bağımsız
+başarı kanıtı değildir; ayrıntı evicted ise yalnız saklanan excerpt görünür. Kaynak,
+collector’ın token/lock/connection, proje/günlük/üretilmiş rapor, not metadata veya
+aktif/rotated journal dosyalarıyla alias olamaz. Ortak doğrulama CLI’de token/lock
+oluşmadan ve TerminalTodos constructor’ında EventStore kurulmadan yapılır; link
+save de yeniden kontrol eder. Inode/hard link, symlink/parent alias ve henüz
+oluşmamış hedefler yalnız yapılandırılmış yollar üzerinden denetlenir; dizin
+keşfi veya kaynak yazımı yapılmaz. [Detaylar](TERMINAL-TODOS.md).
 
 ## Onaylı devam sınırı
 
@@ -250,8 +270,10 @@ Tam proje yolu API’ye eklenmez; dosya yolları mümkün olduğunda proje göre
 
 `src/project-memory.mjs`, `projectOverview` görünümünü ayrı `projects.json`
 dosyasında tutar. Her proje/mod için son istek, kısa yanıt, bildirilen plan,
-son çalışma zamanı ve sonuç saklanır. Canlı/demo başına 500 proje sınırı vardır;
-özetler oturum/olay sınırlarından bağımsız yaşar. Olay checkpoint'i yeniden
+son çalışma zamanı ve sonuç saklanır. Canlı/demo başına 500 proje ve encoded JSON
+kayıtlarında 32 MiB byte bütçesi vardır; en yeni sığan özetler bağımsız tutulur,
+limitte uyarı verilir. Ortak dosya okuyucusu 64 MiB + 1 KiB envelope kabul eder.
+Başarısız save hafızayı budamaz; özetler oturum/olay sınırlarından bağımsız yaşar. Olay checkpoint'i yeniden
 oynatmada eski özetlere dönüşü engeller; atomik kayıt journal rotasyonundan
 önce tamamlanır. Başarısız kayıt rotasyonu durdurur. Ayrıntılı metriklerin
 paydası bu özetlerden hesaplanmaz. [Proje hafızası](PROJECTS.md).

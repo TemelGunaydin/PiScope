@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { fixture, event, token } from './helpers.mjs';
+import { fixture, event, token, snapshots } from './helpers.mjs';
 import { EventStore } from '../src/store.mjs';
 import { validateEvent } from '../extensions/agent-dashboard/events.mjs';
 import { reportPrompt } from '../src/report-prompt.mjs';
 const controlToken = 'b'.repeat(64);
-const presence = { sessionId: 'session-a', projectId: 'project-a', owner: 'report-owner', runId: 'run-a', idle: true, canReport: true };
+const presence = { sessionId: 'session-a', projectId: 'project-a', owner: 'report-owner', runId: 'run-a', idle: true, canReport: true, model: 'synthetic/current' };
 async function setup(t) {
   const f = await fixture(t, { controlToken });
   for (const e of [event('prompt.received', { prompt: 'Add calendar navigation.' }), event('run.started', { model: 'synthetic/current' }), event('run.ended', { outcome: 'idle', summary: 'Calendar navigation was added; no independent test evidence.' }), event('run.settled')]) f.app.store.append(e);
@@ -15,7 +15,7 @@ async function setup(t) {
   f.headers = { Origin: f.url, 'Content-Type': 'application/json', Cookie: paired.headers.getSetCookie().map(c => c.split(';')[0]).join('; ') };
   f.poll = (input = presence) => f.request('/api/control/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
   await f.poll();
-  f.input = { id: 'generate-one', sessionId: presence.sessionId, projectId: presence.projectId, runId: presence.runId, reportDay: f.app.store.dailyMemory.day(Date.now()) };
+  f.input = { id: 'generate-one', sessionId: presence.sessionId, projectId: presence.projectId, runId: presence.runId, reportDay: f.app.store.dailyMemory.day(Date.now()), expectedModel: presence.model };
   f.preview = input => fetch(f.url + '/api/control/report-preview?' + new URLSearchParams(input || f.input), { headers: f.headers });
   f.send = input => fetch(f.url + '/api/control/requests', { method: 'POST', headers: f.headers, body: JSON.stringify(input) });
   f.generate = async (input = f.input) => { const result = await f.preview(input); assert.equal(result.status, 200); const preview = await result.json(); const request = { ...input, expectedPrompt: preview.prompt, expectedSourceHash: preview.sourceHash }; assert.equal((await f.send(request)).status, 202); return request; };
@@ -45,6 +45,17 @@ test('report requests need current capability/idle state and exact unchanged pre
   const delivery = await (await f.poll()).json(); assert.equal(delivery.command.reportRequestId, f.input.id); assert.equal(delivery.command.prompt, request.expectedPrompt);
   assert.equal((await (await f.poll()).json()).command, null);
   assert.ok(!JSON.stringify(f.app.control.snapshot()).includes(request.expectedPrompt));
+});
+test('daily-report approval is model-bound before queueing and after a model change at claim time', async t => {
+  const f = await setup(t), preview = await (await f.preview()).json();
+  f.app.store.append(event('model.selected', { model: 'synthetic/other' }, { runId: undefined }));
+  await f.poll({ ...presence, model: 'synthetic/other' });
+  assert.equal((await f.send({ ...f.input, expectedPrompt: preview.prompt, expectedSourceHash: preview.sourceHash })).status, 409);
+  assert.equal(f.result(), undefined); assert.equal(f.app.control.requests.size, 0);
+  const fresh = { ...f.input, expectedModel: 'synthetic/other' }; await f.generate(fresh);
+  f.app.store.append(event('model.selected', { model: presence.model }, { runId: undefined }));
+  assert.equal((await (await f.poll()).json()).command, null);
+  assert.equal(f.result().status, 'failed'); assert.equal(f.app.control.reservations.size, 0);
 });
 test('generated summaries require the bound typed result and completed run, not a normal model reply', async t => {
   const f = await setup(t); await f.generate(); f.start();
@@ -87,6 +98,82 @@ test('expired or uncertain control delivery never becomes generation success', a
     f.app.control.requests.get(f.input.id).deadline = Date.now() - 1; f.app.control.sweep();
     assert.equal(f.result().status, claimed ? 'unknown' : 'failed'); assert.equal(f.result().summary, '');
   }
+});
+test('submitted report without a bound run becomes Unknown; only a fresh explicit approval can replace it', async t => {
+  const f = await setup(t); let now = Date.now(); f.app.control.now = () => now;
+  const second = { ...presence, sessionId: 'session-b', projectId: 'project-b', runId: 'run-b', owner: 'owner-b' };
+  const fresh = p => {
+    f.app.store.reduce(validateEvent(event('session.heartbeat', {}, { sessionId: p.sessionId, projectId: p.projectId, time: new Date(now).toISOString() }), new Date(now)));
+    f.app.control.agent(p);
+  };
+  for (const [type, data] of [['session.connected', { model: presence.model }], ['prompt.received', { prompt: 'Other project work' }], ['run.ended', { outcome: 'idle' }], ['run.settled', {}]]) f.app.store.append(event(type, data, { sessionId: second.sessionId, projectId: second.projectId, runId: second.runId }));
+  f.app.control.agent(second);
+  const request = await f.generate(); assert.ok((await (await f.poll()).json()).command);
+  await f.poll({ ...presence, ack: { id: request.id, status: 'submitted' } });
+  const next = { ...f.input, id: 'new-explicit-report', ...second }; delete next.owner; delete next.idle; delete next.canReport;
+  assert.equal((await f.preview(next)).status, 409);
+  now += 31001; fresh(presence); fresh(second);
+  assert.equal((await f.preview(next)).status, 200, 'An unstarted delivery must not lock the report day indefinitely');
+  assert.equal(f.result().status, 'unknown'); assert.equal(f.result().summary, ''); assert.equal(f.result().runId, undefined);
+  assert.match(f.result().errorMessage, /No bound Pi request|No matching Pi request/); assert.match(f.result().errorMessage, /nothing.*retried|Nothing.*retried/);
+  assert.equal(f.app.control.requests.size, 1, 'Preview and timeout must not send another command');
+  assert.equal(f.app.control.requests.get(request.id).status, 'submitted');
+  assert.match(f.app.control.ready(presence.sessionId, presence.projectId, presence.runId), /already sent|pending/);
+  assert.equal((await (await f.poll()).json()).command, null);
+  assert.equal((await f.send(request)).status, 202, 'Duplicate confirmation retains the original receipt');
+  assert.equal(f.app.control.requests.size, 1); assert.equal(f.result().status, 'unknown');
+  const replacement = await f.generate(next); assert.equal(f.app.control.requests.size, 2);
+  assert.equal(f.result().id, replacement.id); assert.equal(f.result().status, 'queued');
+  f.record('prompt.received'); f.record('daily.reported', { summary: 'Late superseded result' }); f.record('run.ended', { outcome: 'idle' });
+  assert.equal(f.result().id, replacement.id); assert.equal(f.result().summary, ''); assert.equal(f.result().status, 'queued');
+});
+test('report snapshots independently expire unstarted delivery without clearing an earlier published report', async t => {
+  const f = await setup(t); let now = Date.now(); f.app.control.now = () => now;
+  await f.generate(); await f.poll(); await f.poll({ ...presence, ack: { id: f.input.id, status: 'submitted' } });
+  f.start(); f.record('daily.reported', { summary: 'Earlier good report' }); f.record('run.ended', { outcome: 'idle' }); f.record('run.settled');
+  now += 20000;
+  await f.poll({ ...presence, runId: 'report-run' });
+  const retry = { ...f.input, id: 'unstarted-second', runId: 'report-run' };
+  await f.generate(retry); assert.equal([...f.app.store.reportMemory.entries.values()][0].submittedAt, undefined);
+  await f.poll({ ...presence, runId: 'report-run' });
+  await f.poll({ ...presence, runId: 'report-run', ack: { id: retry.id, status: 'submitted' } });
+  const memory = f.app.store.reportMemory;
+  const result = memory.snapshot(f.app.store.dailyMemory, f.app.store.reportProjects(), now + 31001)[0];
+  assert.equal(result.status, 'unknown'); assert.equal(result.summary, 'Earlier good report'); assert.equal(result.runId, undefined);
+  memory.flush(); const saved = JSON.parse(readFileSync(memory.path, 'utf8')).reports[0]; assert.equal(saved.status, 'unknown');
+  f.record('prompt.received', {}, { reportRequestId: retry.id, runId: 'late-current' });
+  f.record('run.started', {}, { reportRequestId: retry.id, runId: 'late-current' });
+  f.record('daily.reported', { summary: 'Late but still current completed report' }, { reportRequestId: retry.id, runId: 'late-current' });
+  f.record('run.ended', { outcome: 'idle' }, { reportRequestId: retry.id, runId: 'late-current' });
+  assert.equal(f.result().status, 'ready'); assert.equal(f.result().summary, 'Late but still current completed report');
+});
+test('report start timeout counts from the first submitted ACK and never expires a bound run', async t => {
+  const f = await setup(t); let now = Date.now(); f.app.control.now = () => now;
+  await f.generate(); now += 14000; await f.poll();
+  await f.poll({ ...presence, ack: { id: f.input.id, status: 'submitted' } });
+  const memory = f.app.store.reportMemory, r = [...memory.entries.values()][0], submittedAt = r.submittedAt;
+  assert.equal(submittedAt, new Date(now).toISOString());
+  now += 17000; memory.delivery(f.input.id, 'submitted', '', now); f.app.control.sweep();
+  assert.equal(r.submittedAt, submittedAt); assert.equal(f.result().status, 'queued', 'A delayed ACK still gets the complete observation window');
+  f.start(); memory.snapshot(f.app.store.dailyMemory, f.app.store.reportProjects(), now + 3600000);
+  assert.equal(f.result().status, 'generating'); assert.equal(f.result().runId, 'report-run');
+});
+test('report timeout reaches SSE without a new Pi event or receipt change', async t => {
+  const f = await setup(t); await f.generate(); await f.poll();
+  await f.poll({ ...presence, ack: { id: f.input.id, status: 'submitted' } });
+  // Drain any API-triggered announcement first; only the timer may publish the timeout.
+  await new Promise(resolve => setTimeout(resolve, 350));
+  const controller = new AbortController();
+  const response = await f.request('/api/events', { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]) });
+  const stream = snapshots(response.body);
+  try {
+    const first = (await stream.next()).value; assert.equal(first.dailyReport.summaries[0].status, 'queued');
+    const r = [...f.app.store.reportMemory.entries.values()][0]; r.submittedAt = new Date(Date.now() - 31000).toISOString();
+    let snapshot;
+    do { snapshot = (await stream.next()).value; } while (snapshot.dailyReport.summaries[0].status !== 'unknown');
+    assert.match(snapshot.dailyReport.summaries[0].errorMessage, /No bound Pi request/); assert.equal(snapshot.sequence, first.sequence);
+    assert.equal(f.app.control.requests.get(f.input.id).status, 'submitted'); assert.equal(f.app.control.requests.size, 1);
+  } finally { await stream.return(); controller.abort(); }
 });
 test('a retry cannot publish an earlier failed draft without a fresh typed result', async t => {
   const f = await setup(t); await f.generate(); f.start(); f.record('daily.reported', { summary: 'Failed provisional text.' });
@@ -134,6 +221,7 @@ test('one bounded daily request includes other projects but excludes demo and ot
 test('a different Pi runtime cannot duplicate a pending day and regeneration replaces one daily slot', async t => {
   const f = await setup(t);
   for (const e of [event('prompt.received', { prompt: 'Other project work.' }, { projectId: 'project-b', projectName: 'Other', sessionId: 'session-b', runId: 'run-b' }), event('run.ended', { outcome: 'idle' }, { projectId: 'project-b', projectName: 'Other', sessionId: 'session-b', runId: 'run-b' }), event('run.settled', {}, { projectId: 'project-b', projectName: 'Other', sessionId: 'session-b', runId: 'run-b' })]) f.app.store.append(e);
+  f.app.store.append(event('model.selected', { model: presence.model }, { projectId: 'project-b', projectName: 'Other', sessionId: 'session-b', runId: undefined }));
   await f.poll({ ...presence, projectId: 'project-b', sessionId: 'session-b', runId: 'run-b', owner: 'owner-b' });
   const input = { ...f.input, id: 'from-second-runtime', projectId: 'project-b', sessionId: 'session-b', runId: 'run-b' };
   await f.generate(); assert.equal((await f.preview(input)).status, 409); assert.equal(f.app.control.requests.size, 1);

@@ -39,6 +39,7 @@ const reportGuidance = {
   offline: { title: 'Enable control in the selected Pi session', badge: 'Setup needed', steps: [{ text: 'Keep that Pi session open and enable local control there.', code: '/dashboard-control on' }, { text: 'If the session disconnected, reopen Pi and select its connected session. No permissions are enabled automatically.' }] },
   extension: { title: 'Enable daily reporting in this Pi session', badge: 'Update needed', steps: [{ text: 'Update ONLY the selected project’s extension. Run this from the PiScope directory, replacing the example path.', code: 'npm run install:pi -- "/absolute/path/to/selected-project" --update' }, { text: 'Restart Pi in that project; /reload may keep old modules. Then enable local control.', code: '/dashboard-control on' }, { text: 'Generation needs prompt capture. If you keep it disabled, choose another permitted session. Other projects do not need an extension update for their saved work to be included.' }] },
   busy: { title: 'Wait for the selected Pi session', badge: 'Busy', tone: 'working', steps: [{ text: 'Let its current request finish, or choose another ready session. PiScope will not interrupt or steer active work.' }] },
+  model_changed: { title: 'Wait for the current Pi model', badge: 'Model changed', steps: [{ text: 'The selected model or its monitoring signal changed. Wait for Pi, then review a fresh preview. PiScope never switches models for you.' }] },
   stale: { title: 'The selected Pi request changed', badge: 'Not current', steps: [{ text: 'Wait for the latest request to settle. If you navigated Pi’s session tree, enable local control again and select the current session.' }] },
   limited: { title: 'Renew local control in Pi', badge: 'Control paused', steps: [{ text: 'Turn local control off, then explicitly enable it again in the selected Pi session.', code: '/dashboard-control off\n/dashboard-control on' }] },
   reserved: { title: 'Check the request already sent to Pi', badge: 'Check Pi', steps: [{ text: 'Inspect the Pi terminal or its receipt before trying again. Input delivery is not proof of a completed report.' }] },
@@ -69,7 +70,7 @@ async function reviewReport() {
     const response = await fetch('/api/control/report-preview?' + new URLSearchParams(request));
     const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Preview unavailable');
     if (reportId('report-date').value !== day || reportTargetId !== request.sessionId) return;
-    reportDraft = { ...request, expectedPrompt: result.prompt, expectedSourceHash: result.sourceHash };
+    reportDraft = { ...request, expectedPrompt: result.prompt, expectedSourceHash: result.sourceHash, expectedModel: result.model };
     reportText('report-review-target', `All tracked projects (${result.totalProjects})`);
     reportText('report-review-date', `${reportDateLabel(day)} · ${reportSource.timeZone}`);
     reportText('report-review-model', result.model);
@@ -121,6 +122,14 @@ function reportText(id, text) { if (reportId(id).textContent !== text) reportId(
 export function renderDailyReport(source, sessions = reportSessions, control = reportControl) {
   if (!source) return;
   reportSource = source; reportSessions = sessions || []; reportControl = control || { enabled: false, agents: [] };
+  if (reportDraft && !reportSending) {
+    const s = reportSessions.find(s => s.id === reportDraft.sessionId), a = reportControl.agents?.find(a => a.sessionId === reportDraft.sessionId);
+    if (reportDraft.expectedModel !== (s?.model || s?.runs.at(-1)?.model) || a?.model && a.model !== reportDraft.expectedModel) {
+      const focused = reportId('report-review').contains(document.activeElement);
+      cancelReport(); reportId('report-copy-status').textContent = 'Pi model changed. This preview is no longer valid. Check Pi if you already confirmed; review a fresh daily report preview.';
+      if (focused) reportId('report-copy-status').focus({ preventScroll: true });
+    }
+  }
   const date = reportId('report-date'), today = reportDay(Date.now(), source.timeZone);
   if (date.max !== today) date.max = today;
   if (followToday && date.value !== today && document.activeElement !== date) date.value = today;

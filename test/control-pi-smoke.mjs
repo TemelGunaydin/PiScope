@@ -1,6 +1,6 @@
 // Actual installed-Pi sendUserMessage integration. Input is intercepted before any model call.
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { createDashboard } from '../src/server.mjs';
 import { saveConnection } from '../src/config.mjs';
+import { noteRequestPrompt } from '../extensions/agent-dashboard/note-request.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'piscope-control-pi-'));
 const token = randomBytes(32).toString('hex'), controlToken = randomBytes(32).toString('hex');
@@ -19,19 +20,26 @@ const waitFor = async (fn, label) => {
   while (!fn()) { if (Date.now() > deadline) throw new Error(`Timed out: ${label}`); await new Promise(r => setTimeout(r, 50)); }
 };
 try {
-  app = createDashboard({ dataDir, token, controlToken }); const url = await app.listen(0); saveConnection(dataDir, url, token, undefined, true);
+  const todosFile = join(dir, 'synthetic-todos.json');
+  writeFileSync(todosFile, JSON.stringify({ version: 2, next_id: 2, tasks: [{ id: 1, title: 'PISCOPE_CONTROL_SMOKE', completed: false, created_at: 1720000000 }] }));
+  const source = readFileSync(todosFile);
+  app = createDashboard({ dataDir, token, controlToken, todosFile }); const url = await app.listen(0); saveConnection(dataDir, url, token, undefined, true);
+  const notePrompt = noteRequestPrompt('real-pi-approved', 'PISCOPE_CONTROL_SMOKE');
   const probe = join(dir, 'probe.ts');
   writeFileSync(probe, `export default function(pi) {
     pi.on('input', (event, ctx) => {
       if (event.source === 'extension') {
         const report = event.text.startsWith('PiScope daily work summary. Request ID: real-pi-report');
-        ctx.ui.notify(event.text === 'PISCOPE_CONTROL_SMOKE' ? 'CONTROL_INPUT_HANDLED' : report ? 'REPORT_INPUT_HANDLED' : 'UNEXPECTED_CONTROL_INPUT', 'info');
+        ctx.ui.notify(event.text === ${JSON.stringify(notePrompt)} ? 'CONTROL_INPUT_HANDLED' : report ? 'REPORT_INPUT_HANDLED' : 'UNEXPECTED_CONTROL_INPUT', 'info');
         return { action: 'handled' }; // Guarantees this check cannot reach a model.
       }
     });
   }`);
+  const extensions = process.argv.includes('--probe-first')
+    ? ['-e', probe, '-e', fileURLToPath(new URL('../extensions/agent-dashboard/index.ts', import.meta.url))]
+    : ['-e', fileURLToPath(new URL('../extensions/agent-dashboard/index.ts', import.meta.url)), '-e', probe];
   child = spawn(process.env.PI_BIN || 'pi', ['--mode', 'rpc', '--offline', '--no-session', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files', '--tools', 'workflow_report',
-    '-e', fileURLToPath(new URL('../extensions/agent-dashboard/index.ts', import.meta.url)), '-e', probe],
+    ...extensions],
     { cwd: dir, env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, AGENT_DASHBOARD_HOME: dataDir, PI_OFFLINE: '1', PI_TELEMETRY: '0' }, stdio: ['pipe', 'pipe', 'pipe'] });
   child.stderr.on('data', c => diagnostic += c);
   let commands;
@@ -56,10 +64,15 @@ try {
   const paired = await fetch(url + '/api/control/login', { method: 'POST', headers: { Origin: url, 'Content-Type': 'application/json' }, body: JSON.stringify({ token: controlToken }) });
   assert.equal(paired.status, 200);
   const headers = { Origin: url, 'Content-Type': 'application/json', Cookie: paired.headers.getSetCookie().map(c => c.split(';')[0]).join('; ') };
-  const request = { id: 'real-pi-approved', sessionId: session.id, projectId: session.projectId, runId: 'synthetic-prior-run', prompt: 'PISCOPE_CONTROL_SMOKE' };
+  const request = { id: 'real-pi-approved', sessionId: session.id, projectId: session.projectId, runId: 'synthetic-prior-run', expectedModel: session.model, prompt: notePrompt, todoRef: app.todos.tasks[0].ref };
+  assert.equal((await fetch(url + '/api/control/requests', { method: 'POST', headers, body: JSON.stringify({ ...request, expectedModel: 'synthetic/not-reviewed-model' }) })).status, 409);
+  assert.equal(app.control.requests.size, 0); assert.equal(handled, 0);
   for (let i = 0; i < 2; i++) assert.equal((await fetch(url + '/api/control/requests', { method: 'POST', headers, body: JSON.stringify(request) })).status, 202);
   await waitFor(() => handled === 1 && app.control.requests.get(request.id)?.status === 'submitted', 'actual Pi input and acknowledgement');
   assert.equal(handled, 1); assert.equal(diagnostic, '');
+  const tracked = app.store.todoMemory.entries.get(request.todoRef);
+  assert.equal(tracked.status, 'sent'); assert.equal(tracked.runId, undefined); assert.equal(tracked.summary, '');
+  assert.deepEqual(readFileSync(todosFile), source); assert.equal(app.todos.tasks[0].completed, false);
   assert.equal(session.runs.length, 1, 'The intercepted input must never start a model run');
   send({ id: 'disable', type: 'prompt', message: '/dashboard-control off' });
   await waitFor(() => app.control.snapshot().agents.length === 0, 'control revocation');
@@ -69,12 +82,13 @@ try {
   await waitFor(() => app.control.snapshot().agents.some(a => a.idle && a.canReport && a.runId === 'synthetic-report-source'), 'report-capable installed Pi');
   const report = { id: 'real-pi-report', sessionId: session.id, projectId: session.projectId, runId: 'synthetic-report-source', reportDay: app.store.dailyMemory.day(Date.now()) };
   const preview = await fetch(url + '/api/control/report-preview?' + new URLSearchParams(report), { headers }); assert.equal(preview.status, 200);
-  const reportPreview = await preview.json(); const input = { ...report, expectedPrompt: reportPreview.prompt, expectedSourceHash: reportPreview.sourceHash };
+  const reportPreview = await preview.json(); const input = { ...report, expectedPrompt: reportPreview.prompt, expectedSourceHash: reportPreview.sourceHash, expectedModel: reportPreview.model };
   for (let i = 0; i < 2; i++) assert.equal((await fetch(url + '/api/control/requests', { method: 'POST', headers, body: JSON.stringify(input) })).status, 202);
   await waitFor(() => reportsHandled === 1 && app.control.requests.get(report.id)?.status === 'submitted', 'actual approved report input');
   assert.equal(reportsHandled, 1); assert.equal(session.runs.length, 2, 'Report input is also intercepted before any model run'); assert.equal(diagnostic, '');
   send({ id: 'disable-report', type: 'prompt', message: '/dashboard-control off' }); await waitFor(() => app.control.snapshot().agents.length === 0, 'report control revocation');
-  console.log('Installed Pi: ordinary continuation and approved daily-report input delivered once through real sendUserMessage/input; capability, preview and revocation passed. Both inputs were intercepted; no model called.');
+  console.log('Installed Pi: tracked note continuation and approved daily-report input delivered once through real sendUserMessage/input; capability, preview, truthful Sent without a fabricated reply, unchanged source and revocation passed. Both inputs were intercepted; no model called.');
+  console.log(`Input probe ran ${process.argv.includes('--probe-first') ? 'before' : 'after'} the monitor; no run or reply was fabricated.`);
 } finally {
   if (child && child.exitCode === null && child.signalCode === null) {
     child.kill('SIGTERM');

@@ -66,6 +66,7 @@ try {
       hasPendingMessages: () => false, sessionManager: { getSessionId: () => 'browser-control-fixture' }, ui: { notify() {} } };
     const pi = { on: (n, f) => handlers.set(n, f), registerCommand: (n, c) => commands.set(n, c), registerTool: t => tools.set(t.name, t),
       sendUserMessage(prompt) {
+        handlers.get('input')({ text: prompt, source: 'extension' }, ctx);
         idle = false; handlers.get('before_agent_start')({ prompt }, ctx); handlers.get('agent_start')({}, ctx);
         finish = setTimeout(async () => {
           const reportId = /^PiScope daily work summary\. Request ID: ([a-zA-Z0-9_.:\-]+)/.exec(prompt)?.[1];

@@ -88,6 +88,7 @@ export function validateEvent(raw, now = new Date()) {
     sessionId: identifier(raw.sessionId, 'sessionId'),
     runId: raw.runId ? identifier(raw.runId, 'runId') : undefined,
     ...(raw.reportRequestId !== undefined ? { reportRequestId: identifier(raw.reportRequestId, 'reportRequestId') } : {}),
+    ...(raw.controlRequestId !== undefined ? { controlRequestId: identifier(raw.controlRequestId, 'controlRequestId') } : {}),
     projectId: identifier(raw.projectId, 'projectId'), projectName: str(raw.projectName) || 'Proje',
     time: new Date(date).toISOString(), receivedAt: now.toISOString(),
     demo: raw.demo === true, recovered: raw.recovered === true, data

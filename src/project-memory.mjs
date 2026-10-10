@@ -7,6 +7,7 @@ import { recommendations } from '../extensions/agent-dashboard/events.mjs';
 import { savePrivateJSON } from './private-json.mjs';
 
 export const PROJECT_LIMIT = 500;
+const MODE_BYTES = 32 * 1024 * 1024, FILE_BYTES = MODE_BYTES * 2 + 1024;
 const keyOf = p => `${p.demo ? 'demo' : 'live'}:${p.projectId}`;
 const id = value => {
   if (typeof value !== 'string' || !/^[a-zA-Z0-9_.:\-]{1,160}$/.test(value)) throw new Error('Invalid project memory identity');
@@ -45,7 +46,7 @@ export class ProjectMemory {
     this.observedRuns = new WeakSet(); this.partialRuns = new WeakSet();
     if (!existsSync(this.path)) return;
     try {
-      if (statSync(this.path).size > 32 * 1024 * 1024) throw new Error('Project memory exceeds limit');
+      if (statSync(this.path).size > FILE_BYTES) throw new Error('Project memory exceeds limit');
       const saved = JSON.parse(readFileSync(this.path, 'utf8'));
       if (saved.schemaVersion !== 1 || !Array.isArray(saved.projects) || saved.projects.length > PROJECT_LIMIT * 2) throw new Error('Unsupported project memory');
       const entries = saved.projects.map(projectRecord);
@@ -121,8 +122,22 @@ export class ProjectMemory {
   flush() {
     clearTimeout(this.timer); this.timer = undefined;
     if (!this.dirty) return;
-    savePrivateJSON(this.path, { schemaVersion: 1, projects: [...this.entries.values()] });
-    this.dirty = false;
+    const retained = [], trimmedModes = [];
+    for (const demo of [false, true]) {
+      let bytes = 0, trimmed = false;
+      const projects = [...this.entries.values()].filter(p => p.demo === demo).sort((a, b) => (b.lastWorkedAt || b.firstSeen).localeCompare(a.lastWorkedAt || a.firstSeen));
+      for (const p of projects) {
+        const size = Buffer.byteLength(JSON.stringify(p)) + 1;
+        if (bytes + size > MODE_BYTES) { trimmed = true; continue; }
+        bytes += size; retained.push(p);
+      }
+      if (trimmed) trimmedModes.push(demo);
+    }
+    // A failed save must leave the accepted working set and dirty flag intact;
+    // EventStore holds journal rotation until this durable commit succeeds.
+    savePrivateJSON(this.path, { schemaVersion: 1, projects: retained });
+    this.entries = new Map(retained.map(p => [keyOf(p), p])); this.dirty = false;
+    for (const demo of trimmedModes) this.warn(`Project summary byte limit reached; only the most recently active ${demo ? 'demo' : 'live'} projects within 32 MiB are retained.`);
   }
   snapshot(sessions, now = Date.now()) {
     const active = new Map();

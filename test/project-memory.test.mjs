@@ -170,6 +170,62 @@ test('failed summary flush holds rotation and retries without losing accepted ev
   assert.equal(overview(store)[0].latest.summary, 'x'.repeat(600));
 });
 
+function largeProjects(memory, count = PROJECT_LIMIT, demo = false) {
+  const stages = Array.from({ length: 20 }, (_, i) => ({ id: `stage-${i}`, title: '界'.repeat(160), status: 'pending' }));
+  const recommendations = Array.from({ length: 5 }, (_, i) => ({ id: `next-${i}`, title: '界'.repeat(240), prompt: '界'.repeat(4000) }));
+  for (let i = 0; i < count; i++) {
+    const time = new Date(Date.UTC(2025, 0, 1) + (demo ? 86400000 : 0) + i * 1000).toISOString();
+    const e = event('workflow.updated', { stages, recommendations }, { projectId: `large-${i}`, sessionId: `large-session-${i}`, runId: `large-run-${i}`, time, demo });
+    memory.observe(e, { id: e.runId, requestStartedAt: time, startedAt: time, prompt: '界'.repeat(600), summary: '界'.repeat(1000), errorMessage: '', outcome: 'idle', stages, recommendations });
+  }
+}
+test('large UTF-8 summaries fit independent byte budgets and reload without journal recovery', t => {
+  const { dir, store, open } = setup(t), memory = store.projectMemory;
+  largeProjects(memory); memory.flush();
+  const retainedLive = [...memory.entries.values()].map(p => p.projectId);
+  const liveBytes = JSON.parse(readFileSync(memory.path, 'utf8')).projects.reduce((sum, p) => sum + Buffer.byteLength(JSON.stringify(p)) + 1, 0);
+  assert.ok(liveBytes <= 32 * 1024 * 1024, `Live records exceed the byte budget: ${liveBytes}`);
+  assert.ok(retainedLive.length > 0 && retainedLive.length < PROJECT_LIMIT);
+  assert.ok(retainedLive.includes('large-499')); assert.ok(!retainedLive.includes('large-0'));
+  largeProjects(memory, PROJECT_LIMIT, true); memory.flush();
+  assert.deepEqual([...memory.entries.values()].filter(p => !p.demo).map(p => p.projectId), retainedLive, 'Newer demo work must not evict live summaries');
+  const saved = JSON.parse(readFileSync(memory.path, 'utf8'));
+  for (const demo of [false, true]) {
+    const records = saved.projects.filter(p => p.demo === demo);
+    assert.ok(records.length > 0 && records.length < PROJECT_LIMIT);
+    assert.ok(records.reduce((sum, p) => sum + Buffer.byteLength(JSON.stringify(p)) + 1, 0) <= 32 * 1024 * 1024);
+  }
+  assert.ok(statSync(memory.path).size <= 64 * 1024 * 1024 + 1024);
+  assert.equal(statSync(memory.path).mode & 0o777, 0o600); assert.ok(!readdirSync(dir).some(f => /^events(?:\.\d)?\.jsonl$/.test(f)), 'No journal is available to rebuild these summaries');
+  const before = memory.snapshot(store.sessions).items, restored = open();
+  assert.deepEqual(overview(restored), before); assert.equal(restored.warnings.length, 0);
+  assert.ok(!readdirSync(dir).some(f => f.startsWith('projects.json.invalid-')));
+  assert.ok(store.warnings.some(w => /byte limit.*live/.test(w))); assert.ok(store.warnings.some(w => /byte limit.*demo/.test(w)));
+  assert.equal(overview(restored).find(p => !p.demo && p.projectId === 'large-499').latest.recommendations[0].prompt, '界'.repeat(4000));
+});
+test('valid legacy schema-1 summaries above the old 32 MiB reader limit remain readable', t => {
+  const { dir, store, open } = setup(t), memory = store.projectMemory;
+  largeProjects(memory);
+  const original = JSON.stringify({ schemaVersion: 1, projects: [...memory.entries.values()] }) + '\n';
+  assert.ok(Buffer.byteLength(original) > 32 * 1024 * 1024); assert.ok(Buffer.byteLength(original) < 64 * 1024 * 1024);
+  writeFileSync(memory.path, original, { mode: 0o600 }); memory.dirty = false;
+  const restored = open(); assert.equal(overview(restored).length, PROJECT_LIMIT); assert.equal(restored.warnings.length, 0);
+  assert.equal(readFileSync(memory.path, 'utf8'), original); assert.ok(!readdirSync(dir).some(f => f.startsWith('projects.json.invalid-')));
+});
+test('byte-pressure retention is committed only after an atomic save succeeds', t => {
+  const { store, dir } = setup(t), memory = store.projectMemory;
+  store.append(event('prompt.received', { prompt: 'Existing saved project' })); memory.flush();
+  const path = memory.path, before = readFileSync(path, 'utf8');
+  largeProjects(memory); const ids = [...memory.entries.keys()];
+  memory.path = join(dir, 'missing', 'projects.json');
+  assert.throws(() => memory.flush(), /ENOENT/);
+  assert.deepEqual([...memory.entries.keys()], ids); assert.equal(memory.dirty, true); assert.equal(readFileSync(path, 'utf8'), before);
+  assert.ok(!store.warnings.some(w => w.includes('byte limit')));
+  memory.path = path; memory.flush();
+  assert.ok(memory.entries.size > 0 && memory.entries.size < ids.length); assert.equal(memory.dirty, false);
+  assert.ok(store.warnings.some(w => w.includes('byte limit')));
+});
+
 test('project memory is bounded, private, redacted and excludes arbitrary payloads', t => {
   const { dir, store, open } = setup(t);
   store.append(event('prompt.received', { prompt: 'access_token=supersecret ' + 'x'.repeat(900), secretField: 'never-store-me' }, { time: weekAgo }));

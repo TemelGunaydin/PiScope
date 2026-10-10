@@ -108,7 +108,8 @@ with sync_playwright() as pw:
             'window.fetch=async()=>new Response(JSON.stringify(fixture));'
             'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
-        target.add_script_tag(content=(root / 'public/control.js').read_text().replace('export ', ''))
+        target.add_script_tag(content=(root / 'extensions/agent-dashboard/note-request.mjs').read_text().replace('export ', ''))
+        target.add_script_tag(content='\n'.join(line for line in (root / 'public/control.js').read_text().splitlines() if not line.startswith('import ')).replace('export ', ''))
         target.add_script_tag(content=(root / 'public/report.js').read_text().replace('export ', ''))
         target.add_script_tag(content=(root / 'public/notes.js').read_text().replace('export ', ''))
         # Replay module bodies as classic scripts; import declarations cannot run here.
@@ -289,6 +290,66 @@ with sync_playwright() as pw:
         expect(last.locator('.project-expand[data-field="prompt"]')).to_have_attribute('aria-expanded', 'false')
         expect(last.locator('.project-answer')).to_have_text(long_summary)
         assert_equal_project_rows(page)
+        # R7: a focused sidebar button survives its own heartbeat/render and
+        # unrelated SSE. Marker stages prove the production page applied the batch.
+        sidebar = page.locator('.session-item').filter(has_text='Planner')
+        sidebar.click(); expect(page.locator('#prompt')).to_have_text(long_prompt)
+        sidebar.focus(); sidebar_node = sidebar.element_handle()
+        sidebar_label, sidebar_count = sidebar.locator('strong').element_handle(), sidebar.locator('small').element_handle()
+        sidebar_scroll = page.locator('#sessions').evaluate('e => [e.scrollLeft, e.scrollTop]')
+        batch = []
+        project_event('ui-cancelled', 'Planner', 'ui-cancelled-tab', 'session.heartbeat', {})
+        project_event('ui-cancelled', 'Planner', 'ui-cancelled-tab', 'workflow.updated', {'stages': [{'id': 'sidebar', 'title': 'R7 own heartbeat observed', 'status': 'pending'}]})
+        req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
+        expect(page.locator('#stages')).to_contain_text('R7 own heartbeat observed')
+        assert sidebar_node.evaluate('e => e.isConnected'), 'R7: heartbeat replaced the unchanged focused session button'
+        assert sidebar_label.evaluate('e => e.isConnected'); assert sidebar_count.evaluate('e => e.isConnected')
+        expect(sidebar).to_be_focused(); assert 'active' in sidebar.get_attribute('class').split()
+        assert page.locator('#sessions').evaluate('e => [e.scrollLeft, e.scrollTop]') == sidebar_scroll
+        page.locator('#back-to-projects').click(); sidebar.focus()
+        batch = []
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'session.heartbeat', {})
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'workflow.updated', {'stages': [{'id': 'verify', 'title': 'R7 unrelated heartbeat observed', 'status': 'pending'}]})
+        req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
+        expect(page.locator('[data-project="ui-return"]')).to_contain_text('R7 unrelated heartbeat observed')
+        assert sidebar_node.evaluate('e => e.isConnected'); expect(sidebar).to_be_focused()
+        assert 'active' not in sidebar.get_attribute('class').split()
+        page.keyboard.press('Enter'); expect(page.locator('#prompt')).to_have_text(long_prompt)
+        expect(page.locator('.session-item.active')).to_have_attribute('data-session', 'ui-cancelled-tab')
+        sidebar.focus(); page.keyboard.press('Space'); expect(page.locator('#detail-heading')).to_be_focused()
+        page.locator('#back-to-projects').click()
+        # R5: B changes; A's unchanged response/card/selection must stay connected.
+        answer = last.locator('.project-answer'); answer.focus()
+        card_node, answer_node = last.element_handle(), answer.element_handle()
+        answer.evaluate('''e => { const range = document.createRange();
+            range.setStart(e.firstChild, 6); range.setEnd(e.firstChild, 120);
+            const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); }''')
+        selected_text = page.evaluate('getSelection().toString()'); assert selected_text
+        scroll_y = page.evaluate('window.scrollY')
+        batch = []
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'workflow.updated', {'stages': [{'id': 'verify', 'title': 'Only the other project changed', 'status': 'pending'}]})
+        req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
+        expect(page.locator('[data-project="ui-return"]')).to_contain_text('Only the other project changed')
+        assert card_node.evaluate('e => e.isConnected'), 'R5: unrelated SSE replaced the unchanged project card'
+        assert answer_node.evaluate('e => e.isConnected && getSelection().anchorNode === e.firstChild && getSelection().anchorOffset === 6 && getSelection().focusOffset === 120')
+        assert page.evaluate('getSelection().toString()') == selected_text
+        expect(answer).to_be_focused(); expect(summary_toggle).to_have_attribute('aria-expanded', 'true')
+        assert abs(page.evaluate('window.scrollY') - scroll_y) <= 2
+        assert page.locator('.project-card').evaluate_all('(cards) => cards.map(c => c.dataset.project)') == project_order
+        # Short text and keyboard focus are equally stable on the unchanged card.
+        short = page.locator('[data-project="ui-return"] .project-answer'); short.focus()
+        short_node = short.element_handle()
+        short.evaluate('e => { const r = document.createRange(); r.selectNodeContents(e); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }')
+        short_text = short.inner_text(); batch = []
+        project_event('ui-active', 'Notebook', 'ui-active-two', 'workflow.updated', {'stages': [{'id': 'check', 'title': 'A second unrelated update', 'status': 'pending'}]})
+        req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
+        expect(page.locator('[data-project="ui-active"]')).to_contain_text('A second unrelated update')
+        assert short_node.evaluate('e => e.isConnected'); assert page.evaluate('getSelection().toString()') == short_text
+        expect(short).to_be_focused()
         summary_toggle.focus()
         batch = []
         updated_summary = 'Response updated over SSE. ' + long_summary
@@ -401,6 +462,69 @@ with sync_playwright() as pw:
     assert main.locator('.model-role').text_content().strip() == 'Main session'
     assert main.locator('.model-task').text_content().strip() == 'Waiting for subagent results.'
     regression.close()
+    # R7 lifecycle replay supplements HTTP/SSE: exact IDs, label/count patches,
+    # minimal insertion/removal, name reordering, empty state and mobile scroll.
+    sidebar_data = copy.deepcopy(snapshot)
+    template = next(s for s in sidebar_data['sessions'] if not s.get('demo') and s['runs'])
+    sidebar_data['sessions'] = []
+    for sid, name in [('session-z', 'Zulu'), ('session-b', 'Same name'), ('session-a', 'Same name')]:
+        s = copy.deepcopy(template); s.update(id=sid, projectId='project-' + sid, projectName=name)
+        s['runs'] = [s['runs'][-1]]; sidebar_data['sessions'].append(s)
+    demo = copy.deepcopy(template); demo.update(id='hidden-demo', projectName='AAA hidden demo', demo=True)
+    sidebar_data['sessions'].append(demo)
+    sidebar_page = browser.new_page(viewport={'width': 390, 'height': 844})
+    sidebar_page.on('pageerror', lambda error: errors.append(str(error)))
+    replay(sidebar_page, sidebar_data)
+    expect(sidebar_page.locator('#connection-label')).to_have_text('Dashboard connected')
+    def sidebar_ids():
+        return sidebar_page.locator('.session-item').evaluate_all('nodes => nodes.map(e => e.dataset.session)')
+    assert sidebar_ids() == ['session-a', 'session-b', 'session-z']
+    a = sidebar_page.locator('[data-session="session-a"]'); b = sidebar_page.locator('[data-session="session-b"]')
+    a_node, b_node = a.element_handle(), b.element_handle()
+    b.focus(); sidebar_page.locator('#sessions').evaluate('e => e.scrollLeft = 100')
+    left = sidebar_page.locator('#sessions').evaluate('e => e.scrollLeft'); assert left > 0
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', sidebar_data)
+    assert b_node.evaluate('e => e.isConnected'); expect(b).to_be_focused()
+    assert sidebar_page.locator('#sessions').evaluate('e => e.scrollLeft') == left
+    changed = copy.deepcopy(sidebar_data)
+    selected_b = next(s for s in changed['sessions'] if s['id'] == 'session-b')
+    latest = copy.deepcopy(selected_b['runs'][0]); latest.update(id='new-run-b', prompt='Exact session B latest request')
+    selected_b['runs'].append(latest)
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', changed)
+    expect(b.locator('small')).to_have_text('session · 2 requests')
+    assert b_node.evaluate('e => e.isConnected'); assert a_node.evaluate('e => e.isConnected'); expect(b).to_be_focused()
+    sidebar_page.keyboard.press('Enter')
+    expect(sidebar_page.locator('#prompt')).to_have_text('Exact session B latest request')
+    expect(sidebar_page.locator('#run-select')).to_have_value('new-run-b')
+    expect(sidebar_page.locator('.session-item.active')).to_have_attribute('data-session', 'session-b')
+    b.focus(); selected_b['projectName'] = 'AAA renamed'
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', changed)
+    assert sidebar_ids() == ['session-b', 'session-a', 'session-z']
+    expect(b.locator('strong')).to_have_text('AAA renamed'); assert b_node.evaluate('e => e.isConnected'); expect(b).to_be_focused()
+    inserted = copy.deepcopy(changed)
+    extra = copy.deepcopy(template); extra.update(id='session-new', projectName='AAB inserted')
+    inserted['sessions'].append(extra)
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', inserted)
+    assert sidebar_ids() == ['session-b', 'session-new', 'session-a', 'session-z']
+    assert a_node.evaluate('e => e.isConnected'); assert b_node.evaluate('e => e.isConnected'); expect(b).to_be_focused()
+    a.focus()  # Removing an earlier row must not move this later focused button.
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', changed)
+    assert sidebar_ids() == ['session-b', 'session-a', 'session-z']; expect(a).to_be_focused()
+    assert a_node.evaluate('e => e.isConnected')
+    b.focus()
+    changed['sessions'] = [s for s in changed['sessions'] if s['id'] != 'session-b']
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', changed)
+    assert not b_node.evaluate('e => e.isConnected'); expect(sidebar_page.locator('#nav-projects')).to_be_focused()
+    assert sidebar_ids() == ['session-a', 'session-z']; assert a_node.evaluate('e => e.isConnected')
+    sidebar_page.locator('[data-session="session-z"]').focus()
+    changed['sessions'] = [demo]
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', changed)
+    expect(sidebar_page.locator('.session-item')).to_have_count(0)
+    expect(sidebar_page.locator('.sessions-empty')).to_have_text('No sessions connected yet.')
+    expect(sidebar_page.locator('#nav-projects')).to_be_focused()
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', sidebar_data)
+    assert sidebar_ids() == ['session-a', 'session-b', 'session-z']
+    sidebar_page.close()
     # No network snapshots are needed to expire a working badge. Archived
     # summaries remain readable even when their source sessions no longer exist.
     remembered = copy.deepcopy(snapshot)
@@ -435,6 +559,16 @@ with sync_playwright() as pw:
     expect(archive_page.locator('.project-card[data-project="stale-project"]')).to_have_attribute('data-status', 'unknown')
     expect(archived_toggle).to_have_attribute('aria-expanded', 'true')
     expect(archived_toggle).to_be_focused()
+    # R5: the relative-age timer must not rewrite a selected response either.
+    archive_page.locator('[data-project="archived-project"] .project-expand[data-field="summary"]').click()
+    archived_answer = archived_card.locator('.project-answer'); archived_answer.focus()
+    age_node = archived_answer.element_handle(); old_age = archived_card.locator('time').inner_text()
+    archived_answer.evaluate('e => { const r = document.createRange(); r.selectNodeContents(e); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }')
+    archive_page.clock.fast_forward(61000)
+    expect(archived_card.locator('time')).not_to_have_text(old_age)
+    assert age_node.evaluate('e => e.isConnected && getSelection().anchorNode === e && getSelection().anchorOffset === 0 && getSelection().focusOffset === e.childNodes.length')
+    assert archive_page.evaluate('getSelection().toString()') == long_summary
+    expect(archived_answer).to_be_focused()
     archive_page.close()
     # Thresholds are per field; opening replaces the excerpt instead of repeating it.
     excerpts = copy.deepcopy(remembered)
@@ -489,6 +623,28 @@ with sync_playwright() as pw:
         text_page.set_viewport_size({'width': width, 'height': 900})
         assert_readable(text_page)
     both.screenshot(path=str(output / 'expanded-project.png'))
+    # R5 lifecycle replay: inserting/removing earlier cards cannot move or detach
+    # the selected unchanged node. Renaming to a duplicate must update ID labels.
+    both_answer = both.locator('.project-answer'); both_answer.focus()
+    both_node = both_answer.element_handle()
+    both_answer.evaluate('e => { const r = document.createRange(); r.selectNodeContents(e); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }')
+    inserted = copy.deepcopy(excerpts)
+    extra = copy.deepcopy(archived); extra.update(projectId='inserted-project', projectName='AAA New synthetic project')
+    inserted['projectOverview']['items'].append(extra)
+    text_page.evaluate('(next) => { snapshot = next; render(); }', inserted)
+    expect(text_page.locator('[data-project="inserted-project"]')).to_be_visible()
+    assert both_node.evaluate('e => e.isConnected'); assert text_page.evaluate('getSelection().toString()') == long_summary
+    expect(both_answer).to_be_focused()
+    text_page.evaluate('(next) => { snapshot = next; render(); }', excerpts)
+    expect(text_page.locator('[data-project="inserted-project"]')).to_have_count(0)
+    assert both_node.evaluate('e => e.isConnected'); assert text_page.evaluate('getSelection().toString()') == long_summary
+    expect(both_answer).to_be_focused()
+    extra['projectName'] = 'both'
+    text_page.evaluate('(next) => { snapshot = next; render(); }', inserted)
+    expect(both).to_contain_text('Project ID: both')
+    expect(text_page.locator('[data-project="inserted-project"]')).to_contain_text('Project ID: inserted-project')
+    text_page.evaluate('(next) => { snapshot = next; render(); }', excerpts)
+    expect(both).not_to_contain_text('Project ID: both')
     text_page.close()
     # A reported running step is different from a future or blocked step.
     plan_labels = [('pending', 'Plan: Next step'), ('running', 'Plan: Step in progress'),
@@ -563,4 +719,4 @@ with sync_playwright() as pw:
     design.close()
     assert not errors, errors
     browser.close()
-print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, stable project/session ordering under SSE, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))
+print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, stable project/session ordering under SSE, retained sidebar focus/nodes on own/unrelated heartbeat with exact-ID navigation and mobile scroll, label/count patches and keyed session lifecycle, unchanged project node/selection/focus retention on unrelated updates and age ticks, keyed insertion/removal and duplicate-name IDs, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))

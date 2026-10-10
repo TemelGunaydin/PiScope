@@ -138,10 +138,35 @@ and the server rejects a recommendation changed after its preview.
 
 Only the **current request in an open, idle and settled Pi session** can accept
 work. Busy, disconnected, expired, older and demo targets are blocked. Pi checks
-identity, branch and pending messages again after polling, immediately before
-calling `sendUserMessage`. No steering, follow-up queue or prompt-template/
+identity, branch, reviewed model and pending messages again after polling,
+immediately before calling `sendUserMessage`. No steering, follow-up queue or prompt-template/
 slash-command expansion is requested. Terminal permission dialogs can still
 require your attention; the dashboard does not auto-approve them.
+
+## Model-bound approval
+
+Every new submission (Recommended, Other, linked note or daily report) carries
+`expectedModel`, the exact observed provider/model name shown at review. The
+runtime advertises its current model; collector validation requires it to match
+the monitoring signal and approved model, both before queueing and at claim time.
+Pi rechecks its actual current model after the network wait, before sending input.
+The model is never switched by PiScope. Same request IDs cannot change models.
+
+A model change invalidates the visible review instead of silently retargeting
+it. Other text/note draft identity survives; review again for the new model.
+Focus in a closed review moves to its status message. If you already confirmed
+and delivery was uncertain, check Pi and its receipt; invalidation does not prove
+an earlier request was unsent and never causes an automatic retry.
+
+Missing model binding, unknown/unsafe model names and outdated runtimes fail
+closed for **all new control submissions**, not just linked notes/reports.
+Update the selected project's extension from PiScope with
+`npm run install:pi -- "/absolute/path/to/selected-project" --update`, restart Pi,
+and explicitly re-enable `/dashboard-control on`. Monitoring remains available;
+PiScope does not install updates or change permissions automatically. These
+handoff checks do not pin a model for an entire later run or sandbox Pi: a user
+or another extension may change it after input acceptance; observed execution
+remains the evidence of what actually ran.
 
 ## Receipts and uncertain delivery
 

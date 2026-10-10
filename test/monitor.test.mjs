@@ -6,6 +6,7 @@ import { registerMonitor } from '../extensions/agent-dashboard/monitor.mjs';
 import { MonitorClient } from '../extensions/agent-dashboard/client.mjs';
 import { directory, event } from './helpers.mjs';
 import { EventStore } from '../src/store.mjs';
+import { noteRequestPrompt } from '../extensions/agent-dashboard/note-request.mjs';
 
 function setup(t, options = {}) {
   const handlers = new Map(), tools = new Map(), commands = new Map();
@@ -116,7 +117,7 @@ test('approved report input binds the daily tool and only its run carries report
   const f = setup(t, { reportSchema: {} }); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
   f.emit('before_agent_start', { prompt: 'Coding task' }); f.emit('agent_start'); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
   let delivered = false;
-  f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'report-id', reportRequestId: 'report-id', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, prompt: 'Approved report prompt' } });
+  f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'report-id', reportRequestId: 'report-id', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt: 'Approved report prompt' } });
   f.pi.sendUserMessage = (prompt, options) => { assert.deepEqual(options, { expandPromptTemplates: false }); delivered = true; f.emit('before_agent_start', { prompt }); f.emit('agent_start'); };
   const execute = requestId => f.tools.get('daily_report').execute('typed', { requestId, summary: 'Calendar and reminders improved.', remaining: 'Export blocked.' }, undefined, undefined, f.ctx);
   assert.equal((await execute('report-id')).details.recorded, false);
@@ -131,7 +132,7 @@ test('disabled capture rejects report commands before sending any model input', 
   const f = setup(t, { reportSchema: {}, capturePrompts: false }); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
   f.emit('before_agent_start', { prompt: 'PRIVATE_INITIAL' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
   let calls = 0; f.pi.sendUserMessage = () => calls++;
-  f.client.controlRequest = async p => { assert.equal(p.canReport, false); return { command: { id: 'report-disabled', reportRequestId: 'report-disabled', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, prompt: 'PRIVATE_REPORT' } }; };
+  f.client.controlRequest = async p => { assert.equal(p.canReport, false); return { command: { id: 'report-disabled', reportRequestId: 'report-disabled', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt: 'PRIVATE_REPORT' } }; };
   await f.commands.get('dashboard-control').handler('on', f.ctx); assert.equal(calls, 0);
   const result = await f.tools.get('daily_report').execute('typed', { requestId: 'report-disabled', summary: 'PRIVATE_SUMMARY' }, undefined, undefined, f.ctx);
   assert.equal(result.details.recorded, false); assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_'));
@@ -270,4 +271,90 @@ for (const scenario of captured.cases) test(`captured Pi ${captured.provenance.p
     assert.equal(run.outcome, 'idle', 'A normal parent response does not hide the observed child failure');
     assert.equal(run.performance.agents.failed, 1);
   } else assert.equal(run.performance.agents.finished, 2);
+});
+
+test('tracked input binds only observed, unchanged extension input and clears on the next ordinary request', async t => {
+  for (const source of ['extension', 'interactive', 'rpc', 'missing', 'transformed', 'expired']) {
+    let clock = new Date();
+    const f = setup(t, { now: () => clock }); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+    f.emit('before_agent_start', { prompt: 'Earlier request' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+    let delivered = false;
+    f.client.controlRequest = async p => { assert.equal(p.canTrack, true); return { command: delivered ? null : { id: 'tracked-input', controlRequestId: 'tracked-input', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt: noteRequestPrompt('tracked-input', 'Exact edited draft') } }; };
+    f.pi.sendUserMessage = (prompt, options) => {
+      delivered = true; assert.deepEqual(options, { expandPromptTemplates: false });
+      if (source === 'expired') clock = new Date(clock.getTime() + 15001);
+      if (source !== 'missing') f.emit('input', { text: source === 'transformed' ? 'Other text' : prompt, source: ['expired', 'transformed'].includes(source) ? 'extension' : source });
+      f.emit('before_agent_start', { prompt }); f.emit('agent_start'); f.emit('agent_end', { messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Bound synthetic reply' }] }] });
+    };
+    await f.commands.get('dashboard-control').handler('on', f.ctx);
+    assert.equal(delivered, true);
+    const response = f.client.queue.at(-1); assert.equal(response.type, 'run.ended'); assert.equal(response.controlRequestId, source === 'extension' ? 'tracked-input' : undefined);
+    f.emit('agent_settled'); f.emit('input', { source: 'interactive', text: 'Ordinary work again' }); f.emit('before_agent_start', { prompt: 'Ordinary work again' }); assert.equal(f.client.queue.at(-1).controlRequestId, undefined);
+  }
+});
+test('handled tracked input cannot lend its identity to a later identical extension input', async t => {
+  const f = setup(t); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+  f.emit('before_agent_start', { prompt: 'Earlier request' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+  const base = f.client.queue.find(e => e.type === 'prompt.received'), cleanups = [];
+  const store = new EventStore(directory({ after: fn => cleanups.push(fn) }));
+  t.after(() => { try { store.close(); } finally { for (const cleanup of cleanups) cleanup(); } });
+  const prompt = 'PiScope note request. Request ID: tracked-handled\n\nRepeated synthetic text';
+  const todoRef = 'e'.repeat(64);
+  store.todoMemory.start({ id: 'tracked-handled', todoRef, projectId: base.projectId, sessionId: base.sessionId, baseRunId: base.runId, createdAt: new Date().toISOString() });
+  store.todoMemory.delivery('tracked-handled', 'submitted');
+  let delivered = 0;
+  f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'tracked-handled', controlRequestId: 'tracked-handled', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt } });
+  f.pi.sendUserMessage = text => { delivered++; f.emit('input', { source: 'extension', text }); /* A subsequent hook handles this input: no run. */ };
+  await f.commands.get('dashboard-control').handler('on', f.ctx);
+  assert.equal(delivered, 1); assert.equal(f.client.queue.filter(e => e.type === 'prompt.received').length, 1);
+  // Even an exact copy (including its marker) from another input cannot reuse the consumed ticket.
+  f.emit('input', { source: 'extension', text: prompt }); f.emit('before_agent_start', { prompt }); f.emit('agent_start');
+  f.emit('agent_end', { messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'Reply to another extension request' }] }] });
+  for (const e of f.client.queue) store.append(e);
+  assert.equal(f.client.queue.at(-1).controlRequestId, undefined, 'An unrelated input inherited the handled request identity');
+  const activity = store.todoMemory.snapshot(store.sessions)[0];
+  assert.equal(activity.status, 'sent'); assert.equal(activity.runId, undefined); assert.equal(activity.summary, ''); assert.equal(activity.detailAvailable, false);
+  store.todoMemory.sweep(Date.now() + 31000); assert.equal(store.todoMemory.snapshot(store.sessions)[0].status, 'unknown');
+  assert.equal(delivered, 1, 'Uncertainty must not replay or resend input');
+});
+test('earlier handled input cannot let another extension borrow its ID using the same bare draft', async t => {
+  const f = setup(t); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+  f.emit('before_agent_start', { prompt: 'Earlier request' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+  let delivered = false;
+  f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'handled-earlier', controlRequestId: 'handled-earlier', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt: noteRequestPrompt('handled-earlier', 'Repeated draft') } });
+  f.pi.sendUserMessage = () => { delivered = true; /* An earlier hook handles it; the monitor never receives input. */ };
+  await f.commands.get('dashboard-control').handler('on', f.ctx); assert.equal(delivered, true);
+  f.emit('input', { source: 'extension', text: 'Repeated draft' }); f.emit('before_agent_start', { prompt: 'Repeated draft' });
+  assert.equal(f.client.queue.at(-1).controlRequestId, undefined);
+});
+test('asynchronous unchanged marked input retains its request ID; ordinary Other needs no marker', async t => {
+  for (const tracked of [true, false]) {
+    const f = setup(t); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+    f.emit('before_agent_start', { prompt: 'Earlier request' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+    let delivered = false, dispatch;
+    f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'async-input', ...(tracked ? { controlRequestId: 'async-input' } : {}), sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt: tracked ? noteRequestPrompt('async-input', 'Asynchronous draft') : 'Ordinary Other' } });
+    f.pi.sendUserMessage = text => { delivered = true; dispatch = Promise.resolve().then(() => { f.emit('input', { source: 'extension', text }); f.emit('before_agent_start', { prompt: text }); }); };
+    await f.commands.get('dashboard-control').handler('on', f.ctx); await dispatch;
+    assert.equal(delivered, true); assert.equal(f.client.queue.at(-1).controlRequestId, tracked ? 'async-input' : undefined);
+  }
+});
+test('unmarked tracked commands are rejected before delivery, not associated by bare draft text', async t => {
+  for (const prompt of ['Repeated synthetic text', noteRequestPrompt('wrong-id', 'Draft'), noteRequestPrompt('unmarked-track', '  ')]) {
+    const f = setup(t); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+    f.emit('before_agent_start', { prompt: 'Earlier request' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+    let supplied = false, delivered = 0;
+    f.client.controlRequest = async p => { const command = supplied ? null : { id: 'unmarked-track', controlRequestId: 'unmarked-track', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt }; supplied = true; return { command }; };
+    f.pi.sendUserMessage = () => { delivered++; };
+    await f.commands.get('dashboard-control').handler('on', f.ctx);
+    assert.equal(delivered, 0); assert.equal(f.monitor.control.acks[0].status, 'rejected');
+  }
+});
+test('tracked request IDs survive disabled text capture without exposing note or response text', async t => {
+  const f = setup(t, { capturePrompts: false }); f.ctx.isIdle = () => true; f.ctx.hasPendingMessages = () => false;
+  f.emit('before_agent_start', { prompt: 'Earlier request' }); f.emit('agent_end', { messages: [] }); f.emit('agent_settled');
+  let delivered = false;
+  f.client.controlRequest = async p => ({ command: delivered ? null : { id: 'tracked-private', controlRequestId: 'tracked-private', sessionId: p.sessionId, projectId: p.projectId, runId: p.runId, expectedModel: p.model, prompt: noteRequestPrompt('tracked-private', 'PRIVATE_NOTE') } });
+  f.pi.sendUserMessage = prompt => { delivered = true; f.emit('input', { source: 'extension', text: prompt }); f.emit('before_agent_start', { prompt }); f.emit('agent_start'); f.emit('agent_end', { messages: [{ role: 'assistant', stopReason: 'stop', content: [{ type: 'text', text: 'PRIVATE_RESPONSE' }] }] }); };
+  await f.commands.get('dashboard-control').handler('on', f.ctx);
+  assert.equal(f.client.queue.at(-1).controlRequestId, 'tracked-private'); assert.equal(f.client.queue.at(-1).data.summary, ''); assert.ok(!JSON.stringify(f.client.queue).includes('PRIVATE_'));
 });

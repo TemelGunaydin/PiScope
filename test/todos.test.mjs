@@ -20,10 +20,10 @@ async function pair(f) {
 }
 const link = (f, headers, labelId, projectId) => fetch(f.url + '/api/control/todo-link', { method: 'POST', headers, body: JSON.stringify({ labelId, projectId }) });
 const send = (f, headers, input) => fetch(f.url + '/api/control/requests', { method: 'POST', headers, body: JSON.stringify(input) });
-const poll = (f, project = 'project-a', idle = true) => f.request('/api/control/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: `session-${project}`, projectId: project, runId: `run-${project}`, owner: `owner-${project}`, idle }) });
+const poll = (f, project = 'project-a', idle = true) => f.request('/api/control/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: `session-${project}`, projectId: project, runId: `run-${project}`, owner: `owner-${project}`, idle, model: 'synthetic/current' }) });
 async function seed(f, project = 'project-a') {
   const fields = { sessionId: `session-${project}`, projectId: project, projectName: 'Same Name', runId: `run-${project}` };
-  for (const e of [event('prompt.received', { prompt: 'Previously captured work' }, fields), event('run.ended', { outcome: 'idle' }, fields), event('run.settled', {}, fields)]) await f.post(e);
+  for (const e of [event('session.connected', { model: 'synthetic/current' }, fields), event('prompt.received', { prompt: 'Previously captured work' }, fields), event('run.ended', { outcome: 'idle' }, fields), event('run.settled', {}, fields)]) await f.post(e);
 }
 
 test('Terminal Todos is opt-in; exact environment paths, no discovery or legacy import', t => {
@@ -136,7 +136,7 @@ test('saving a label link requires separate control pairing and exact Origin but
 });
 test('an edited note uses ordinary exact, single-project, at-most-once input; sent is not completed', async t => {
   const s = source(t), f = await fixture(t, { todosFile: s.path, controlToken }); await seed(f); await seed(f, 'project-b');
-  const headers = await pair(f), input = { id: 'note-prompt-1', sessionId: 'session-project-b', projectId: 'project-b', runId: 'run-project-b', prompt: task().title + '\nEdited instruction: yalnız bu proje.' };
+  const headers = await pair(f), input = { id: 'note-prompt-1', sessionId: 'session-project-b', projectId: 'project-b', runId: 'run-project-b', expectedModel: 'synthetic/current', prompt: task().title + '\nEdited instruction: yalnız bu proje.' };
   assert.equal((await send(f, headers, input)).status, 409); // Runtime is not opted in.
   await poll(f, 'project-a'); await poll(f, 'project-b', false);
   assert.equal((await send(f, headers, input)).status, 409); // No busy queuing.

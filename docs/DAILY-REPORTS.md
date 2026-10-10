@@ -48,8 +48,18 @@ Generation consumes the existing model's quota. PiScope makes **no direct provid
 API call**, requires **no new API key**, changes no model and spawns no Pi process.
 It does not automatically generate or retry; Pi's own existing retry settings still
 apply. A pending report for a day blocks a second submission even from a different
-Pi session. Regenerating after completion replaces that day's overall report,
-regardless of which eligible runtime is selected.
+Pi session. If no bound Pi request is observed within 30 seconds of the first
+submitted acknowledgement, the job becomes **Unknown**, not success/failure or a
+permanent pending lock. Check the original Pi terminal before reviewing a new
+request in another eligible session. Nothing is automatically retried, and the
+original session's same-run reservation remains. The preview also binds its
+observed Pi model: changing that model invalidates consent and requires a fresh
+preview; collector and Pi reject mismatched delivery without switching models.
+A matching late result may still
+finish the current job; output from a superseded request cannot replace it. An
+already bound generation is not expired by this start-observation window.
+Regenerating replaces that day's overall report, regardless of which eligible
+runtime is selected; an earlier published report remains visible on uncertainty.
 
 Pi keeps its existing permissions; this is **not a sandbox**. The prompt asks for
 summarization only, no commands/edits/delegation, but a prompt is not an OS permission

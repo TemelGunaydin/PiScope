@@ -93,7 +93,18 @@ notu) **Other** alanına kopyalar. Orada da düzenleyebilir, **Review prompt** i
 proje/oturum/mevcut model ve tam metni inceleyip **Confirm and send to Pi** ile
 onaylayabilirsin. Düzenleme/kopyalama/Cancel model işi başlatmaz; canlı güncellemeler
 ve sonraki not değişiklikleri taslağı silmez. Taslak diske yazılmaz; tarayıcı
-yenilemesinden sonra geri yüklenmez.
+yenilemesinden sonra geri yüklenmez. Takip edilen notun onay ekranında görünür
+bir request-ID başlığı eklenir; taslak aynen kalır ve 8.000 karakterlik toplam
+girdi sınırı bu başlığı da içerir.
+Gönderimden sonra kartta **Pending / Sent / Running / Reply ready / Error /
+Unknown**, saklanan kısa yanıt ve ilgili oturum/isteği açan **View Pi request**
+görünür. Bunlar gözlenen istek durumlarıdır; görevin tamamlandığının kanıtı değildir.
+Sonuç bağlantısı desteklenmiyorsa o projenin eklentisini güncelleyip Pi’yi yeniden
+başlatmak gerekir. Sıradan Other için not-sonuç yeteneği gerekmez, ancak
+**bütün yeni gönderimler model-bağlı onay ister**: eski proje eklentisini güncelle,
+Pi’yi yeniden başlat ve `/dashboard-control on` ile tekrar izin ver. İzleme açık
+kalır; PiScope model değiştirmez. Terminal Todos terminalde kalır; bu görünüm
+PiScope’un masaüstü tarayıcısında da çalışır, telefon isteğe bağlıdır.
 
 Günlük raporun aksine prompt **yalnız onaylanan proje/oturuma** gider; başka
 projelerin notları birleştirilmez. Aynı üç kontrol izni gerekir. Okuma kota

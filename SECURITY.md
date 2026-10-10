@@ -39,6 +39,11 @@ publicly while arranging that channel. No response-time guarantee is offered.
 - Control login/writes require exact Origin and JSON content type. Separate
   host-only HttpOnly/SameSite=Strict control cookies are scoped to `/api/control`
   and Secure over HTTPS. Read pairing/bearer tokens alone cannot submit work.
+- New control requests bind the reviewed provider/model name. Runtime presence,
+  monitoring and approval must agree; collector rechecks before queue/claim and
+  Pi checks its current model before sending input. Missing binding/old extensions
+  fail closed for new sends. This does not pin a model after input acceptance or
+  imply a provider-quality/security guarantee; PiScope never switches models.
 - Commands are bounded, ephemeral, never journaled or replayed, and handed off
   at most once during a runtime. Unknown delivery is not retried. Queued prompts
   are not in exports; normal Pi history/capture applies after delivery.
@@ -56,7 +61,14 @@ publicly while arranging that channel. No response-time guarantee is offered.
   history exports. Explicit project-ID links are private PiScope metadata, not
   source edits. Only a reviewed, confirmed editable prompt uses existing control
   and Pi permissions; it is single-project scope, not automatic execution or
-  completion. Approved prompts may subsequently be captured as normal Pi work.
+  completion. Latest-request IDs and bounded reply/error excerpts are private
+  metadata; they never replay commands, complete source notes or independently
+  prove success. No separate original-note/draft/path copy is imported into this
+  activity file; returned model text may quote the approved input.
+  The source cannot alias collector-owned tokens, lock/connection, memory or
+  active/rotated journal files. Startup rejects collisions before token/lock
+  writes or store initialization, including inode and symlink/parent aliases.
+  Approved prompts may subsequently be captured as normal Pi work.
   [Source, targeting and limits](docs/TERMINAL-TODOS.md).
 - Imported JUnit summaries are report observations, not signed runner evidence
   or proof that a specific commit passed tests.

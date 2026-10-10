@@ -11,10 +11,10 @@ import { EventStore } from '../src/store.mjs';
 import { ensureToken, saveConnection } from '../src/config.mjs';
 
 const controlToken = 'b'.repeat(64);
-const presence = { sessionId: 'session-a', projectId: 'project-a', owner: 'owner-a', runId: 'run-a', idle: true };
-const input = { id: 'approved-1', sessionId: 'session-a', projectId: 'project-a', runId: 'run-a', prompt: 'Implement the approved test fix.' };
+const presence = { sessionId: 'session-a', projectId: 'project-a', owner: 'owner-a', runId: 'run-a', idle: true, model: 'synthetic/current' };
+const input = { id: 'approved-1', sessionId: 'session-a', projectId: 'project-a', runId: 'run-a', prompt: 'Implement the approved test fix.', expectedModel: 'synthetic/current' };
 async function seed(f, overrides = {}) {
-  for (const e of [event('prompt.received', { prompt: 'Synthetic initial work' }, overrides),
+  for (const e of [event('session.connected', { model: 'synthetic/current' }, overrides), event('prompt.received', { prompt: 'Synthetic initial work' }, overrides),
     event('workflow.updated', { stages: [{ id: 'done', title: 'Respond', status: 'done' }], recommendations: [{ id: 'test', title: 'Check the result', prompt: 'Run the relevant tests.' }] }, overrides),
     event('run.ended', { outcome: 'idle' }, overrides), event('run.settled', {}, overrides)]) await f.post(e);
 }
@@ -147,9 +147,57 @@ test('recommended text is bounded, redacted, safely projected and survives saved
   const restarted = new EventStore(dir); t.after(() => restarted.close());
   assert.equal(restarted.snapshot().projectOverview.items[0].latest.recommendations[0].id, 'a');
 });
+test('reviewed model is checked before submission and again before claiming a queued command', async t => {
+  for (const recommended of [false, true]) {
+    const f = await fixture(t, { controlToken }); await seed(f);
+    await f.post(event('model.selected', { model: 'synthetic/model-A' }, { runId: undefined }));
+    const boundPresence = { ...presence, model: 'synthetic/model-A' }; await poll(f, boundPresence);
+    const approved = recommended
+      ? { ...input, prompt: undefined, recommendationId: 'test', expectedPrompt: 'Run the relevant tests.', expectedModel: 'synthetic/model-A' }
+      : { ...input, expectedModel: 'synthetic/model-A' };
+    const { headers } = await pair(f);
+    await f.post(event('model.selected', { model: 'synthetic/model-B' }, { runId: undefined }));
+    assert.equal((await send(f, headers, approved)).status, 409, 'A stale reviewed model must never queue work');
+    assert.equal(f.app.control.requests.size, 0);
+    await f.post(event('model.selected', { model: 'synthetic/model-A' }, { runId: undefined }));
+    assert.equal((await send(f, headers, approved)).status, 202);
+    await f.post(event('model.selected', { model: 'synthetic/model-B' }, { runId: undefined }));
+    assert.equal((await (await poll(f, { ...boundPresence, model: 'synthetic/model-B' })).json()).command, null);
+    assert.equal(f.app.control.requests.get(approved.id).status, 'rejected'); assert.equal(f.app.control.reservations.size, 0);
+    assert.equal((await send(f, headers, { ...approved, expectedModel: 'synthetic/model-B' })).status, 409, 'A reused ID cannot change its reviewed model');
+    assert.equal((await send(f, headers, approved)).status, 202, 'Original ID returns its rejection receipt, never another dispatch');
+    assert.equal(f.app.control.requests.size, 1);
+  }
+});
+test('Pi rejects model changes during the network wait without switching a model or sending input', async t => {
+  let calls = 0; const state = { identity: presence, runId: 'run-a', settled: true,
+    context: { model: { provider: 'synthetic', id: 'model-A' }, isIdle: () => true, hasPendingMessages: () => false } };
+  const control = new PiControl({ sendUserMessage: () => calls++ }, { async controlRequest(p) {
+    state.context.model = { provider: 'synthetic', id: 'model-B' };
+    return { command: { ...input, expectedModel: 'synthetic/model-A' } };
+  } }, () => state);
+  t.after(() => control.stop()); await control.start();
+  assert.equal(calls, 0); assert.equal(control.acks[0].status, 'rejected'); assert.equal(state.context.model.id, 'model-B');
+});
+test('model binding is required; old or unknown-model runtimes cannot accept new approvals', async t => {
+  const f = await fixture(t, { controlToken }); await seed(f); const { headers } = await pair(f);
+  await poll(f, { ...presence, model: undefined });
+  assert.equal((await send(f, headers)).status, 409);
+  await poll(f);
+  for (const expectedModel of [undefined, '', 'synthetic/other', 'x'.repeat(301), 'bad\u0000model']) {
+    assert.notEqual((await send(f, headers, { ...input, expectedModel })).status, 202);
+    assert.equal(f.app.control.requests.size, 0);
+  }
+  for (const expectedModel of [undefined, '', 'synthetic/other']) {
+    let calls = 0; const state = { identity: presence, runId: 'run-a', settled: true,
+      context: { model: { provider: 'synthetic', id: 'current' }, isIdle: () => true, hasPendingMessages: () => false } };
+    const control = new PiControl({ sendUserMessage: () => calls++ }, { async controlRequest() { return { command: { ...input, expectedModel } }; } }, () => state);
+    t.after(() => control.stop()); await control.start(); assert.equal(calls, 0); assert.equal(control.acks[0].status, 'rejected');
+  }
+});
 test('Pi control is opt-in, restores current run on reload, and uses sendUserMessage exactly once', async t => {
   let calls = [], polls = [], command = { ...input };
-  const state = { identity: { sessionId: 'session-a', projectId: 'project-a' }, context: { isIdle: () => true, hasPendingMessages: () => false }, runId: undefined, running: false, settled: true };
+  const state = { identity: { sessionId: 'session-a', projectId: 'project-a' }, context: { model: { provider: 'synthetic', id: 'current' }, isIdle: () => true, hasPendingMessages: () => false }, runId: undefined, running: false, settled: true };
   const control = new PiControl({ sendUserMessage: (...args) => calls.push(args) }, { async controlRequest(p) { polls.push(p); return { currentRunId: 'run-a', command }; } }, () => state);
   t.after(() => control.stop()); await control.poll(); assert.equal(polls.length, 0);
   await control.start(); assert.equal(calls.length, 1); assert.equal(calls[0][0], input.prompt); assert.deepEqual(calls[0][1], { expandPromptTemplates: false });
@@ -159,7 +207,7 @@ test('Pi control is opt-in, restores current run on reload, and uses sendUserMes
 test('Pi checks idle state, current identity and branch again after a network wait', async t => {
   for (const change of [state => state.context.isIdle = () => false, state => state.identity.sessionId = 'new-session', state => state.leaf = 'new-leaf', state => state.settled = false, state => state.context.hasPendingMessages = () => true]) {
     let calls = 0; const state = { identity: { sessionId: 'session-a', projectId: 'project-a' }, runId: 'run-a', running: false, settled: true, leaf: 'old-leaf' };
-    state.context = { isIdle: () => true, hasPendingMessages: () => false, sessionManager: { getLeafId: () => state.leaf } };
+    state.context = { model: { provider: 'synthetic', id: 'current' }, isIdle: () => true, hasPendingMessages: () => false, sessionManager: { getLeafId: () => state.leaf } };
     const control = new PiControl({ sendUserMessage: () => calls++ }, { async controlRequest() { change(state); return { command: input }; } }, () => state);
     t.after(() => control.stop()); await control.start(); assert.equal(calls, 0); assert.equal(control.acks[0].status, 'rejected');
   }
@@ -201,19 +249,19 @@ test('reservations remain visible after receipt expiry instead of offering a dup
 });
 test('revocation during a network wait cannot dispatch an already-claimed command', async t => {
   let resolve, calls = 0;
-  const state = { identity: presence, runId: 'run-a', settled: true, context: { isIdle: () => true, hasPendingMessages: () => false } };
+  const state = { identity: presence, runId: 'run-a', settled: true, context: { model: { provider: 'synthetic', id: 'current' }, isIdle: () => true, hasPendingMessages: () => false } };
   const control = new PiControl({ sendUserMessage: () => calls++ }, { controlRequest: p => p.enabled === false ? Promise.resolve({ command: null }) : new Promise(r => resolve = r) }, () => state);
   t.after(() => control.stop()); const pending = control.start(); await control.stop(); resolve({ command: input }); await pending;
   assert.equal(calls, 0); assert.equal(control.enabled, false); assert.equal(control.seen.size, 0);
 });
 test('deduplication limits advertise a pause before accepting another command', async t => {
   let advertised;
-  const state = { identity: presence, runId: 'run-a', settled: true, context: { isIdle: () => true, hasPendingMessages: () => false } };
+  const state = { identity: presence, runId: 'run-a', settled: true, context: { model: { provider: 'synthetic', id: 'current' }, isIdle: () => true, hasPendingMessages: () => false } };
   const control = new PiControl({}, { async controlRequest(p) { advertised = p; return { command: null }; } }, () => state);
   t.after(() => control.stop()); for (let i = 0; i < 100; i++) control.seen.add(`received-${i}`);
   await control.start(); assert.equal(advertised.idle, false); assert.equal(advertised.limited, true); assert.match(control.lastError, /limit reached/);
 });
 test('missing pending-message API cannot advertise safe idle control', async t => {
-  const control = new PiControl({}, { async controlRequest() { return { command: input }; } }, () => ({ identity: presence, runId: 'run-a', settled: true, context: { isIdle: () => true } }));
+  const control = new PiControl({}, { async controlRequest() { return { command: input }; } }, () => ({ identity: presence, runId: 'run-a', settled: true, context: { model: { provider: 'synthetic', id: 'current' }, isIdle: () => true } }));
   t.after(() => control.stop()); await control.start(); assert.equal(control.acks[0].status, 'rejected');
 });

@@ -1,5 +1,255 @@
 # Verification log / Doğrulama kaydı
 
+## Note outcomes + seven fixes — publication preflight — 2026-10-10
+
+- User explicitly authorized commit/push of the accumulated note-outcome feature
+  and seven regression-backed fixes. Earlier entries preserve their verification
+  state at that time (local/uncommitted and then-pending findings), not the final
+  publication status. No other feature, installation or configuration change is
+  part of this publication.
+- Immediately before publication: **259/259 tests**, **54 modules**, shell syntax
+  and diff checks passed. Installed Pi 1.1.0 monitoring/recovery smoke and tracked
+  note/daily input probes before/after the monitor passed again, with interception
+  before any model execution. Current R7 monitoring HTTP/SSE and simulated HTTPS,
+  plus nearest control/daily/notes HTTP/SSE browser evidence remains applicable;
+  no product files changed after those passing gates.
+- New control submissions require `expectedModel` and model-advertising runtime
+  presence. Update/restart the selected project's extension and explicitly
+  re-enable local control; missing binding fails closed for all new sends.
+  Monitoring, existing permissions/model/quota and source notes stay unchanged.
+- Private notes/history, credentials, screenshots and ignored review diagnostics
+  are excluded from this publication. Hosted CI will be triggered by push; this
+  preflight does not claim its result or physical-device/paid-provider proof.
+
+## R7 — sidebar heartbeat focus retention — 2026-10-10 (local, uncommitted)
+
+- User approved continuing with R7. Disposable Chrome/HTTP/SSE diagnostic again
+  lost focus and disconnected an unchanged session button after a heartbeat.
+  The permanent `test/browser-smoke.py --network` regression failed before the
+  patch: **R7: heartbeat replaced the unchanged focused session button**. HTTP
+  batches contain heartbeats plus visible marker stages proving the production
+  page applied each batch; the separate diagnostic also exercises a lone heartbeat.
+- Narrow `public/app.js` sidebar fix reuses buttons by full session ID, patches
+  only changed name/count text and active styling, removes obsolete rows before
+  minimal ordered insertion. Clicks resolve the current snapshot for the exact ID;
+  no labels, shortened IDs or stale run objects determine a destination. Renamed
+  retained rows keep focus after movement; a removed focused row falls back to
+  Projects without selecting another target. Empty state and live-only A–Z/ID
+  ordering remain unchanged. R5 project rendering and R6 consent guards were not
+  changed by this patch; collector/extensions/auth/protocol/storage also untouched.
+- **259/259 tests**, **54 modules**, Python AST, shell syntax and diff whitespace
+  checks passed. Full monitoring browsers passed real HTTP/SSE and simulated
+  private HTTPS, with active/inactive sidebar focus, connected button/label/count
+  nodes, unchanged sidebar scroll and native Enter/Space exact-session navigation.
+  Supplemental replay covers duplicate names/short ID prefixes, latest-run count
+  patching, rename/reorder, earlier row insertion/removal, removed focused row,
+  empty/demo-only transitions and nonzero mobile horizontal scroll. Those lifecycle
+  snapshots are explicitly replay, not a native Pi/network claim.
+- Nearest control/daily/notes HTTP/SSE browsers also passed draft/selection,
+  model-bound approval, note source preservation, navigation and mobile/200% gates.
+  Diagnostic now retains `session-item active` focus and the same connected button;
+  R5 selection and R6 stale-model blocking remain healthy. All seven reviewed
+  findings now have local regression-backed fixes; this does not establish absence
+  of other bugs. No paid model call, personal data read, extension installation,
+  live Serve/config/permission change, commit/push, physical-phone or hosted CI
+  proof. Prior published hosted CI remains the baseline, not this working tree.
+
+## R6 — model-bound approval — 2026-10-10 (local, uncommitted)
+
+- User approved continuing with R6. Runtime diagnostic again showed review A
+  handed off under B with no PiScope model/leaf switch. Two permanent tests failed
+  before changes (stale approval returned 202 and post-network model change sent
+  input); the real HTTP/SSE approval browser also failed to hide stale review.
+- Every new submission now requires a bounded safe `expectedModel`, included in
+  idempotency signature and command. Pi presence advertises its current model;
+  collector requires current monitoring/presence agreement and checks model at
+  submission and claim. Pi compares live context model after network wait, before
+  `sendUserMessage`. Missing/old-runtime binding fails closed, not a legacy bypass.
+  `model_select` refreshes monitor context. No model set/switch API is introduced.
+- Other/Recommended and daily-report reviews close on model change, preserve
+  draft text/note reference and require fresh review/ID. Review focus moves to a
+  status message only when inside the closed preview. Cancellation of an uncertain
+  already-attempted review does not claim no previous input was sent. Existing
+  opt-ins, branch/idle/reservation checks, exact prompt/source binding, capability,
+  consent, deduplication, quota/permissions and no replay/retry remain in force.
+- **259/259 tests**, **54 modules**, **90 focused control/monitor/report/note
+  tests** passed. New regression coverage includes stale Other/Recommended/report
+  approval, queued model changes with rejection/release, late-network Pi rejection,
+  missing/wrong binding and changed-model ID reuse. HTTP/SSE and simulated private
+  HTTPS browsers passed control, daily report, notes and monitoring, including R5
+  retained selection and mobile/200%. Daily browser proves invalidation without
+  any write; monitoring/sidebar R7 still reproduces and is not fixed.
+- Installed Pi 1.1.0 smoke passed with probes before/after monitor: wrong expected
+  model rejected with zero commands; matching tracked-note and daily input each
+  delivered once then intercepted before model execution. Runtime model-change
+  races were proved with mocks, not a paid provider or a live user's model switch.
+  Diagnostic now rejects A-to-B submission without dispatch, hides/disables old
+  browser consent. No personal data reads, actual model calls, project extension
+  installs, permission/model/live Serve changes, commit/push or hosted CI claimed.
+
+## R5 — unchanged project card reading under unrelated updates — 2026-10-10 (local, uncommitted)
+
+- User approved continuing with R5. Reviewer reproduced the loss of selection and
+  disconnection of an unchanged response node through synthetic Chrome + real
+  HTTP/SSE. A permanent network browser regression then failed before the patch:
+  `R5: unrelated SSE replaced the unchanged project card`.
+- `public/app.js` now keys visible cards by explicit project ID and their own
+  content/actions, using a WeakMap rather than exposing keys in HTML attributes.
+  Unchanged nodes remain connected. Obsolete cards are removed before ordered
+  insertion so replacement of an earlier card does not move later unchanged
+  nodes. Relative age is patched on its time node only. Existing filters, A–Z
+  ordering, duplicate-name identity labels, expansion, changed-response focus
+  fallback, exact request navigation and project-note buttons remain supported.
+- Permanent browser checks cover expanded partial-selection text/Range offsets,
+  short full-selection text, connected card/paragraph identity, focus, expansion,
+  scroll and ordering while other projects change over real SSE. Supplemental
+  replay/clock cases cover age ticks, insertion/removal and duplicate-name ID
+  labels; those cases are not claimed as network/native Pi proof.
+- **255/255 tests**, **54 JavaScript modules**, Python AST and diff checks passed.
+  The full monitoring browser suite passed HTTP/SSE and simulated private HTTPS,
+  including mobile/200% and own-response updates. Notes, ordinary control and
+  daily-report browsers passed HTTP/SSE. Review diagnostic now retains selection
+  and unchanged node; R6 model-preview mismatch and R7 sidebar-focus loss still
+  reproduce and are untouched. No model calls, personal data reads, permissions/
+  model/live Serve configuration changes, physical-device proof, commit/push or
+  hosted CI claimed.
+
+## R3 — project memory writer/reader compatibility — 2026-10-09 (local, uncommitted)
+
+- User approved continuing with R3; reviewer-side reproduction again showed 500
+  valid synthetic CJK summaries writing 39,774,703 bytes, then isolated reload
+  returning zero and preserving the rejected file. This does not prove all 500
+  vanish from EventStore: retained journals can rebuild them. Three permanent
+  regressions failed before the patch: encoded-byte bounds, valid legacy file
+  readability, and byte-pressure retention after a failed/successful save.
+- Writer now uses the existing daily-memory retention pattern: newest-first,
+  independent 32 MiB encoded-record budgets per live/demo mode, with the existing
+  500-per-mode count cap. JSON serialization byte counts include UTF-8, escaping
+  and commas. Shared reader allows 64 MiB + 1 KiB envelope allowance. Schema-1,
+  excerpts/checkpoints/redaction, capture settings and project identities remain
+  unchanged. Save failure keeps the working set/dirty flag and holds rotation;
+  trimming/warnings commit only after successful private atomic save.
+- Synthetic 1,000 large live/demo records prove demo cannot evict retained live
+  summaries, newest context/recommendations survive, saved 0600 memory matches
+  reloaded overview without any journal, and no unreadable warning/quarantine is
+  created. An old valid ~39.8 MB schema-1 file loads all 500 records unchanged.
+  Diagnostic now retains/reloads 421 summaries, 33,490,520 bytes, with an explicit
+  live byte-budget warning; 421 is fixture-specific, not a promised capacity.
+- **255/255 tests**, **54 JavaScript modules**, **62 focused memory/event/report
+  tests** passed. Monitoring browser regressions passed HTTP/SSE and simulated
+  private HTTPS; daily-report browser passed HTTP/SSE. No personal notes/history
+  read, model calls, model/permission/live Serve configuration changes, physical
+  device proof, commit/push or hosted CI claimed. R5/R6/R7 remain untouched.
+
+## R2 — submitted report without an observed run — 2026-10-09 (local, uncommitted)
+
+- User delegated reproduction checking. The reviewer repeated the synthetic
+  diagnostic twice: submitted delivery, fresh idle Pi, still queued after 60
+  seconds and another runtime blocked. Two permanent regression tests then failed
+  before product changes (HTTP preview stayed 409 and snapshot stayed queued).
+- A submitted ACK records a bounded optional `submittedAt` in schema-1 memory.
+  After 30 seconds without a bound request, the job becomes Unknown. The timer
+  starts at the first ACK, duplicate ACKs cannot extend it, a new attempt clears
+  it, and a bound generation is not expired. Legacy unstarted entries use creation
+  time. Broker validation and snapshots both sweep; the control watcher includes
+  report states so SSE reports the change without new Pi events/receipt changes.
+- Original receipts/reservations remain: no replay, automatic retry or same-run
+  uncertainty resend. A different ready runtime still needs a fresh exact preview
+  and explicit approval. Previous published content remains; matching current
+  late typed completion can resolve uncertainty, superseded output cannot overwrite
+  a new attempt. Diagnostic now shows Unknown and a permitted side-effect-free
+  next preview, not an automatic generation.
+- **252/252 tests**, **54 JavaScript modules**, **43 focused report/control tests**
+  passed. New tests include live HTTP/SSE timeout with unchanged event sequence.
+  Daily-report browser regressions passed on HTTP/SSE and simulated private HTTPS;
+  installed Pi 1.1.0 input smoke passed with inputs handled before model execution.
+  No paid model calls, personal data reads, physical-device proof, live permission/
+  model/Serve-route changes, commit/push or hosted CI claimed. Other pending review
+  findings were not fixed.
+
+## R1 — collector/source collision preflight — 2026-10-09 (local, uncommitted)
+
+- User reproduced source rename/byte changes for `projects.json` and `events.jsonl`.
+  New permanent collision/CLI/alias tests failed before product changes, including
+  lock handling before source validation. They now pass; the original diagnostic
+  reports rejected=true, source path/bytes unchanged and no renamed copies.
+- Shared source validation covers all 12 managed token/lock/connection/memory/note/
+  active-and-rotated-journal names. CLI validates before token chmod/creation and
+  lock acquisition; the adapter validates before EventStore initialization and
+  rechecks before link writes. Existing inode/hard-link, directory symlink,
+  missing-parent and dangling-target aliases are covered without directory scans.
+  Rejection preserves source bytes, inode, mode, mtime/ctime and directory contents;
+  CLI also preserves data-directory mode. Ordinary `todos.json` beside collector
+  data remains readable and unchanged through captured work; disabled integration
+  is unchanged. This is preflight protection, not an OS boundary against a hostile
+  same-user process replacing paths concurrently.
+- **248/248 tests**, **54 JavaScript modules**, **45 focused tests**, shell syntax
+  and diff whitespace passed. Real HTTP/SSE and isolated simulated HTTPS notes
+  browser regressions passed; no model calls or physical-phone proof. No personal
+  note/history reads, permission/model/real Serve-route changes, commit/push or
+  hosted CI claimed. Only user-verified R1 was fixed in this slice; other pending
+  review findings were not changed.
+
+## R4 — handled input cannot lend its note identity — 2026-10-09 (local, uncommitted)
+
+- User independently reproduced the incorrect note response association. Before
+  the product patch, two permanent monitor regression tests failed: a second
+  identical extension input inherited the handled request ID; an unmarked tracked
+  command was dispatched. Both now pass.
+- Tracked notes include a visible request-ID header in the exact approved input,
+  generated by a shared browser/collector/Pi helper. The original edited draft is
+  unchanged; the 8,000-character input limit includes the header. Collector and
+  Pi reject missing/wrong/empty markers. A second observed input invalidates the
+  first ticket even if it includes an identical marker. Bare drafts cannot borrow
+  an unseen ticket when an earlier hook handled the original. Async healthy input,
+  ordinary Other, disabled capture, source identity, three opt-ins and no replay
+  remain covered. No source-note edit/completion is introduced.
+- **227/227 tests**, **53 JavaScript modules** and diff whitespace passed; **63**
+  focused monitor/control/note-activity tests passed. HTTP/SSE and isolated simulated
+  HTTPS notes browser checks passed: exact preview equals submitted/captured input,
+  visible header matches request ID, unchanged draft, over-limit no-send, cancellation,
+  duplicate-click protection and source bytes unchanged. Ordinary-control, daily
+  report and HTTP/network monitoring browser regressions passed.
+- Installed **Pi 1.1.0** control/report smoke passed with an input probe loaded
+  both **before and after** the monitor. Both marked note inputs were delivered
+  once and handled before model execution, remained Sent without a fabricated
+  reply/run, and left the source unchanged. Completed-response proof is mock
+  runtime, not paid-provider verification. Existing historical replies are not
+  independently reverified by this patch.
+- Review findings other than user-verified R4 were not fixed. No personal notes,
+  credentials or history read; no paid calls, live permission/model/Serve-route
+  changes, physical-device testing, commit/push or hosted CI claimed. To use the
+  patch, restart PiScope, refresh the browser, and update/restart the selected
+  project's extension with the existing settings and explicit opt-ins preserved.
+
+## Linked note request outcomes — 2026-10-09 (local, uncommitted)
+
+- **223/223 tests**, **52 JavaScript modules**, shell syntax and diff whitespace
+  passed. Synthetic tests cover explicit source/request/session/project/new-run
+  binding, identical text and same-name targets, edited exact input, opt-ins and
+  old capabilities, at-most-once delivery, no source mutation/completion, known
+  rejection/expiry versus uncertainty, provider/child failure, cancellation,
+  disabled capture, stale/offline signal, restart without replay, late matching
+  completion, old/wrong result rejection, bounded retention, detail eviction,
+  corruption preservation and abort-before-dispatch on activity storage failure.
+- Real Chrome HTTP/SSE and isolated simulated Serve HTTPS notes tests passed:
+  correct request navigation, retained reply on reload, no record for edit/copy/
+  cancel, response node/selection/focus/scroll retained under unrelated SSE,
+  literal response markup, all displayed states, expired-detail fallback,
+  missing capability, view-only separation and 320/390px + 200% reflow.
+- Ordinary continuation and all-project daily-report browser regressions passed.
+  Monitoring HTTP/network and isolated HTTPS suites passed, including synthetic
+  replay, navigation, stable ordering, expansion, accessibility and signal expiry.
+- Installed **Pi 1.1.0** monitoring/recovery smoke and control/report input smoke
+  passed. The tracked note's ordinary sendUserMessage input was delivered once,
+  intercepted before model execution, and stayed Sent with no fabricated run or
+  reply. Source bytes/completion stayed unchanged. This is not paid-provider
+  response-quality proof; completed-reply UI uses a mock Pi runtime.
+- No personal notes/history read, paid model calls, Terminal Todos source changes,
+  permission changes, real Serve-route changes or physical-device testing.
+  Generated screenshots/private data remain outside commits. No commit/push or
+  hosted CI is claimed for this local slice.
+
 ## Terminal Todos publication gates — 2026-10-09
 
 - Rechecked **209/209 tests**, **50 JavaScript modules**, shell syntax and diff

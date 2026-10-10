@@ -86,7 +86,7 @@ export function renderProjectNotes(source, projects = [], control) {
   text(noteId('notes-results'), `${tasks.length} notes shown · ${notesSource.tasks.length} available · ID order${!notesSource.available ? ' · last read snapshot; sending disabled' : ''}`);
   const cards = [];
   for (const task of tasks) {
-    let card = noteCards.get(task.id);
+    let card = noteCards.get(task.ref);
     if (!card) {
       card = noteNode('article', 'notes-card'); card.dataset.note = task.id;
       card.meta = noteNode('p', 'report-label'); card.body = noteNode('p', 'notes-text'); card.body.tabIndex = 0;
@@ -103,10 +103,21 @@ export function renderProjectNotes(source, projects = [], control) {
       card.edit.setAttribute('aria-controls', card.editor.id); card.edit.setAttribute('aria-expanded', 'false');
       card.use = noteNode('button', 'button', 'Use as prompt'); card.use.type = 'button';
       const actions = noteNode('div', 'notes-prompt-actions'); actions.append(card.edit, card.use);
-      card.append(card.meta, card.body, label, select, card.target, card.editor, actions); noteCards.set(task.id, card);
+      card.activity = noteNode('section', 'notes-activity hidden');
+      card.activityHeading = noteNode('h3', '', 'Latest Pi request'); card.activityHeading.id = `note-activity-${task.id}`;
+      card.activity.setAttribute('aria-labelledby', card.activityHeading.id);
+      card.badge = noteNode('span', 'badge'); card.activityMeta = noteNode('p', 'report-label'); card.reason = noteNode('p', 'report-label');
+      card.reply = noteNode('div', 'notes-reply'); card.reply.tabIndex = 0; card.reply.setAttribute('role', 'region'); card.reply.setAttribute('aria-label', 'Captured Pi response excerpt');
+      card.open = noteNode('button', 'button notes-result-open', 'View Pi request'); card.open.type = 'button';
+      card.retention = noteNode('p', 'report-label');
+      card.activity.append(card.activityHeading, card.badge, card.activityMeta, card.reason, card.reply, card.open, card.retention);
+      card.append(card.meta, card.body, card.activity, label, select, card.target, card.editor, actions); noteCards.set(task.ref, card);
+      card.open.onclick = () => {
+        const result = notesActions.openResult(card.currentActivity); if (result) text(noteId('notes-action-status'), result);
+      };
       select.onchange = () => { card.chosen = true; renderProjectNotes(notesSource, notesProjects, notesControl); };
       card.edit.onclick = () => {
-        const current = notesSource.tasks.find(t => t.id === task.id);
+        const current = notesSource.tasks.find(t => t.ref === task.ref);
         if (!notesSource.available || !current || card.editing) return;
         card.input.value = current.title; card.editing = true;
         renderProjectNotes(notesSource, notesProjects, notesControl);
@@ -119,14 +130,25 @@ export function renderProjectNotes(source, projects = [], control) {
         (card.edit.disabled ? card.body : card.edit).focus();
       };
       card.use.onclick = () => {
-        const current = notesSource.tasks.find(t => t.id === task.id);
+        const current = notesSource.tasks.find(t => t.ref === task.ref);
         if (!current || !canUseNotePrompt(card, current)) return;
-        const result = notesActions.usePrompt(select.value, card.editing ? card.input.value : current.title);
+        const result = notesActions.usePrompt(select.value, card.editing ? card.input.value : current.title, current.ref);
         if (result) text(noteId('notes-action-status'), result);
       };
     }
     text(card.meta, `#${task.id} · ${task.projectName} · ${task.completed ? 'Completed in Terminal Todos' : 'Open note'}`);
     text(card.body, task.title || '[Empty note]');
+    const activity = notesSource.activity?.find(a => a.todoRef === task.ref); card.currentActivity = activity;
+    card.activity.classList.toggle('hidden', !activity);
+    if (activity) {
+      const names = { queued: 'Pending', sent: 'Sent', running: 'Running', reply: 'Reply ready', error: 'Error', unknown: 'Unknown' };
+      text(card.badge, names[activity.status] || 'Unknown'); card.badge.className = `badge ${activity.status === 'queued' ? 'pending' : activity.status === 'reply' ? 'idle' : activity.status}`;
+      text(card.activityMeta, `Project ID: ${activity.projectId}\nPi session: ${activity.sessionId}\n${activity.model || 'Current Pi model'} · ${activity.createdAt}`);
+      text(card.reason, activity.reason || (activity.status === 'queued' ? 'Waiting for the opted-in Pi session. Nothing is complete yet.' : 'Pi is working. This does not complete the source note.'));
+      text(card.reply, activity.summary || ''); card.reply.classList.toggle('hidden', !activity.summary);
+      card.open.disabled = !activity.detailAvailable;
+      text(card.retention, activity.detailAvailable ? 'Open the exact linked request. The excerpt above is bounded and redacted.' : activity.runId ? 'Pi request detail is no longer retained. Only the saved excerpt is available.' : 'No linked Pi request has been observed yet. Check the terminal if delivery is uncertain.');
+    }
     projectsSelect(card.select, card.chosen ? card.select.value : labels.get(task.labelId));
     text(card.target, card.select.value ? `Target project ID: ${card.select.value}` : 'Choose an explicit target; no project is guessed.');
     card.use.disabled = !canUseNotePrompt(card, task);
@@ -137,6 +159,6 @@ export function renderProjectNotes(source, projects = [], control) {
     cards.push(card);
   }
   reconcile(noteId('notes-list'), cards);
-  for (const [id] of noteCards) if (!notesSource.tasks.some(t => t.id === id)) noteCards.delete(id);
+  for (const [ref] of noteCards) if (!notesSource.tasks.some(t => t.ref === ref)) noteCards.delete(ref);
   noteId('notes-empty').classList.toggle('hidden', cards.length > 0);
 }

@@ -30,9 +30,10 @@ function usage(u) {
 export function registerMonitor(pi, { schema, reportSchema, client = new MonitorClient(), now = () => new Date(), capturePrompts = process.env.AGENT_DASHBOARD_CAPTURE_PROMPTS !== '0', readProfile = readWorkflowProfile } = {}) {
   let context; let runId; let identity; let heartbeat; let droppedReported = 0; let running = false;
   let runStartedAt; let settled = true; const reportKeys = new Set();
-  let pendingReport, activeReportId;
-  const control = new PiControl(pi, client, () => ({ context, identity: context ? identify(context) : identity, runId, running, settled, canReport: Boolean(reportSchema && capturePrompts) }), command => {
+  let pendingReport, activeReportId, pendingControl, activeControlId;
+  const control = new PiControl(pi, client, () => ({ context, identity: context ? identify(context) : identity, runId, running, settled, canReport: Boolean(reportSchema && capturePrompts), canTrack: true }), command => {
     pendingReport = command?.reportRequestId ? { ...command, until: now().getTime() + 15000 } : undefined;
+    pendingControl = command?.controlRequestId ? { ...command, until: now().getTime() + 15000 } : undefined;
   });
   const toolCalls = new Map(), fingerprints = new Map();
   function identify(ctx) {
@@ -44,7 +45,7 @@ export function registerMonitor(pi, { schema, reportSchema, client = new Monitor
     if (!ctx) return;
     identity ||= identify(ctx);
     return client.enqueue({ schemaVersion: 1, id: randomUUID(), type, ...identity, runId: runScoped ? runId : undefined,
-      time: now().toISOString(), ...(runScoped && activeReportId ? { reportRequestId: activeReportId } : {}), data });
+      time: now().toISOString(), ...(runScoped && activeReportId ? { reportRequestId: activeReportId } : {}), ...(runScoped && activeControlId ? { controlRequestId: activeControlId } : {}), data });
   }
   const listen = (event, handler) => pi.on(event, (e, ctx) => {
     try { return handler(e, ctx); } catch (error) {
@@ -55,7 +56,7 @@ export function registerMonitor(pi, { schema, reportSchema, client = new Monitor
   listen('session_start', (_e, ctx) => {
     void control.stop();
     context = ctx; identity = identify(ctx); runId = undefined; running = false; settled = true;
-    runStartedAt = undefined; pendingReport = undefined; activeReportId = undefined; reportKeys.clear();
+    runStartedAt = undefined; pendingReport = undefined; activeReportId = undefined; pendingControl = undefined; activeControlId = undefined; reportKeys.clear();
     toolCalls.clear(); fingerprints.clear(); clearInterval(heartbeat); client.start();
     emit('session.connected', { model: modelName(ctx.model) }, ctx);
     heartbeat = setInterval(() => {
@@ -68,14 +69,26 @@ export function registerMonitor(pi, { schema, reportSchema, client = new Monitor
   });
   listen('session_tree', (_e, ctx) => {
     void control.stop(); context = ctx; identity = identify(ctx); runId = undefined; running = false; settled = true;
-    pendingReport = undefined; activeReportId = undefined;
+    pendingReport = undefined; activeReportId = undefined; pendingControl = undefined; activeControlId = undefined;
     emit('session.connected', { model: modelName(ctx.model) }, ctx);
+  });
+  // One input per approved, request-marked handoff. A second input invalidates
+  // it even if identical: the first may have been handled by a later hook.
+  // The visible request marker also prevents bare draft text from borrowing
+  // an unseen handoff when an earlier hook handled the original input.
+  listen('input', e => {
+    if (pendingControl) {
+      if (!pendingControl.inputObserved && e.source === 'extension' && e.text === pendingControl.prompt) pendingControl.inputObserved = true;
+      else pendingControl = undefined;
+    }
   });
   listen('before_agent_start', (e, ctx) => {
     context = ctx; identity = identify(ctx); runId = randomUUID(); running = true; settled = false;
     runStartedAt = now().getTime(); reportKeys.clear();
     activeReportId = pendingReport && pendingReport.until >= runStartedAt && pendingReport.prompt === e.prompt && pendingReport.sessionId === identity.sessionId && pendingReport.projectId === identity.projectId ? pendingReport.reportRequestId : undefined;
     pendingReport = undefined;
+    activeControlId = pendingControl && pendingControl.inputObserved && pendingControl.until >= runStartedAt && pendingControl.prompt === e.prompt && pendingControl.sessionId === identity.sessionId && pendingControl.projectId === identity.projectId ? pendingControl.controlRequestId : undefined;
+    pendingControl = undefined;
     toolCalls.clear(); fingerprints.clear();
     emit('prompt.received', { prompt: capturePrompts ? redact(e.prompt, 12000) : '[Prompt capture disabled]' }, ctx);
     try {
@@ -89,9 +102,10 @@ export function registerMonitor(pi, { schema, reportSchema, client = new Monitor
     context = ctx; runId ||= randomUUID(); running = true;
     emit('run.started', { model: modelName(ctx.model) }, ctx);
   });
-  listen('model_select', (e, ctx) => emit('model.selected', {
-    model: modelName(e.model), previousModel: modelName(e.previousModel), source: e.source
-  }, ctx, running));
+  listen('model_select', (e, ctx) => {
+    context = ctx;
+    emit('model.selected', { model: modelName(e.model), previousModel: modelName(e.previousModel), source: e.source }, ctx, running);
+  });
   listen('message_end', (e, ctx) => {
     if (e.message?.role !== 'assistant') return;
     const m = e.message;

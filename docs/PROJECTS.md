@@ -17,7 +17,17 @@ the bottom. Expansion and larger text grow the row without clipping content;
 mobile cards retain their natural height.
 **Open last request** opens the source request if it is still retained. **← Back to projects** restores
 the overview's filters, scroll position, and focus on the originating card when
-it is still visible. The sidebar lists sessions by project name and session ID.
+it is still visible. Unrelated project updates retain unchanged card nodes,
+including short/expanded text selection and keyboard focus. Relative-age ticks
+update only the time label. A card whose own content/actions change may be rebuilt,
+with its expansion/focus handling preserved; old selected text is not fabricated
+for a changed response. The sidebar lists sessions by project name and session ID.
+Its buttons are retained by full session ID across heartbeats and unrelated SSE;
+name, request count and active styling update in place, without replacing the
+focused button or resetting unchanged mobile sidebar scroll. Name-based reordering
+restores focus on that same retained button; removing the focused session returns
+focus to **Projects**, not another execution target. Duplicate names/short ID
+prefixes never select a different session; a click opens that ID's latest snapshot.
 The UI only shows live records; there is no Live/Demo selector.
 **Projects** and [**Daily report**](DAILY-REPORTS.md) are separate navigation views;
 project cards keep latest context, while daily reports use an explicitly approved
@@ -71,9 +81,14 @@ completion rule. Models and providers do not affect project identity or status.
 
 `projects.json` lives in `AGENT_DASHBOARD_HOME` (by default
 `~/.agent-workflow-dashboard/`) with private `0600` permissions. The file holds
-at most **500 live and 500 demo projects**, independently. At a limit, the least
-recently active project in that mode is removed and a storage warning appears.
-This is a bounded memory, not a permanent all-time project counter.
+at most **500 live and 500 demo projects**, independently. Encoded JSON records
+also have a **32 MiB budget per mode**, including UTF-8 and JSON escaping. At a
+count or byte limit, the most recently active summaries that fit are retained
+and a storage warning appears. Demo pressure cannot evict live summaries. The
+shared reader allows **64 MiB plus 1 KiB envelope allowance**, so saved files fit
+its limit; valid schema-1 files above the former 32 MiB reader limit can still
+load without being renamed or rewritten merely by opening them. This is bounded
+memory, not a permanent all-time project counter.
 
 Each entry keeps at most 600 characters of request text, 1,000 of response text,
 20 stages with 160-character titles, identities, timestamps, and a technical
@@ -86,7 +101,8 @@ normal monitoring.
 Summaries are written through a private temporary file, `fsync`, and atomic
 rename, at most once per 500 ms of active ingestion. They also flush at shutdown
 and before journal rotation. A failed flush prevents rotation from discarding
-recovery events. Per-project event checkpoints prevent replay from regressing
+recovery events; byte-budget pruning is committed only after the save succeeds,
+not on a failed write. Per-project event checkpoints prevent replay from regressing
 saved summaries and allow the unflushed journal tail to be recovered after a
 process exit. Power-loss/filesystem durability is not guaranteed.
 
