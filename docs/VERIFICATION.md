@@ -1,5 +1,124 @@
 # Verification log / Doğrulama kaydı
 
+## Projects dropdown + SpinKit Flow — publication preflight — 2026-10-10
+
+- User explicitly authorized commit/push of the final sidebar project dropdown
+  and right-aligned three-dot Flow. Earlier local/uncommitted entries preserve
+  their state and appearance at that checkpoint, not final publication status.
+- Preflight reran **259/259 tests**, **54 modules**, shell syntax and diff checks.
+  Matching final-code monitoring HTTP/SSE, simulated private HTTPS and nearest
+  control/daily/notes browser proofs above remain applicable; no product code
+  changed after them. Python AST and **121 unique static HTML IDs** also passed.
+- Publication contains only the scoped browser change, permanent regression,
+  relevant docs and pinned SpinKit/MIT notices. Screenshots, diagnostic artifacts,
+  personal data and credentials are excluded. No collector/extension/protocol/
+  configuration/permissions/model changes. Hosted CI follows push; this entry
+  does not claim that result or physical-device/paid-provider execution.
+
+## SpinKit Flow — 2026-10-10 (local, uncommitted)
+
+- User selected the recommended three-dot Flow. Replaced the Bootstrap grow
+  child/component/notice; no unused Bootstrap runtime CSS or JS remains. Vendored
+  only SpinKit Flow from pinned commit `742a71277c49b69053b5beb9fad80d720840a2ab`,
+  verified against inspected source. Tobias Ahlin's full MIT notice is retained
+  in CSS and `THIRD_PARTY_NOTICES.md`; READMEs link the updated notice.
+- Three circular green dots scale in sequence with the source easing/stagger,
+  a calm **1.5s** cycle (upstream 1.4s), and a fixed 2rem right-hand column. No
+  layout movement on status expiry, extra labels, percentage, CDN, npm package,
+  build, new timers or model call. Reduced-motion shows three static dots;
+  collapsed/inactive rows stop all three animations. Navigation/consent unchanged.
+- Permanent regression failed on missing Flow before patch. **259/259 tests**,
+  **54 modules**, Python AST and diff checks passed. Real HTTP/SSE and simulated
+  private HTTPS check three dots, source keyframes, staggered delays, current
+  advancing animations and retention of all three animation objects under
+  unrelated SSE. Controlled phase sampling proves distinct scales and produces
+  ignored synthetic screenshots; not Pi/provider execution evidence. Right-edge
+  geometry, signal expiry, keyboard/focus, mobile/320px/actual 200% and nearest
+  control/daily/notes HTTP/SSE suites passed. Screenshots inspected.
+- No personal data, model execution, installed-extension/config/Serve change,
+  physical-device or hosted-CI claim. Not committed/pushed. Entries below preserve
+  earlier Bootstrap/rotating/static appearances, not the current component.
+
+## Slower Bootstrap grow cycle — 2026-10-10 (earlier local checkpoint)
+
+- User requested slower pulsing. Changed only the component's duration from
+  0.75s to **1.5s**; shape, placement, observed-status checks and reduced-motion
+  behavior unchanged. Timing assertion first failed against the old duration.
+  Midpoint sampling now uses 750ms. Monitoring HTTP/SSE browser regression,
+  JavaScript syntax, Node tests, Python AST and diff checks passed. No commit/push.
+  The Bootstrap entry below records the earlier .75s checkpoint.
+
+## Bootstrap spinner-grow — 2026-10-10 (local, uncommitted)
+
+- User approved Bootstrap's growing/fading dot instead of the rotating ring.
+  Vendored only the Bootstrap **5.3.8** small `spinner-grow` CSS component from
+  upstream `_spinners.scss`/compiled CSS; selectors and keyframe name scoped,
+  full MIT notice retained in the stylesheet and `THIRD_PARTY_NOTICES.md`.
+  No CDN, full stylesheet/global reset, Bootstrap JS, npm dependency or build.
+- Existing fixed right-hand wrapper, Running label/tooltip, observed signal
+  checks, disclosure/navigation and keyed focus/reading behavior stay unchanged.
+  A decorative child runs the upstream .75s linear scale/opacity cycle. PiScope
+  disables motion and shows a static visible dot for reduced-motion instead of
+  upstream's slower animation. Inactive/collapsed rows stop animating.
+- Permanent regression failed on missing `.spinner-grow` before the patch. Real
+  HTTP/SSE browser proof checks source keyframe shape/duration (no rotation),
+  right alignment, midpoint full-opacity/size, actual advancing animation and
+  retained animation/node under unrelated SSE. A controlled midpoint screenshot
+  is synthetic animation sampling, not a provider/runtime result. Reduced motion,
+  expiry, unchanged name width and desktop/mobile/320px/200% reflow checked;
+  simulated private HTTPS/Secure-cookie and nearest control/daily/notes suites
+  passed. **259/259 tests**, **54 modules**, Python AST and diff checks passed.
+- No personal data, model calls, configuration/Serve/extension changes, hosted
+  CI, physical-phone or new installed-Pi execution claim. Not committed/pushed.
+  Earlier entries preserve their historical component appearance.
+
+## Right-aligned running spinner — 2026-10-10 (earlier local checkpoint)
+
+- After accepting the dropdown, user requested right alignment and loading-style
+  motion. Production follow-up changes only `public/style.css`: a reserved 1rem
+  grid column at the right, wrapping name on the left and full-width duplicate ID
+  below. Names keep their width when the running signal expires.
+- A high-contrast indeterminate ring rotates at .9s, linear, transform-only. Its
+  fixed wrapper avoids layout movement; Running accessible label/tooltip retained,
+  no percentage or completed-work claim. Reduced-motion keeps a static ring;
+  hidden/inactive/collapsed spinners do not animate. No new animation library,
+  timers, controls, model calls or protocol/permission/configuration changes.
+- Regression first failed on right-edge alignment, then passed real HTTP/SSE and
+  simulated private HTTPS. Geometry checks cover desktop/mobile/320px and actual
+  200% text; Web Animations proves an advancing running animation and the same
+  animation/node retained across unrelated SSE. Reduced-motion and signal expiry
+  checked; nearest control/daily/notes HTTP/SSE suites passed. Screenshots inspected
+  and ignored. Production CSP remains strict; no unsafe-eval allowance added.
+- **259/259 tests**, **54 modules**, Python AST and diff checks passed. No physical
+  phone, new installed-Pi/paid-provider execution, hosted CI or commit/push claim.
+  The entry below records the earlier static-icon checkpoint, not current motion.
+
+## Projects dropdown — names + running icon only — 2026-10-10 (earlier local checkpoint)
+
+- User clarified placement: names must expand underneath the sidebar Projects
+  button. Removed the rejected card/session icons. The disclosure now contains
+  one entry per live recorded project and a small static green gear only for
+  running projects; no extra status labels, animation or help panel. Existing
+  project cards and session rows are unchanged.
+- Native-button expanded/controls semantics, Space/Enter/Tab/Escape and focus
+  restoration; A–Z/full-ID ordering, duplicate-name identity labels and retained
+  keyed nodes. Selection resolves exact current project/session/latest run;
+  archived records reveal the saved card, clearing filters only if needed.
+  Closed lists skip timer rendering. Existing aggregate signal expiry removes
+  the icon without SSE. Disclosure state is page-local, not persisted.
+- Permanent assertion failed on missing expanded state before implementation,
+  then passed real HTTP/SSE and simulated private HTTPS/Secure-cookie transport:
+  grouping two sessions once, icons only in the dropdown, exact native navigation,
+  unchanged row/icon/focus under unrelated SSE, open/close and reduced motion.
+  Replay/clock supplements cover empty lists, archived selection, duplicate IDs,
+  nonzero list scroll and stale-signal expiry. Replay is not native Pi/network proof.
+- **259/259 tests**, **54 modules**, Python AST and diff checks passed. Monitoring
+  desktop/mobile/320px and actual 200% text reflow passed (32px root/36px body).
+  Synthetic screenshots were inspected and remain ignored. Nearest control/daily/
+  notes HTTP/SSE suites passed. No model calls, personal data, installed-extension
+  or configuration/Serve changes; no new hosted CI, installed-Pi execution or
+  physical-device claim. Not committed/pushed.
+
 ## Note outcomes + seven fixes — publication preflight — 2026-10-10
 
 - User explicitly authorized commit/push of the accumulated note-outcome feature

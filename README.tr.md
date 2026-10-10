@@ -409,3 +409,5 @@ simülasyonudur; gerçek telefon erişimini kendi tailnet’inde ayrıca dene.
 
 [MIT](LICENSE). PiScope bağımsız topluluk projesidir; Pi, Tailscale veya model
 sağlayıcılarının resmî ürünü değildir.
+
+[Üçüncü taraf lisansları](THIRD_PARTY_NOTICES.md): kapsamlandırılmış SpinKit Flow bileşeni.

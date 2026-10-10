@@ -28,6 +28,20 @@ focused button or resetting unchanged mobile sidebar scroll. Name-based reorderi
 restores focus on that same retained button; removing the focused session returns
 focus to **Projects**, not another execution target. Duplicate names/short ID
 prefixes never select a different session; a click opens that ID's latest snapshot.
+Click the sidebar **Projects** button to expand/collapse a list of project names
+underneath it. Each live recorded project appears once, in A–Z/full-ID order.
+Only running projects show SpinKit's **Flow** at the row's right edge (Running
+accessible text and tooltip): three green dots scaling in sequence at a calm
+1.5-second cycle. There are no extra labels or invented progress percentages.
+A reserved column keeps names stable. Only the scoped CSS component is vendored
+locally, with [its pinned source and MIT notice](../THIRD_PARTY_NOTICES.md); no
+CDN, JavaScript bundle or npm dependency. Reduced-motion keeps three static dots,
+and collapsed/inactive rows stop animating. It uses existing aggregate observed
+status and disappears when no fresh running signal remains. Original
+project cards and session rows are unchanged. Enter/Space work natively; Escape
+closes the list and returns focus to Projects. Unchanged rows, focus and scroll
+survive SSE. Duplicate names show full project IDs; selection opens the exact
+latest retained request or reveals that project's saved card if archived.
 The UI only shows live records; there is no Live/Demo selector.
 **Projects** and [**Daily report**](DAILY-REPORTS.md) are separate navigation views;
 project cards keep latest context, while daily reports use an explicitly approved

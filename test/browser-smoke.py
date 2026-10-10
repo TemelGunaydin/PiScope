@@ -88,12 +88,22 @@ def assert_equal_project_rows(target):
     assert paired, 'Fixture must exercise multi-column project rows'
     assert all(max(heights) - min(heights) <= 1 for heights in paired), rows
 
+def assert_spinner_alignment(target):
+    assert target.evaluate('''() => [...document.querySelectorAll('#project-navigation .running-icon')]
+        .filter(icon => icon.getClientRects().length).every(icon => {
+            const row = icon.closest('.project-nav-item'), rect = row.getBoundingClientRect();
+            const name = row.querySelector('.project-nav-name').getBoundingClientRect();
+            const ring = icon.getBoundingClientRect(), padding = parseFloat(getComputedStyle(row).paddingRight);
+            return Math.abs(ring.right - (rect.right - padding)) <= 1 && name.right <= ring.left - 7;
+        })'''), 'Running spinner must be right aligned in its own reserved column'
+
 with sync_playwright() as pw:
     executable = os.environ.get('BROWSER_EXECUTABLE') or shutil.which('chromium')
     browser = pw.chromium.launch(headless=True,
         args=['--host-resolver-rules=MAP dashboard.test-tailnet.ts.net 127.0.0.1', '--no-proxy-server'] if args.tailscale else [],
         **({'executable_path': executable} if executable else {}))
     page = browser.new_page(viewport={'width': 1440, 'height': 1150}, ignore_https_errors=args.tailscale)
+    page.emulate_media(reduced_motion='no-preference')
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     html = (root / 'public/index.html').read_text().replace(
@@ -154,6 +164,33 @@ with sync_playwright() as pw:
     expect(page.locator('#project-list')).not_to_contain_text('Swift Playground')
     expect(page.locator('#sessions')).not_to_contain_text('Swift Playground')
     expect(page.locator('#back-to-projects')).to_be_hidden()
+    # Projects expands names underneath; only running names have an icon.
+    expect(page.locator('#nav-projects')).to_have_attribute('aria-expanded', 'false')
+    expect(page.locator('#project-navigation')).to_be_hidden()
+    page.locator('#nav-projects').focus(); page.keyboard.press('Space')
+    expect(page.locator('#project-overview')).to_be_visible()
+    expect(page.locator('#nav-projects')).to_have_attribute('aria-expanded', 'true')
+    expect(page.locator('#project-navigation')).to_be_visible()
+    expect(page.locator('.project-nav-item')).to_have_count(1)
+    expect(page.locator('#project-navigation .running-icon')).to_be_visible()
+    expect(page.locator('#project-navigation .running-icon')).to_have_attribute('aria-label', 'Running')
+    expect(page.locator('#project-navigation .running-icon')).to_have_attribute('title', 'Running')
+    assert_spinner_alignment(page)
+    flow = page.locator('#project-navigation .running-icon .sk-flow')
+    expect(flow).to_have_count(1); expect(flow).to_have_attribute('aria-hidden', 'true')
+    dots = flow.locator('.sk-flow-dot'); expect(dots).to_have_count(3)
+    styles = dots.evaluate_all('es => es.map(e => { const s = getComputedStyle(e); return [s.animationName, s.animationDuration, s.animationDelay, s.animationTimingFunction, s.animationIterationCount, s.backgroundColor]; })')
+    for style, delay in zip(styles, ('-0.3s', '-0.15s', '0s')):
+        assert style == ['piscope-flow', '1.5s', delay, 'cubic-bezier(0.455, 0.03, 0.515, 0.955)', 'infinite', 'rgb(113, 220, 173)']
+    frames = dots.first.evaluate('e => e.getAnimations()[0].effect.getKeyframes().map(f => f.transform || "none")')
+    assert 'scale(0.3)' in frames and 'scale(1)' in frames and not any('rotate' in f for f in frames)
+    assert page.locator('.spinner-grow').count() == 0
+    assert page.locator('.project-card .running-icon, .session-item .running-icon, #project-navigation .badge').count() == 0
+    expect(page.locator('#project-navigation')).not_to_contain_text('Swift Playground')
+    page.keyboard.press('Tab'); expect(page.locator('.project-nav-item')).to_be_focused()
+    page.keyboard.press('Escape'); expect(page.locator('#project-navigation')).to_be_hidden()
+    assert dots.evaluate_all('es => es.every(e => getComputedStyle(e).animationName === "none")')
+    expect(page.locator('#nav-projects')).to_be_focused()
     page.locator('#project-search').fill('Fixture')
     page.locator('.project-open').click()
     page.wait_for_selector('#run-content:not(.hidden)')
@@ -253,6 +290,45 @@ with sync_playwright() as pw:
         page.locator('#back-to-projects').click()
         expect(page.locator('.project-card')).to_have_count(4)
         expect(page.locator('#project-count')).to_have_text('4')
+        page.locator('#nav-projects').click()
+        expect(page.locator('.project-nav-item')).to_have_count(4)  # Two Notebook sessions, one project.
+        assert page.locator('.project-nav-name').all_text_contents() == ['Fixture Playground', 'Marketplace', 'Notebook', 'Planner']
+        running_row = page.locator('.project-nav-item[data-project-id="ui-active"]')
+        expect(running_row.locator('.running-icon')).to_be_visible()
+        expect(page.locator('.project-nav-item:not([data-project-id="ui-active"]) .running-icon:visible')).to_have_count(0)
+        assert_spinner_alignment(page)
+        page.emulate_media(reduced_motion='reduce')
+        dots = running_row.locator('.sk-flow-dot'); expect(dots).to_have_count(3)
+        assert dots.evaluate_all('es => es.every(e => getComputedStyle(e).animationName === "none" && getComputedStyle(e).transform === "none")')
+        for dot in dots.all(): expect(dot).to_be_visible()
+        page.emulate_media(reduced_motion='no-preference')
+        running_row.focus(); icon_node = running_row.locator('.running-icon').element_handle()
+        animations = icon_node.evaluate_handle('e => e.getAnimations({subtree: true})')
+        assert animations.evaluate('as => as.length') == 3
+        row_node = running_row.element_handle()
+        # First dot peaks at 40%: 300ms current time plus its -300ms delay.
+        animations.evaluate('as => as.forEach(a => { a.pause(); a.currentTime = 300; })')
+        assert dots.first.evaluate('e => getComputedStyle(e).transform') == 'matrix(1, 0, 0, 1, 0, 0)'
+        assert len(set(dots.evaluate_all('es => es.map(e => getComputedStyle(e).transform)'))) == 3
+        page.locator('.view-nav').screenshot(path=str(output / 'projects-dropdown-live.png'))
+        animations.evaluate('as => as.forEach(a => a.play())')
+        batch = []
+        project_event('ui-return', 'Marketplace', 'ui-return-tab', 'workflow.updated', {'stages': [{'id': 'verify', 'title': 'Verify: Running icon SSE observed', 'status': 'pending'}]}, True)
+        req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(batch).encode(), headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
+        expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('Running icon SSE observed')
+        assert icon_node.evaluate('e => e.isConnected'); assert row_node.evaluate('e => e.isConnected')
+        assert icon_node.evaluate('(e, previous) => { const current = e.getAnimations({subtree: true}); return current.length === 3 && current.every((a, i) => a === previous[i] && a.playState === "running" && a.currentTime > 0 && a.playbackRate === 1); }', animations)
+        expect(running_row).to_be_focused(); expect(page.locator('#nav-projects')).to_have_attribute('aria-expanded', 'true')
+        req = urllib.request.Request(config['url'] + '/api/state', headers={'Authorization': 'Bearer ' + config['token']})
+        with urllib.request.urlopen(req, timeout=3) as response: current = json.load(response)
+        exact = next(p for p in current['projectOverview']['items'] if p['projectId'] == 'ui-active')['latest']
+        page.keyboard.press('Enter')
+        expect(page.locator('.session-item.active')).to_have_attribute('data-session', exact['sessionId'])
+        expect(page.locator('#run-select')).to_have_value(exact['runId'])
+        running_row.focus(); page.keyboard.press('Escape')
+        expect(page.locator('#project-navigation')).to_be_hidden(); expect(page.locator('#nav-projects')).to_be_focused()
+        page.locator('#back-to-projects').click()
         assert_equal_project_rows(page)
         expect(page.locator('.project-card[data-project="ui-active"]')).to_contain_text('2 active sessions')
         expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('8 days ago')
@@ -524,6 +600,11 @@ with sync_playwright() as pw:
     expect(sidebar_page.locator('#nav-projects')).to_be_focused()
     sidebar_page.evaluate('(next) => { snapshot = next; render(); }', sidebar_data)
     assert sidebar_ids() == ['session-a', 'session-b', 'session-z']
+    sidebar_page.locator('#nav-projects').click()
+    empty_nav = copy.deepcopy(sidebar_data); empty_nav['projectOverview']['items'] = []
+    sidebar_page.evaluate('(next) => { snapshot = next; render(); }', empty_nav)
+    expect(sidebar_page.locator('.project-nav-item')).to_have_count(0)
+    expect(sidebar_page.locator('.projects-nav-empty')).to_have_text('No tracked projects yet.')
     sidebar_page.close()
     # No network snapshots are needed to expire a working badge. Archived
     # summaries remain readable even when their source sessions no longer exist.
@@ -543,6 +624,11 @@ with sync_playwright() as pw:
     archive_page.clock.install()
     replay(archive_page, remembered)
     expect(archive_page.locator('#connection-label')).to_have_text('Dashboard connected')
+    archive_page.locator('#nav-projects').click()
+    archive_page.locator('#project-search').fill('not-visible')
+    archive_page.locator('.project-nav-item[data-project-id="archived-project"]').click()
+    expect(archive_page.locator('#project-search')).to_have_value('')
+    expect(archive_page.locator('[data-project="archived-project"] .project-answer')).to_be_focused()
     archived_card = archive_page.locator('[data-project="archived-project"]').filter(has=archive_page.locator('h2'))
     expect(archived_card).to_contain_text('detailed event history is no longer retained')
     assert archived_card.locator('.project-open').count() == 0
@@ -554,9 +640,15 @@ with sync_playwright() as pw:
     assert archived_card.locator('img').count() == 0
     expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Running')
     expect(archive_page.locator('.project-card[data-project="stale-project"]')).to_have_attribute('data-status', 'running')
+    expect(archive_page.locator('.project-nav-item[data-project-id="stale-project"] .running-icon')).to_be_visible()
+    name_width = archive_page.locator('.project-nav-item[data-project-id="stale-project"] .project-nav-name').evaluate('e => e.getBoundingClientRect().width')
+    assert_spinner_alignment(archive_page)
     archive_page.clock.fast_forward(31000)
     expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Outcome unknown')
     expect(archive_page.locator('.project-card[data-project="stale-project"]')).to_have_attribute('data-status', 'unknown')
+    expect(archive_page.locator('.project-nav-item[data-project-id="stale-project"] .running-icon')).to_be_hidden()
+    assert archive_page.locator('.project-nav-item[data-project-id="stale-project"] .sk-flow-dot').evaluate_all('es => es.length === 3 && es.every(e => getComputedStyle(e).animationName === "none")')
+    assert archive_page.locator('.project-nav-item[data-project-id="stale-project"] .project-nav-name').evaluate('e => e.getBoundingClientRect().width') == name_width
     expect(archived_toggle).to_have_attribute('aria-expanded', 'true')
     expect(archived_toggle).to_be_focused()
     # R5: the relative-age timer must not rewrite a selected response either.
@@ -642,6 +734,17 @@ with sync_playwright() as pw:
     extra['projectName'] = 'both'
     text_page.evaluate('(next) => { snapshot = next; render(); }', inserted)
     expect(both).to_contain_text('Project ID: both')
+    text_page.locator('#nav-projects').click()
+    expect(text_page.locator('.project-nav-item[data-project-id="both"] .project-nav-id')).to_have_text('Project ID: both')
+    expect(text_page.locator('.project-nav-item[data-project-id="inserted-project"] .project-nav-id')).to_have_text('Project ID: inserted-project')
+    nav_both = text_page.locator('.project-nav-item[data-project-id="both"]'); nav_both.focus()
+    nav_both_node = nav_both.element_handle()
+    text_page.locator('#project-navigation').evaluate('e => e.scrollTop = 32')
+    nav_scroll = text_page.locator('#project-navigation').evaluate('e => e.scrollTop'); assert nav_scroll > 0
+    text_page.evaluate('(next) => { snapshot = next; render(); }', inserted)
+    assert nav_both_node.evaluate('e => e.isConnected'); expect(nav_both).to_be_focused()
+    assert text_page.locator('#project-navigation').evaluate('e => e.scrollTop') == nav_scroll
+    text_page.locator('#nav-projects').click()
     expect(text_page.locator('[data-project="inserted-project"]')).to_contain_text('Project ID: inserted-project')
     text_page.evaluate('(next) => { snapshot = next; render(); }', excerpts)
     expect(both).not_to_contain_text('Project ID: both')
@@ -699,7 +802,14 @@ with sync_playwright() as pw:
         expect(design.locator('.project-card')).to_have_count(1)
         expect(design.locator('.project-card h2')).to_have_text(name)
     design.locator('#project-filter').select_option('')
+    design.locator('#nav-projects').click()
+    for status, _, _ in states:
+        icon = design.locator(f'.project-nav-item[data-project-id="{status}"] .running-icon')
+        if status == 'running': expect(icon).to_be_visible()
+        else: expect(icon).to_be_hidden()
+    assert design.locator('#project-navigation .badge, .project-card .running-icon, .session-item .running-icon').count() == 0
     assert_readable(design)
+    design.locator('.view-nav').screenshot(path=str(output / 'projects-dropdown-desktop.png'))
     design.screenshot(path=str(output / 'status-palette.png'), full_page=True)
     design.locator('#project-search').focus()
     design.keyboard.press('Tab')
@@ -707,16 +817,21 @@ with sync_playwright() as pw:
     assert design.locator('#project-filter').evaluate('(e) => getComputedStyle(e).outlineStyle') != 'none'
     for width in (1024, 768, 390, 320):
         design.set_viewport_size({'width': width, 'height': 900})
-        assert_readable(design)
+        assert_readable(design); assert_spinner_alignment(design)
     # A long real-world repository name and 200% text size must not break reflow.
-    design.locator('.project-card h2').first.evaluate('(e) => e.textContent = "LongRepositoryName".repeat(8)')
+    palette['projectOverview']['items'][0]['projectName'] = 'LongRepositoryName' * 8
+    design.evaluate('(next) => { snapshot = next; render(); }', palette)
     design.set_viewport_size({'width': 390, 'height': 844})
-    assert_readable(design)
+    assert_readable(design); assert_spinner_alignment(design)
     design.screenshot(path=str(output / 'mobile-projects.png'), full_page=True)
     design.set_viewport_size({'width': 720, 'height': 900})
-    design.add_style_tag(content='html { font-size: 200%; }')
-    assert_readable(design)
+    design.evaluate("() => document.documentElement.style.fontSize = '200%'")
+    assert design.evaluate('getComputedStyle(document.documentElement).fontSize') == '32px'
+    assert design.evaluate('getComputedStyle(document.body).fontSize') == '36px'
+    assert_readable(design); assert_spinner_alignment(design)
+    design.screenshot(path=str(output / 'projects-dropdown-200.png'))
+    design.set_viewport_size({'width': 1440, 'height': 1100}); assert_readable(design); assert_spinner_alignment(design)
     design.close()
     assert not errors, errors
     browser.close()
-print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, stable project/session ordering under SSE, retained sidebar focus/nodes on own/unrelated heartbeat with exact-ID navigation and mobile scroll, label/count patches and keyed session lifecycle, unchanged project node/selection/focus retention on unrelated updates and age ticks, keyed insertion/removal and duplicate-name IDs, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))
+print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, Projects dropdown with names and a running icon only, stable project/session ordering under SSE, retained sidebar focus/nodes on own/unrelated heartbeat with exact-ID navigation and mobile scroll, label/count patches and keyed session lifecycle, unchanged project node/selection/focus retention on unrelated updates and age ticks, keyed insertion/removal and duplicate-name IDs, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))

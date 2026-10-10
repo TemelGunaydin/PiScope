@@ -18,6 +18,14 @@ function modelLabel(model) {
   if (/glm/i.test(model)) return 'GLM'; return model.split('/').slice(-1)[0];
 }
 function badge(status) { return el('span', `badge ${status}`, labels[status] || status); }
+function runningIcon() {
+  const icon = el('span', 'running-icon');
+  icon.setAttribute('role', 'img'); icon.setAttribute('aria-label', 'Running'); icon.title = 'Running';
+  const flow = el('span', 'sk-flow'); flow.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i++) flow.append(el('span', 'sk-flow-dot'));
+  icon.append(flow);
+  return icon;
+}
 // Only the observed agent.finished mark is terminal proof for an agent card.
 // A progress-only status literal — even a terminal-looking 'done'/'error'/
 // 'blocked'/'cancelled' — is never a result: without the finished mark the card
@@ -71,6 +79,28 @@ function returnToProjects() {
   const card = [...$('project-list').children].find(c => c.dataset.project === returnProjectId);
   (card?.querySelector('.project-open') || $('overview-heading')).focus({ preventScroll: true });
   window.scrollTo(0, overviewScrollY);
+}
+function setProjectNavigation(open) {
+  const list = $('project-navigation');
+  if (!open && list.contains(document.activeElement)) $('nav-projects').focus({ preventScroll: true });
+  list.classList.toggle('hidden', !open); $('nav-projects').setAttribute('aria-expanded', String(open));
+  if (open) renderProjectNavigation();
+}
+function openSidebarProject(projectId) {
+  const p = projectsNow().find(p => p.projectId === projectId);
+  if (!p) return;
+  const s = snapshot.sessions.find(s => s.projectId === projectId && s.id === p.latest?.sessionId);
+  if (p.detailAvailable && s?.runs.some(r => r.id === p.latest?.runId)) {
+    openDetails(s.id, p.latest.runId, projectId); return;
+  }
+  // Saved projects have no retained request to open. Reveal their exact card.
+  returnProjectId = projectId; returnToProjects();
+  let card = [...$('project-list').children].find(c => c.dataset.project === projectId);
+  if (!card) {
+    $('project-search').value = ''; $('project-filter').value = ''; renderProjects();
+    card = [...$('project-list').children].find(c => c.dataset.project === projectId);
+  }
+  if (card) { card.querySelector('.project-answer')?.focus({ preventScroll: true }); card.scrollIntoView({ block: 'start' }); overviewScrollY = window.scrollY; }
 }
 function showDailyReport() {
   if (overview) overviewScrollY = window.scrollY;
@@ -212,7 +242,37 @@ function selected() {
   if (r) runId = r.id;
   return { s, r };
 }
+function renderProjectNavigation() {
+  const list = $('project-navigation');
+  if (list.classList.contains('hidden')) return;
+  const projects = projectsNow(), buttons = [], previous = new Map([...list.children].map(b => [b.dataset.projectId, b]));
+  const focused = list.contains(document.activeElement) ? document.activeElement : undefined;
+  const names = new Map(); for (const p of projects) names.set(p.projectName, (names.get(p.projectName) || 0) + 1);
+  const current = !overview && !reportView && !notesView ? snapshot.sessions.find(s => s.id === sessionId)?.projectId : undefined;
+  for (const p of projects) {
+    let button = previous.get(p.projectId);
+    if (!button) {
+      button = el('button', 'project-nav-item'); button.type = 'button'; button.dataset.projectId = p.projectId;
+      button.append(el('span', 'project-nav-name'), runningIcon(), el('span', 'project-nav-id'));
+      button.onclick = () => openSidebarProject(p.projectId);
+    }
+    const name = button.querySelector('.project-nav-name'), id = button.querySelector('.project-nav-id');
+    if (name.textContent !== p.projectName) name.textContent = p.projectName;
+    button.querySelector('.running-icon').classList.toggle('hidden', p.status !== 'running');
+    const identity = names.get(p.projectName) > 1 ? `Project ID: ${p.projectId}` : '';
+    if (id.textContent !== identity) id.textContent = identity;
+    id.classList.toggle('hidden', !identity);
+    if (p.projectId === current) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+    buttons.push(button);
+  }
+  if (!buttons.length) buttons.push(list.querySelector('.projects-nav-empty') || el('p', 'projects-nav-empty', 'No tracked projects yet.'));
+  const retained = new Set(buttons);
+  for (const button of [...list.children]) if (!retained.has(button)) button.remove();
+  for (let i = 0; i < buttons.length; i++) if (list.children[i] !== buttons[i]) list.insertBefore(buttons[i], list.children[i] || null);
+  if (focused && document.activeElement !== focused) (retained.has(focused) ? focused : $('nav-projects')).focus({ preventScroll: true });
+}
 function renderSidebar() {
+  renderProjectNavigation();
   const all = filteredSessions();
   $('project-count').textContent = (snapshot.projectOverview?.items || []).filter(p => !p.demo).length;
   const list = $('sessions'), previous = new Map([...list.children].map(button => [button.dataset.session, button]));
@@ -489,7 +549,13 @@ initializeProjectNotes({ authorized: canControl, usePrompt: useNotePrompt, openR
   followSubmission = undefined; openDetails(s.id, activity.runId, activity.projectId); $('control-response-heading').scrollIntoView({ block: 'start' }); return '';
 } });
 $('back-to-projects').onclick = () => detailOrigin === 'report' ? showDailyReport() : detailOrigin === 'notes' ? showProjectNotes() : returnToProjects();
-$('nav-projects').onclick = returnToProjects;
+$('nav-projects').onclick = () => {
+  const open = $('nav-projects').getAttribute('aria-expanded') !== 'true';
+  returnToProjects(); setProjectNavigation(open); $('nav-projects').focus({ preventScroll: true });
+};
+$('project-navigation').onkeydown = $('nav-projects').onkeydown = e => {
+  if (e.key === 'Escape' && $('nav-projects').getAttribute('aria-expanded') === 'true') { e.preventDefault(); setProjectNavigation(false); }
+};
 $('nav-report').onclick = showDailyReport;
 $('nav-notes').onclick = () => showProjectNotes('');
 $('project-search').oninput = renderProjects;
@@ -498,7 +564,7 @@ $('run-select').onchange = e => { followSubmission = undefined; runId = e.target
 $('event-search').oninput = () => { const { r } = selected(); if (r) renderTimeline(r); };
 $('workflow-task-set').onchange = () => { const { s, r } = selected(); if (r) renderWorkflowComparison(s, r); };
 setInterval(updateDuration, 1000);
-setInterval(() => { renderProjects(); if (reportView) refreshDailyReport(); }, 1000);
+setInterval(() => { renderProjectNavigation(); renderProjects(); if (reportView) refreshDailyReport(); }, 1000);
 async function boot() {
   const fragment = new URLSearchParams(location.hash.slice(1));
   const controlToken = fragment.get('control-token');
