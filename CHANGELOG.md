@@ -6,7 +6,7 @@ Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
 - The sidebar Projects button expands a project-name list; only running projects
-  show right-aligned SpinKit Flow (three staggered green dots, 1.5s cycle).
+  show right-aligned SpinKit Rotating Plane (a flipping green square, 1.5s cycle).
   Only the licensed, pinned and scoped CSS component is local;
   reduced-motion fallback and no extra labels, CDN, npm dependency or progress.
   Stable grouping/order, exact navigation, keyboard/focus and signal expiry;

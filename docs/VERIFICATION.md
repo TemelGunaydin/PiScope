@@ -1,5 +1,29 @@
 # Verification log / Doğrulama kaydı
 
+## SpinKit Rotating Plane — publication preflight — 2026-10-10
+
+- Replaced Flow with the user-requested **Rotating Plane** (square, gallery demo
+  #1). Gallery standard keyframes match the pinned upstream `sk-plane` component;
+  the source's perspective/X–Y flips and ease-in-out timing are retained.
+- Kept the green Running label/tooltip, reserved right column and calm **1.5s**
+  cycle (upstream 1.2s). A right-aligned **1rem square** replaces all three dots.
+  Reduced-motion is a static square; inactive/collapsed rows have no animation.
+  Full MIT notice remains in CSS and `THIRD_PARTY_NOTICES.md`. No external runtime
+  fetch, dependency, build, CSP, control, configuration or model changes.
+- Permanent browser regression first failed on the missing `.sk-plane`, then
+  passed: single square, source keyframes, duration/easing/color, right alignment,
+  reduced-motion/hidden expiry and retention of its one advancing animation,
+  row/icon/focus under unrelated SSE. Existing keyboard/navigation/order/scroll,
+  mobile/320px and actual 200% text reflow checks also passed.
+- Monitoring **real HTTP/SSE** and **simulated private HTTPS/Secure cookie/SSE**
+  passed; **259/259 tests**, **54 modules**, Python AST and diff checks passed.
+  Synthetic screenshots were inspected and remain ignored. These are local
+  preflight results; hosted CI follows publication. No new installed-Pi,
+  paid-provider or physical-device proof is claimed.
+- User authorized commit/push of this slice only: source, regression, relevant
+  docs and MIT notices. No screenshots, private data or credentials are staged.
+  Earlier Flow entries below describe the superseded implementation/checkpoints.
+
 ## Projects dropdown + SpinKit Flow — publication preflight — 2026-10-10
 
 - User explicitly authorized commit/push of the final sidebar project dropdown

@@ -21,9 +21,8 @@ function badge(status) { return el('span', `badge ${status}`, labels[status] || 
 function runningIcon() {
   const icon = el('span', 'running-icon');
   icon.setAttribute('role', 'img'); icon.setAttribute('aria-label', 'Running'); icon.title = 'Running';
-  const flow = el('span', 'sk-flow'); flow.setAttribute('aria-hidden', 'true');
-  for (let i = 0; i < 3; i++) flow.append(el('span', 'sk-flow-dot'));
-  icon.append(flow);
+  const plane = el('span', 'sk-plane'); plane.setAttribute('aria-hidden', 'true');
+  icon.append(plane);
   return icon;
 }
 // Only the observed agent.finished mark is terminal proof for an agent card.

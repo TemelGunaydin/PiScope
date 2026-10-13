@@ -451,4 +451,4 @@ Bug reports and focused contributions are welcome. See [CONTRIBUTING.md](CONTRIB
 product of Pi, Tailscale, OpenAI or any model provider. Pi and pi-open-agents
 are separate projects; mentioning them does not imply endorsement.
 
-[Third-party notices](THIRD_PARTY_NOTICES.md): the scoped SpinKit Flow component.
+[Third-party notices](THIRD_PARTY_NOTICES.md): the scoped SpinKit Rotating Plane component.

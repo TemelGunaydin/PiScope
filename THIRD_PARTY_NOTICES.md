@@ -1,19 +1,20 @@
 # Third-party notices
 
-## SpinKit — Flow
+## SpinKit — Rotating Plane
 
-PiScope vendors only SpinKit's three-dot **Flow** component in `public/style.css`,
-not the full spinner collection or a JavaScript bundle. The earlier Bootstrap
-spinner-grow component has been removed.
+PiScope vendors only SpinKit's **Rotating Plane** component in `public/style.css`,
+not the full spinner collection or a JavaScript bundle. This is the flipping
+square shown as demo #1 at https://tobiasahlin.com/spinkit/.
+The earlier Flow and Bootstrap spinner-grow components have been removed.
 
 Source pinned to commit `742a71277c49b69053b5beb9fad80d720840a2ab`:
 https://github.com/tobiasahlin/SpinKit/blob/742a71277c49b69053b5beb9fad80d720840a2ab/spinkit.css
 
 Adaptations: scope selectors to `.running-icon`, prefix the keyframe name, use a
-2rem × 1rem reserved slot with three circular .5rem dots, use the existing green
-color and Running accessible label, retain the source's stagger/easing while
-slowing the cycle from 1.4s to 1.5s, and stop motion for inactive/collapsed rows or
-reduced motion. No CDN, runtime npm dependency, or frontend build is required.
+2rem × 1rem reserved slot with a right-aligned 1rem square, use the existing green
+color and Running accessible label, retain the source's perspective/X–Y flips
+and ease-in-out timing while slowing the cycle from 1.2s to 1.5s, and stop motion
+for inactive/collapsed rows or reduced motion (a static square). No CDN, runtime npm dependency, or frontend build is required.
 The full license notice is also preserved in the CSS.
 
 ```text

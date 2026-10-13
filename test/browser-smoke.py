@@ -176,20 +176,19 @@ with sync_playwright() as pw:
     expect(page.locator('#project-navigation .running-icon')).to_have_attribute('aria-label', 'Running')
     expect(page.locator('#project-navigation .running-icon')).to_have_attribute('title', 'Running')
     assert_spinner_alignment(page)
-    flow = page.locator('#project-navigation .running-icon .sk-flow')
-    expect(flow).to_have_count(1); expect(flow).to_have_attribute('aria-hidden', 'true')
-    dots = flow.locator('.sk-flow-dot'); expect(dots).to_have_count(3)
-    styles = dots.evaluate_all('es => es.map(e => { const s = getComputedStyle(e); return [s.animationName, s.animationDuration, s.animationDelay, s.animationTimingFunction, s.animationIterationCount, s.backgroundColor]; })')
-    for style, delay in zip(styles, ('-0.3s', '-0.15s', '0s')):
-        assert style == ['piscope-flow', '1.5s', delay, 'cubic-bezier(0.455, 0.03, 0.515, 0.955)', 'infinite', 'rgb(113, 220, 173)']
-    frames = dots.first.evaluate('e => e.getAnimations()[0].effect.getKeyframes().map(f => f.transform || "none")')
-    assert 'scale(0.3)' in frames and 'scale(1)' in frames and not any('rotate' in f for f in frames)
-    assert page.locator('.spinner-grow').count() == 0
+    plane = page.locator('#project-navigation .running-icon .sk-plane')
+    expect(plane).to_have_count(1); expect(plane).to_have_attribute('aria-hidden', 'true')
+    style = plane.evaluate('e => { const s = getComputedStyle(e); return [s.animationName, s.animationDuration, s.animationTimingFunction, s.animationIterationCount, s.backgroundColor, s.width, s.height, s.borderRadius]; }')
+    assert style == ['piscope-plane', '1.5s', 'ease-in-out', 'infinite', 'rgb(113, 220, 173)', '16px', '16px', '0px']
+    frames = plane.evaluate('e => e.getAnimations()[0].effect.getKeyframes().map(f => f.transform || "none")')
+    assert len(frames) == 3 and all('perspective(120px)' in f for f in frames)
+    assert 'rotateX(-180.1deg)' in frames[1] and 'rotateY(-179.9deg)' in frames[2]
+    assert page.locator('.spinner-grow, .sk-flow, .sk-flow-dot').count() == 0
     assert page.locator('.project-card .running-icon, .session-item .running-icon, #project-navigation .badge').count() == 0
     expect(page.locator('#project-navigation')).not_to_contain_text('Swift Playground')
     page.keyboard.press('Tab'); expect(page.locator('.project-nav-item')).to_be_focused()
     page.keyboard.press('Escape'); expect(page.locator('#project-navigation')).to_be_hidden()
-    assert dots.evaluate_all('es => es.every(e => getComputedStyle(e).animationName === "none")')
+    assert plane.evaluate('e => getComputedStyle(e).animationName') == 'none'
     expect(page.locator('#nav-projects')).to_be_focused()
     page.locator('#project-search').fill('Fixture')
     page.locator('.project-open').click()
@@ -298,18 +297,17 @@ with sync_playwright() as pw:
         expect(page.locator('.project-nav-item:not([data-project-id="ui-active"]) .running-icon:visible')).to_have_count(0)
         assert_spinner_alignment(page)
         page.emulate_media(reduced_motion='reduce')
-        dots = running_row.locator('.sk-flow-dot'); expect(dots).to_have_count(3)
-        assert dots.evaluate_all('es => es.every(e => getComputedStyle(e).animationName === "none" && getComputedStyle(e).transform === "none")')
-        for dot in dots.all(): expect(dot).to_be_visible()
+        plane = running_row.locator('.sk-plane'); expect(plane).to_have_count(1)
+        assert plane.evaluate('e => getComputedStyle(e).animationName === "none" && getComputedStyle(e).transform === "none"')
+        expect(plane).to_be_visible()
         page.emulate_media(reduced_motion='no-preference')
         running_row.focus(); icon_node = running_row.locator('.running-icon').element_handle()
         animations = icon_node.evaluate_handle('e => e.getAnimations({subtree: true})')
-        assert animations.evaluate('as => as.length') == 3
+        assert animations.evaluate('as => as.length') == 1
         row_node = running_row.element_handle()
-        # First dot peaks at 40%: 300ms current time plus its -300ms delay.
-        animations.evaluate('as => as.forEach(a => { a.pause(); a.currentTime = 300; })')
-        assert dots.first.evaluate('e => getComputedStyle(e).transform') == 'matrix(1, 0, 0, 1, 0, 0)'
-        assert len(set(dots.evaluate_all('es => es.map(e => getComputedStyle(e).transform)'))) == 3
+        # Sample the first flip, away from its edge-on midpoint.
+        animations.evaluate('as => as.forEach(a => { a.pause(); a.currentTime = 150; })')
+        assert plane.evaluate('e => getComputedStyle(e).transform').startswith('matrix3d(')
         page.locator('.view-nav').screenshot(path=str(output / 'projects-dropdown-live.png'))
         animations.evaluate('as => as.forEach(a => a.play())')
         batch = []
@@ -318,7 +316,7 @@ with sync_playwright() as pw:
         with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
         expect(page.locator('.project-card[data-project="ui-return"]')).to_contain_text('Running icon SSE observed')
         assert icon_node.evaluate('e => e.isConnected'); assert row_node.evaluate('e => e.isConnected')
-        assert icon_node.evaluate('(e, previous) => { const current = e.getAnimations({subtree: true}); return current.length === 3 && current.every((a, i) => a === previous[i] && a.playState === "running" && a.currentTime > 0 && a.playbackRate === 1); }', animations)
+        assert icon_node.evaluate('(e, previous) => { const current = e.getAnimations({subtree: true}); return current.length === 1 && current.every((a, i) => a === previous[i] && a.playState === "running" && a.currentTime > 0 && a.playbackRate === 1); }', animations)
         expect(running_row).to_be_focused(); expect(page.locator('#nav-projects')).to_have_attribute('aria-expanded', 'true')
         req = urllib.request.Request(config['url'] + '/api/state', headers={'Authorization': 'Bearer ' + config['token']})
         with urllib.request.urlopen(req, timeout=3) as response: current = json.load(response)
@@ -647,7 +645,7 @@ with sync_playwright() as pw:
     expect(archive_page.locator('.project-card[data-project="stale-project"] .badge')).to_have_text('Outcome unknown')
     expect(archive_page.locator('.project-card[data-project="stale-project"]')).to_have_attribute('data-status', 'unknown')
     expect(archive_page.locator('.project-nav-item[data-project-id="stale-project"] .running-icon')).to_be_hidden()
-    assert archive_page.locator('.project-nav-item[data-project-id="stale-project"] .sk-flow-dot').evaluate_all('es => es.length === 3 && es.every(e => getComputedStyle(e).animationName === "none")')
+    assert archive_page.locator('.project-nav-item[data-project-id="stale-project"] .sk-plane').evaluate('e => getComputedStyle(e).animationName') == 'none'
     assert archive_page.locator('.project-nav-item[data-project-id="stale-project"] .project-nav-name').evaluate('e => e.getBoundingClientRect().width') == name_width
     expect(archived_toggle).to_have_attribute('aria-expanded', 'true')
     expect(archived_toggle).to_be_focused()
