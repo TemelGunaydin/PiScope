@@ -27,6 +27,8 @@ in their original language.
 
 - **All your monitored Pi projects:** one card per project, even across several sessions.
 - **Recent context:** last request, last response, last work time and reported plan step.
+- **New replies:** a small **New reply** label on project cards and in Projects.
+  Select the project to open its unread reply; opening that reply clears the label.
 - **Daily report:** one **Generate report** button summarizes the selected day
   across all tracked projects with the current Pi model, plus remaining work and **Copy report**.
 - **Response beside continuation:** read the selected request's **Last model response**
@@ -411,6 +413,9 @@ execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
   notices remain visible. Daily generation is disabled with this setting.
   It does not purge previously captured or generated data.
   Control prompts still reach Pi when approved.
+- Reply read markers stay in this browser's local storage: up to 500 full
+  project/session/request identities, no copied text. First visit starts quietly;
+  clearing browser storage resets this baseline. Other browsers have their own state.
 - Same-user OS processes can read local records. Tailscale is an extra network
   boundary, not per-project or multi-user authorization. Review exports before
   sharing, and keep pairing links, queues and `connection.json` private.

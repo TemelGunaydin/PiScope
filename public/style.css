@@ -76,7 +76,9 @@ input::placeholder { color: var(--subtle); opacity: 1; }
 #nav-projects[aria-expanded="true"] .project-nav-chevron { transform: rotate(90deg); }
 .project-navigation { min-width: 0; max-height: min(32vh, 24rem); overflow: auto; padding: 4px; border-left: 1px solid #526b8c; }
 .view-nav .project-nav-item { display: grid; grid-template-columns: minmax(0, 1fr) 2rem; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; text-align: left; font-size: var(--small); overflow-wrap: anywhere; }
-.project-nav-name { min-width: 0; }
+.project-nav-name, .project-card-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.new-reply { display: inline-block; max-width: 100%; padding: 0 6px; border-radius: 4px; color: var(--accent); background: var(--blue-bg); font-size: var(--small); font-weight: 600; line-height: 1.5; }
+.project-nav-name .new-reply { color: #e1edff; background: #294263; }
 .project-nav-item[aria-current="page"] { background: #294263; box-shadow: inset 3px 0 #93bcff; }
 .project-nav-id { grid-column: 1 / -1; color: #bdcce1; }
 .projects-nav-empty { font-size: var(--small); color: #bdcce1; padding: 8px; }

@@ -14,6 +14,7 @@ const assets = new Map([
   ['/control.js', ['control.js', 'text/javascript; charset=utf-8']],
   ['/report.js', ['report.js', 'text/javascript; charset=utf-8']],
   ['/notes.js', ['notes.js', 'text/javascript; charset=utf-8']],
+  ['/replies.js', ['replies.js', 'text/javascript; charset=utf-8']],
   ['/note-request.js', ['../extensions/agent-dashboard/note-request.mjs', 'text/javascript; charset=utf-8']],
   ['/style.css', ['style.css', 'text/css; charset=utf-8']],
   ['/icon.png', ['icon.png', 'image/png']],

@@ -122,6 +122,7 @@ with sync_playwright() as pw:
         target.add_script_tag(content='\n'.join(line for line in (root / 'public/control.js').read_text().splitlines() if not line.startswith('import ')).replace('export ', ''))
         target.add_script_tag(content=(root / 'public/report.js').read_text().replace('export ', ''))
         target.add_script_tag(content=(root / 'public/notes.js').read_text().replace('export ', ''))
+        target.add_script_tag(content=(root / 'public/replies.js').read_text().replace('export ', ''))
         # Replay module bodies as classic scripts; import declarations cannot run here.
         target.add_script_tag(content='\n'.join(line for line in (root / 'public/app.js').read_text().splitlines() if not line.startswith('import ')))
     if args.network:
@@ -160,6 +161,7 @@ with sync_playwright() as pw:
     expect(page.locator('.project-card')).to_have_count(1)
     # Short saved text is already visible; no duplicate summary or expand action.
     expect(page.locator('.project-saved, .project-expand')).to_have_count(0)
+    expect(page.locator('.new-reply:visible')).to_have_count(0)  # First visit is quiet.
     expect(page.locator('#project-count')).to_have_text('1')
     expect(page.locator('#project-list')).not_to_contain_text('Swift Playground')
     expect(page.locator('#sessions')).not_to_contain_text('Swift Playground')
@@ -291,7 +293,7 @@ with sync_playwright() as pw:
         expect(page.locator('#project-count')).to_have_text('4')
         page.locator('#nav-projects').click()
         expect(page.locator('.project-nav-item')).to_have_count(4)  # Two Notebook sessions, one project.
-        assert page.locator('.project-nav-name').all_text_contents() == ['Fixture Playground', 'Marketplace', 'Notebook', 'Planner']
+        assert page.locator('.project-nav-title').all_text_contents() == ['Fixture Playground', 'Marketplace', 'Notebook', 'Planner']
         running_row = page.locator('.project-nav-item[data-project-id="ui-active"]')
         expect(running_row.locator('.running-icon')).to_be_visible()
         expect(page.locator('.project-nav-item:not([data-project-id="ui-active"]) .running-icon:visible')).to_have_count(0)
@@ -462,6 +464,87 @@ with sync_playwright() as pw:
         page.evaluate("() => document.documentElement.style.fontSize=''")
         page.evaluate('() => window.scrollTo(0, 0)')
         page.screenshot(path=str(output / 'projects.png'), full_page=True)
+        # Browser-only unread replies: real ingestion/SSE, no model or control send.
+        def publish_reply(project_id, session_id, run_id, records):
+            events = [{'schemaVersion': 1, 'id': str(uuid.uuid4()), 'type': kind,
+                'time': datetime.now(timezone.utc).isoformat(), 'demo': False,
+                'projectId': project_id, 'projectName': 'Unread duplicate',
+                'sessionId': session_id, 'runId': run_id, 'data': data} for kind, data in records]
+            req = urllib.request.Request(config['url'] + '/api/events', data=json.dumps(events).encode(),
+                headers={'Authorization': 'Bearer ' + config['token'], 'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout=3) as response: assert response.status == 200
+        pa, pb, sa, sb = 'reply-project-full', 'reply-project-full-extra', 'reply-session-full', 'reply-session-full-extra'
+        answer_text = 'Identical captured response; no model was called.'
+        ca = page.locator(f'.project-card[data-project="{pa}"]')
+        cb = page.locator(f'.project-card[data-project="{pb}"]')
+        ra = page.locator(f'.project-nav-item[data-project-id="{pa}"]')
+        rb = page.locator(f'.project-nav-item[data-project-id="{pb}"]')
+        publish_reply(pa, sa, 'reply-run-a', [('prompt.received', {'prompt': 'Synthetic unread request'}), ('message.completed', {'summary': answer_text})])
+        expect(ca.locator('.project-answer')).to_have_text(answer_text)
+        expect(ca.locator('.new-reply')).to_be_hidden()  # Intermediate assistant text is not terminal.
+        publish_reply(pa, sa, 'reply-run-a', [('run.ended', {'outcome': 'idle', 'summary': answer_text})])
+        expect(ca.locator('.new-reply')).to_be_visible()
+        publish_reply(pb, sb, 'reply-run-a', [('prompt.received', {'prompt': 'Same name and same reply, different full identities'}), ('run.ended', {'outcome': 'idle', 'summary': answer_text})])
+        expect(cb.locator('.new-reply')).to_be_visible()
+        if page.locator('#nav-projects').get_attribute('aria-expanded') == 'false': page.locator('#nav-projects').click()
+        expect(ra.locator('.new-reply')).to_be_visible(); expect(rb.locator('.new-reply')).to_be_visible()
+        rb.click()
+        expect(page.locator('#run-select')).to_have_value('reply-run-a')
+        expect(page.locator('.session-item.active')).to_have_attribute('data-session', sb)
+        expect(rb.locator('.new-reply')).to_be_hidden(); expect(ra.locator('.new-reply')).to_be_visible()
+        page.reload(); expect(page.locator('#connection-label')).to_have_text('Dashboard connected')
+        expect(ca.locator('.new-reply')).to_be_visible(); expect(cb.locator('.new-reply')).to_be_hidden()
+        markers = page.evaluate("() => localStorage.getItem('piscope.reply-reads.v1')")
+        assert answer_text not in markers and 'Unread duplicate' not in markers
+        page.locator('#nav-projects').click(); ra.focus()
+        card_node, row_node = ca.element_handle(), ra.element_handle()
+        ca.locator('.project-answer').evaluate('e => { const range = document.createRange(); range.selectNodeContents(e); getSelection().removeAllRanges(); getSelection().addRange(range); }')
+        publish_reply(pb, sb, 'reply-run-a', [('workflow.updated', {'stages': [{'id': 'check', 'title': 'Unrelated SSE preserves unread reply and selection', 'status': 'pending'}]})])
+        expect(cb).to_contain_text('Unrelated SSE preserves unread reply and selection')
+        assert card_node.evaluate('e => e.isConnected') and row_node.evaluate('e => e.isConnected')
+        assert page.evaluate('() => getSelection().toString()') == answer_text
+        expect(ra).to_be_focused(); expect(ra.locator('.new-reply')).to_be_visible()
+        # A new in-progress request does not clear the older unread response.
+        publish_reply(pa, sa, 'reply-run-b', [('prompt.received', {'prompt': 'Second synthetic request'})])
+        expect(ca.locator('.project-prompt')).to_have_text('Second synthetic request')
+        expect(ra.locator('.new-reply')).to_be_visible()
+        ra.click(); expect(page.locator('#run-select')).to_have_value('reply-run-a')
+        expect(ra.locator('.new-reply')).to_be_hidden()
+        page.locator('#run-select').select_option('reply-run-b')
+        page.locator('#run-select').select_option('reply-run-a')
+        publish_reply(pa, sa, 'reply-run-b', [('run.ended', {'outcome': 'idle', 'summary': answer_text})])
+        expect(ra.locator('.new-reply')).to_be_visible()  # An older open reply does not read this one.
+        page.locator('#back-to-projects').click()
+        for width in (1440, 320):
+            page.set_viewport_size({'width': width, 'height': 900}); assert_readable(page)
+        page.evaluate("() => document.documentElement.style.fontSize='200%'")
+        for width in (720, 1440):
+            page.set_viewport_size({'width': width, 'height': 1000}); assert_readable(page)
+        page.screenshot(path=str(output / 'new-reply-200.png'), full_page=True)
+        page.evaluate("() => document.documentElement.style.fontSize=''")
+        page.set_viewport_size({'width': 1440, 'height': 1150})
+        page.screenshot(path=str(output / 'new-reply.png'), full_page=True)
+        ra.click(); expect(page.locator('#run-select')).to_have_value('reply-run-b')
+        expect(ra.locator('.new-reply')).to_be_hidden()
+        # An open, visible request reads its eventual reply; a hidden tab does not.
+        page.locator('#back-to-projects').click()
+        publish_reply(pa, sa, 'reply-run-c', [('prompt.received', {'prompt': 'Wait for this visible request'})])
+        expect(ca.locator('.project-prompt')).to_have_text('Wait for this visible request')
+        ca.locator('.project-open').click(); expect(page.locator('#run-select')).to_have_value('reply-run-c')
+        page.evaluate("() => Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'hidden'})")
+        publish_reply(pa, sa, 'reply-run-c', [('run.ended', {'outcome': 'idle', 'summary': 'Reply arrived while tab hidden'})])
+        expect(page.locator('#summary')).to_have_text('Reply arrived while tab hidden')
+        expect(ra.locator('.new-reply')).to_be_visible()
+        page.evaluate("() => { Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'visible'}); document.dispatchEvent(new Event('visibilitychange')); }")
+        expect(ra.locator('.new-reply')).to_be_hidden()
+        page.locator('#back-to-projects').click()
+        publish_reply(pa, sa, 'reply-run-d', [('prompt.received', {'prompt': 'Visible live completion'})])
+        expect(ca.locator('.project-prompt')).to_have_text('Visible live completion')
+        ca.locator('.project-open').click()
+        publish_reply(pa, sa, 'reply-run-d', [('run.ended', {'outcome': 'idle', 'summary': 'Reply arrived in the visible request'})])
+        expect(page.locator('#summary')).to_have_text('Reply arrived in the visible request')
+        expect(ra.locator('.new-reply')).to_be_hidden()
+        page.locator('#back-to-projects').click()
     assert page.evaluate('() => getComputedStyle(document.documentElement).colorScheme') == 'light'
     assert page.locator('#theme').count() == 0
     assert_readable(page)
@@ -659,6 +742,17 @@ with sync_playwright() as pw:
     assert age_node.evaluate('e => e.isConnected && getSelection().anchorNode === e && getSelection().anchorOffset === 0 && getSelection().focusOffset === e.childNodes.length')
     assert archive_page.evaluate('getSelection().toString()') == long_summary
     expect(archived_answer).to_be_focused()
+    # Saved replies can be read via the same project navigation without a session.
+    archived_update = copy.deepcopy(remembered)
+    saved_reply = next(p for p in archived_update['projectOverview']['items'] if p['projectId'] == 'archived-project')
+    saved_reply['latest'].update(verdict='completed', runId='new-archived-reply', summary='New archived captured reply')
+    archive_page.evaluate('(next) => { snapshot = next; render(); }', archived_update)
+    archived_row = archive_page.locator('.project-nav-item[data-project-id="archived-project"]')
+    expect(archived_row.locator('.new-reply')).to_be_visible()
+    archived_row.click()
+    expect(archive_page.locator('[data-project="archived-project"] .project-answer')).to_be_focused()
+    expect(archive_page.locator('[data-project="archived-project"] .project-answer')).to_have_text('New archived captured reply')
+    expect(archived_row.locator('.new-reply')).to_be_hidden()
     archive_page.close()
     # Thresholds are per field; opening replaces the excerpt instead of repeating it.
     excerpts = copy.deepcopy(remembered)
@@ -832,4 +926,4 @@ with sync_playwright() as pw:
     design.close()
     assert not errors, errors
     browser.close()
-print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, Projects dropdown with names and a running icon only, stable project/session ordering under SSE, retained sidebar focus/nodes on own/unrelated heartbeat with exact-ID navigation and mobile scroll, label/count patches and keyed session lifecycle, unchanged project node/selection/focus retention on unrelated updates and age ticks, keyed insertion/removal and duplicate-name IDs, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))
+print('UI passed: English PiScope UI, unchanged non-English user text, live-only overview, back navigation with filters/focus/scroll restored, Projects dropdown with running-only Plane and browser-local New reply labels, exact unread navigation/read clearing and archived reply focus, stable project/session ordering under SSE, retained sidebar focus/nodes on own/unrelated heartbeat with exact-ID navigation and mobile scroll, label/count patches and keyed session lifecycle, unchanged project node/selection/focus retention on unrelated updates and age ticks, keyed insertion/removal and duplicate-name IDs, grouped tabs, conditional per-field text expansion, 220-character boundaries, archived summaries, stale work, signal expiry, models, stages, workflow comparisons, JUnit evidence, filters, semantic status colors, light theme, 18px body / 16px secondary text, text contrast, keyboard focus, responsive layout, 200% text sizing and terminal-literal regression. Main transport: ' + ('simulated Tailscale Serve HTTPS proxy, Secure cookie and live SSE.' if args.tailscale else 'real HTTP/SSE including live comparison and project updates.' if args.network else 'stubbed replay.'))

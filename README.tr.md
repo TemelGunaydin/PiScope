@@ -328,6 +328,12 @@ Masaüstünde aynı satırdaki kartlar eşit yüksekliktedir; sonraki adım ve i
 alanları alta hizalanır. Uzun metin açılınca veya yazı boyutu büyüyünce satır
 birlikte uzar, içerik kesilmez. Mobilde kartlar doğal yüksekliklerini korur.
 
+Yeni yanıt gelen projenin kartında ve **Projects** listesinde **New reply** görünür.
+Projects altından projeyi seçmek okunmamış yanıtı açar; ilgili yanıt açılınca işaret
+kalkar. İlk açılışta eski yanıtlar işaretlenmez. Okuma durumu bu tarayıcıda tutulur;
+sayfa yenilenince korunur, tarayıcı verileri silinince sıfırlanır. Not tamamlanmaz,
+Pi'ye istek gönderilmez; ek ayar veya bildirim izni gerekmez.
+
 Model/sağlayıcı hatası kartta hata metniyle gösterilir. Aktif istek yoksa kırmızı
 **Error** rozeti görünür; çalışma devam ediyorsa **Running** korunur.
 

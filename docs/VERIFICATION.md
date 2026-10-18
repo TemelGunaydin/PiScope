@@ -1,5 +1,37 @@
 # Verification log / Doğrulama kaydı
 
+## Simple unread replies — publication preflight — 2026-10-18
+
+- Added one **New reply** label per project, on its card and in Projects. First
+  visit starts quietly; selecting the project opens its exact unread reply.
+  Opening another/older request does not clear it. A newer pending request does
+  not erase a retained unread reply; late parallel completions are ordered by
+  reply time, not request start. Read means viewed, not independently verified
+  success or source-note completion. No settings, inbox, counts or notifications.
+- Read markers survive reload in browser/origin-local storage: at most **500**
+  full project/session/run ID triples, no names, prompts, responses or credentials.
+  Missing/corrupt/blocked storage has a quiet baseline/page-local fallback. No
+  cross-device sync or reconstruction of expired replies. No collector data or
+  API change; the server only adds the fixed local `/replies.js` module asset.
+- Added eight focused tests; the absent module and late-parallel ordering each
+  failed before implementation/fix. Coverage includes exact identities with
+  duplicate names/text, first visit/reload, terminal vs intermediate/error/
+  cancelled/unknown events, saved summaries, blocked storage and bounded markers.
+- Monitoring **real HTTP/SSE** and **simulated private HTTPS/Secure cookie/SSE**
+  passed: badge display/clearing, exact unread navigation despite a newer pending
+  request, archived reply focus, unrelated SSE node/selection/focus retention,
+  reload, controlled visibility-state changes, 320px and actual 200% reflow.
+  Synthetic screenshots were inspected and remain ignored.
+- **267/267 tests**, **56 modules**, Python AST, **121 unique static HTML IDs**,
+  shell syntax and diff checks passed. Nearest control/daily/notes HTTP/SSE gates
+  passed, including retained drafts, reviewed-model consent and unchanged source
+  notes. These are local preflight results; hosted CI follows publication. No
+  model call or new installed-Pi/physical-device test is claimed. Extensions,
+  permissions, configuration and Serve routes unchanged.
+- User authorized commit/push of this slice: source, permanent tests and relevant
+  docs only. Ignored screenshots, diagnostic artifacts, private data and
+  credentials are excluded.
+
 ## SpinKit Rotating Plane — publication preflight — 2026-10-10
 
 - Replaced Flow with the user-requested **Rotating Plane** (square, gallery demo

@@ -1,11 +1,15 @@
 import { initializeControls, renderControls, modelError, controlAvailability, canControl, prepareOtherPrompt } from './control.js';
 import { initializeDailyReport, renderDailyReport, refreshDailyReport } from './report.js';
 import { initializeProjectNotes, renderProjectNotes, filterProjectNotes, projectNoteCount } from './notes.js';
+import { ReplyReadState } from './replies.js';
 const $ = id => document.getElementById(id);
 const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = String(text); return node; };
 let snapshot = { sessions: [] }, sessionId = '', runId = '', overview = true, eventSource, projectRenderKey = '';
 let overviewScrollY = 0, returnProjectId = '', followSubmission;
 const projectCardKeys = new WeakMap();
+let browserStorage;
+try { browserStorage = window.localStorage; } catch { /* Storage can be disabled. */ }
+const replyReads = new ReplyReadState(browserStorage);
 let reportView = false, notesView = false, detailOrigin = 'projects', reportScrollY = 0, notesScrollY = 0;
 const labels = { running: 'Running', starting: 'Request sent', pending: 'Waiting', idle: 'Response finished', done: 'Done', error: 'Error', blocked: 'Blocked', cancelled: 'Cancelled', unknown: 'Outcome unknown' };
 const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '—';
@@ -18,6 +22,14 @@ function modelLabel(model) {
   if (/glm/i.test(model)) return 'GLM'; return model.split('/').slice(-1)[0];
 }
 function badge(status) { return el('span', `badge ${status}`, labels[status] || status); }
+function newReplyBadge(projectId) {
+  return el('span', `new-reply${replyReads.unread(projectId) ? '' : ' hidden'}`, 'New reply');
+}
+function refreshReplyBadges() {
+  for (const item of document.querySelectorAll('.project-card, .project-nav-item')) {
+    item.querySelector('.new-reply')?.classList.toggle('hidden', !replyReads.unread(item.dataset.project || item.dataset.projectId));
+  }
+}
 function runningIcon() {
   const icon = el('span', 'running-icon');
   icon.setAttribute('role', 'img'); icon.setAttribute('aria-label', 'Running'); icon.title = 'Running';
@@ -88,9 +100,10 @@ function setProjectNavigation(open) {
 function openSidebarProject(projectId) {
   const p = projectsNow().find(p => p.projectId === projectId);
   if (!p) return;
-  const s = snapshot.sessions.find(s => s.projectId === projectId && s.id === p.latest?.sessionId);
-  if (p.detailAvailable && s?.runs.some(r => r.id === p.latest?.runId)) {
-    openDetails(s.id, p.latest.runId, projectId); return;
+  const target = replyReads.unread(projectId) || p.latest;
+  const s = snapshot.sessions.find(s => !s.demo && s.projectId === projectId && s.id === target?.sessionId);
+  if (s?.runs.some(r => r.id === target?.runId)) {
+    openDetails(s.id, target.runId, projectId); return;
   }
   // Saved projects have no retained request to open. Reveal their exact card.
   returnProjectId = projectId; returnToProjects();
@@ -99,7 +112,12 @@ function openSidebarProject(projectId) {
     $('project-search').value = ''; $('project-filter').value = ''; renderProjects();
     card = [...$('project-list').children].find(c => c.dataset.project === projectId);
   }
-  if (card) { card.querySelector('.project-answer')?.focus({ preventScroll: true }); card.scrollIntoView({ block: 'start' }); overviewScrollY = window.scrollY; }
+  if (card) {
+    card.querySelector('.project-answer')?.focus({ preventScroll: true }); card.scrollIntoView({ block: 'start' }); overviewScrollY = window.scrollY;
+    if (target?.sessionId === p.latest?.sessionId && target?.runId === p.latest?.runId) {
+      replyReads.markRead(projectId, target?.sessionId, target?.runId); refreshReplyBadges();
+    }
+  }
 }
 function showDailyReport() {
   if (overview) overviewScrollY = window.scrollY;
@@ -195,7 +213,8 @@ function renderProjects() {
     const card = el('article', 'project-card'); card.dataset.project = p.projectId; card.dataset.status = p.status;
     projectCardKeys.set(card, cardKey);
     const heading = el('div', 'project-card-head'), [tone, label] = error && !p.activeSessions ? ['error', 'Error'] : projectStates[p.status] || projectStates.unknown;
-    heading.append(el('h2', '', p.projectName), el('span', `badge ${tone}`, label));
+    const title = el('div', 'project-card-title'); title.append(el('h2', '', p.projectName), newReplyBadge(p.projectId));
+    heading.append(title, el('span', `badge ${tone}`, label));
     const when = el('p', 'project-when');
     if (p.lastWorkedAt) { const date = el('time', '', `${p.ago} · ${fullDate(p.lastWorkedAt)}`); date.dateTime = p.lastWorkedAt; when.append(date); }
     else when.textContent = p.ago;
@@ -252,10 +271,11 @@ function renderProjectNavigation() {
     let button = previous.get(p.projectId);
     if (!button) {
       button = el('button', 'project-nav-item'); button.type = 'button'; button.dataset.projectId = p.projectId;
-      button.append(el('span', 'project-nav-name'), runningIcon(), el('span', 'project-nav-id'));
+      const name = el('span', 'project-nav-name'); name.append(el('span', 'project-nav-title'), newReplyBadge(p.projectId));
+      button.append(name, runningIcon(), el('span', 'project-nav-id'));
       button.onclick = () => openSidebarProject(p.projectId);
     }
-    const name = button.querySelector('.project-nav-name'), id = button.querySelector('.project-nav-id');
+    const name = button.querySelector('.project-nav-title'), id = button.querySelector('.project-nav-id');
     if (name.textContent !== p.projectName) name.textContent = p.projectName;
     button.querySelector('.running-icon').classList.toggle('hidden', p.status !== 'running');
     const identity = names.get(p.projectName) > 1 ? `Project ID: ${p.projectId}` : '';
@@ -502,7 +522,10 @@ function render() {
     const latest = snapshot.sessions.find(s => s.id === sessionId)?.runs.at(-1);
     if (latest && latest.id !== followSubmission.runId) { runId = latest.id; followSubmission = undefined; }
   }
-  const { s, r } = selected(); renderSidebar();
+  const { s, r } = selected();
+  replyReads.update(snapshot.projectOverview?.items, snapshot.sessions);
+  if (!overview && !reportView && !notesView && document.visibilityState === 'visible' && s && r) replyReads.markRead(s.projectId, s.id, r.id);
+  refreshReplyBadges(); renderSidebar();
   $('project-overview').classList.toggle('hidden', !overview); $('workspace-details').classList.toggle('hidden', overview || reportView || notesView);
   $('daily-report').classList.toggle('hidden', !reportView);
   $('nav-projects').setAttribute('aria-pressed', String(overview)); $('nav-report').setAttribute('aria-pressed', String(reportView));
@@ -555,6 +578,7 @@ $('nav-projects').onclick = () => {
 $('project-navigation').onkeydown = $('nav-projects').onkeydown = e => {
   if (e.key === 'Escape' && $('nav-projects').getAttribute('aria-expanded') === 'true') { e.preventDefault(); setProjectNavigation(false); }
 };
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') render(); });
 $('nav-report').onclick = showDailyReport;
 $('nav-notes').onclick = () => showProjectNotes('');
 $('project-search').oninput = renderProjects;

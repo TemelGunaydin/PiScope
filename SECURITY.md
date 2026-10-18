@@ -72,6 +72,10 @@ publicly while arranging that channel. No response-time guarantee is offered.
   [Source, targeting and limits](docs/TERMINAL-TODOS.md).
 - Imported JUnit summaries are report observations, not signed runner evidence
   or proof that a specific commit passed tests.
+- Browser-local reply read markers store up to 500 project/session/run identity
+  triples in `localStorage`, not text or credentials. They are observational,
+  browser/origin-specific and never authorize control or complete source notes.
+  Clearing browser data resets them; blocked storage uses page-local tracking.
 - Event history, persistent project summaries, daily report excerpts, pending
   queues, quarantine files, clipboard copies and exports may be private.
   Keep them outside the repository and review anything you intend to share.

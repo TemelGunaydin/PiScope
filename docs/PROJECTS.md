@@ -32,7 +32,8 @@ Click the sidebar **Projects** button to expand/collapse a list of project names
 underneath it. Each live recorded project appears once, in A–Z/full-ID order.
 Only running projects show SpinKit's **Rotating Plane** at the row's right edge
 (Running accessible text and tooltip): a green square flipping around the X/Y
-axes at a calm 1.5-second cycle. There are no extra labels or invented progress percentages.
+axes at a calm 1.5-second cycle. There are no extra running-status labels or
+invented progress percentages.
 A reserved column keeps names stable. Only the scoped CSS component is vendored
 locally, with [its pinned source and MIT notice](../THIRD_PARTY_NOTICES.md); no
 CDN, JavaScript bundle or npm dependency. Reduced-motion keeps a static square,
@@ -47,6 +48,24 @@ The UI only shows live records; there is no Live/Demo selector.
 project cards keep latest context, while daily reports use an explicitly approved
 Pi model request to synthesize captured work across all tracked projects into one
 overall-day report. Only one Generate report button and execution session are needed. Merely viewing either screen makes no model call.
+
+## New replies
+
+A small **New reply** label appears on project cards and in the Projects list
+when the latest captured terminal main reply has not been opened in this browser.
+Select the project under Projects to open that exact reply, even if a newer
+request has started. Opening an older/different request does not clear it. An
+already open, visible request reads its reply when it arrives; a hidden tab does
+not. Saved completed summaries can be opened from Projects when details expired.
+
+First visit starts quietly, without flagging old history. Read markers survive
+reload in this browser/origin's `localStorage` (up to 500 full project/session/run
+ID triples; no names, prompts, responses or credentials). Clearing browser data
+resets the baseline; unavailable/corrupt storage falls back to page-local tracking.
+Other browsers have independent state. This is one marker per project, not an
+unlimited unread history or cross-device inbox. Expired/uncaptured replies are
+not reconstructed. No settings, notification permissions, counts, model calls,
+control writes or source-note completion. **New reply is not verified success.**
 
 ## Identity and scope
 

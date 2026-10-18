@@ -5,6 +5,10 @@
 Initial open-source release preparation. No hosted release is implied by this
 entry; the application version remains `0.1.0`.
 
+- Browser-local **New reply** labels on project cards and the Projects list;
+  opening the exact reply clears its label. Quiet first visit, reload persistence,
+  full-identity matching and bounded ID-only markers; no notifications, model
+  requests or source-note completion.
 - The sidebar Projects button expands a project-name list; only running projects
   show right-aligned SpinKit Rotating Plane (a flipping green square, 1.5s cycle).
   Only the licensed, pinned and scoped CSS component is local;
