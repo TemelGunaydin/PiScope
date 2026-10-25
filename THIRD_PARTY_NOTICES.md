@@ -1,5 +1,24 @@
 # Third-party notices
 
+## Marked 18.1.1
+
+`public/vendor/marked.js` is the unmodified UMD distribution from
+[Marked 18.1.1](https://registry.npmjs.org/marked/-/marked-18.1.1.tgz).
+The downloaded package was verified against npm's SHA-512 integrity value:
+
+```text
+sha512-zEGgrtUG8crk+TrMacJSVABU4DYDDkS8uqgU3ohrn/2fW9C2AEfUrO3m6IhpIpQpl7YcVpiXXC9cSMWDANT3dg==
+```
+
+The complete upstream license and Markdown notices are preserved in
+[`public/vendor/marked.LICENSE`](public/vendor/marked.LICENSE). Copyright
+(c) 2018+, MarkedJS; (c) 2011-2018, Christopher Jeffrey.
+
+PiScope uses only its lexer and creates response elements with DOM/text-node APIs.
+No parsed HTML is inserted, no remote assets are fetched, and no npm install or
+frontend build is needed. For upgrades, replace the upstream distribution and
+license together and rerun the Markdown/workspace browser checks.
+
 ## SpinKit — Rotating Plane
 
 PiScope vendors only SpinKit's **Rotating Plane** component in `public/style.css`,

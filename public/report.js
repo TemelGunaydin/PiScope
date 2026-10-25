@@ -1,3 +1,4 @@
+import { renderMarkdown } from './markdown.js';
 const reportNode = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
 const reportId = id => document.getElementById(id);
 let reportSource, reportSessions = [], reportControl, reportAvailability, reportSummary, followToday = true, reportDraft, reportSending = false, reportLoading = false, reportDate = '', reportAwaitedId, reportTargetId, reportChosen = false;
@@ -169,8 +170,8 @@ export function renderDailyReport(source, sessions = reportSessions, control = r
   if (reportVersions.get(body) !== version) {
     reportVersions.set(body, version); body.replaceChildren();
     if (r?.summary) {
-      body.append(reportNode('p', 'report-response', r.summary));
-      if (r.remaining) body.append(reportNode('h3', 'report-remaining-heading', 'Remaining / blocked'), reportNode('p', 'report-response', r.remaining));
+      const summary = reportNode('div', 'report-response'); renderMarkdown(summary, r.summary); body.append(summary);
+      if (r.remaining) { const remaining = reportNode('div', 'report-response'); renderMarkdown(remaining, r.remaining); body.append(reportNode('h3', 'report-remaining-heading', 'Remaining / blocked'), remaining); }
     } else body.append(reportNode('p', 'report-response', records.length ? 'No daily report generated yet. Use Generate report once to summarize all tracked projects.' : 'No recorded work for this day. Choose another date; uncaptured work cannot be reconstructed.'));
   }
   reportText('report-kind', r?.summary ? r.status === 'ready' ? 'AI-generated daily report' : 'Previous generated daily report' : '');

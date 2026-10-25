@@ -113,18 +113,17 @@ with sync_playwright() as pw:
     )
     # Deliberately stub only browser transport. Never disguise this as network E2E.
     def replay(target, data):
+        target.evaluate('() => { if (location.protocol !== "about:") history.replaceState(null, "", location.pathname); }')
         target.set_content(html)
         target.add_script_tag(content='const fixture=' + json.dumps(data) + ';'
             'window.fetch=async()=>new Response(JSON.stringify(fixture));'
             'window.EventSource=class{constructor(){setTimeout(()=>this.onopen?.(),10)}'
             'addEventListener(n,f){setTimeout(()=>f({data:JSON.stringify(fixture)}),20)}close(){}};')
         target.add_script_tag(content=(root / 'extensions/agent-dashboard/note-request.mjs').read_text().replace('export ', ''))
-        target.add_script_tag(content='\n'.join(line for line in (root / 'public/control.js').read_text().splitlines() if not line.startswith('import ')).replace('export ', ''))
-        target.add_script_tag(content=(root / 'public/report.js').read_text().replace('export ', ''))
-        target.add_script_tag(content=(root / 'public/notes.js').read_text().replace('export ', ''))
-        target.add_script_tag(content=(root / 'public/replies.js').read_text().replace('export ', ''))
+        target.add_script_tag(content=(root / 'public/vendor/marked.js').read_text())
         # Replay module bodies as classic scripts; import declarations cannot run here.
-        target.add_script_tag(content='\n'.join(line for line in (root / 'public/app.js').read_text().splitlines() if not line.startswith('import ')))
+        for module in ['markdown.js', 'workspace.js', 'explorer.js', 'control.js', 'report.js', 'notes.js', 'replies.js', 'app.js']:
+            target.add_script_tag(content='\n'.join(line for line in (root / 'public' / module).read_text().splitlines() if not line.startswith('import ')).replace('export ', ''))
     if args.network:
         browser_url = config['tailscaleUrl'] if args.tailscale else config['url']
         if args.tailscale:
@@ -493,10 +492,14 @@ with sync_playwright() as pw:
         expect(page.locator('.session-item.active')).to_have_attribute('data-session', sb)
         expect(rb.locator('.new-reply')).to_be_hidden(); expect(ra.locator('.new-reply')).to_be_visible()
         page.reload(); expect(page.locator('#connection-label')).to_have_text('Dashboard connected')
+        expect(page.locator('#run-select')).to_have_value('reply-run-a')
+        expect(page.locator('.session-item.active')).to_have_attribute('data-session', sb)
+        page.locator('#nav-projects').click()
         expect(ca.locator('.new-reply')).to_be_visible(); expect(cb.locator('.new-reply')).to_be_hidden()
         markers = page.evaluate("() => localStorage.getItem('piscope.reply-reads.v1')")
         assert answer_text not in markers and 'Unread duplicate' not in markers
-        page.locator('#nav-projects').click(); ra.focus()
+        if page.locator('#nav-projects').get_attribute('aria-expanded') == 'false': page.locator('#nav-projects').click()
+        ra.focus()
         card_node, row_node = ca.element_handle(), ra.element_handle()
         ca.locator('.project-answer').evaluate('e => { const range = document.createRange(); range.selectNodeContents(e); getSelection().removeAllRanges(); getSelection().addRange(range); }')
         publish_reply(pb, sb, 'reply-run-a', [('workflow.updated', {'stages': [{'id': 'check', 'title': 'Unrelated SSE preserves unread reply and selection', 'status': 'pending'}]})])

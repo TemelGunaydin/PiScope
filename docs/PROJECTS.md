@@ -5,8 +5,13 @@ on?” using recorded Pi events, without model calls or a new task runner.
 
 Each project has one card with its last work time, latest request excerpt,
 latest visible response excerpt, and first unfinished reported stage. Cards
-are ordered by project name (English locale, with project ID as a tie-breaker),
-so activity updates do not move them. Search covers the saved name, request,
+are ordered with explicitly pinned projects first, then by project name within
+each group (English locale, project ID as tie-breaker). Activity updates do not
+move them. **Cards / Compact list** changes density without reducing text size;
+**Pin / Unpin** changes only the project's placement. The layout and up to 500
+full project IDs are stored in this browser's `piscope.projects.v1` local storage,
+with a page-local fallback when storage is unavailable. No captured text is saved
+in preferences. Search covers the saved name, request,
 response, and next step. A status filter includes projects untouched for at
 least seven days. Request and response text are shown directly on the card.
 Only fields longer than 220 characters have **Show more** underneath;
@@ -66,6 +71,42 @@ Other browsers have independent state. This is one marker per project, not an
 unlimited unread history or cross-device inbox. Expired/uncaptured replies are
 not reconstructed. No settings, notification permissions, counts, model calls,
 control writes or source-note completion. **New reply is not verified success.**
+
+## Needs attention, history and request links
+
+**Needs attention** groups exact request identities with unread main replies,
+current saved request/provider errors, or blocked/error stages in the latest
+reported project plan. An older unread reply remains separate from a newer
+failure. Opening a reply clears only its unread reason, not its errors/blockers.
+Historical errors from superseded requests are not permanent alerts. Viewing
+saved summaries reveals that project's exact card, including in Compact list.
+No notification permissions, execution or automatic retry are added.
+
+**Search history** searches captured prompts, responses, error text and model
+identities across all retained live sessions. Filters combine exact project ID,
+observed model (including earlier main models and observed child models), result,
+and inclusive date range in the displayed report timezone. Requested-only child
+models and demo sessions are excluded. Results show 50 at a time. This is bounded
+request history, up to 30 requests per session, not full transcript/journal search.
+Search filters survive in-page navigation and browser history, including after
+reloading a request. Filter values stay in browser session history, not the URL
+or exported state.
+
+Request URLs contain only view and full project/session/request IDs. **Copy request
+link** uses the current origin and contains no pairing token or captured text;
+another browser must pair independently. Navigation never dispatches Pi input.
+Reload and browser Back/Forward resolve that exact request; missing, expired or
+mismatched identities show an unavailable view instead of selecting another run.
+Saved summaries remain available from Projects when detailed history has expired.
+
+Captured responses support local Markdown in project cards, selected requests,
+subagent results, daily reports and note response excerpts. Code blocks have a
+language label, horizontal scrolling and exact **Copy code** action. Marked tokens
+are rendered with DOM creation and text nodes, never interpreted response HTML.
+HTML/images stay literal; relative/custom-protocol links are not navigable.
+External HTTP(S)/mailto links require a click and open with `noopener noreferrer`.
+Unchanged selected responses and project/note summaries keep their nodes,
+selection and scroll position during SSE.
 
 ## Identity and scope
 

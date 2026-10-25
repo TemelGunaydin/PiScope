@@ -14,6 +14,8 @@
     <nav class="view-nav" aria-label="Dashboard views">
       <button id="nav-projects" type="button" aria-pressed="true" aria-expanded="false" aria-controls="project-navigation"><span>Projects</span><span class="project-nav-chevron" aria-hidden="true">›</span></button>
       <div id="project-navigation" class="project-navigation hidden" role="group" aria-label="Tracked projects"></div>
+      <button id="nav-attention" type="button" aria-pressed="false"><span>Needs attention</span><span id="attention-count" class="nav-count hidden">0</span></button>
+      <button id="nav-history" type="button" aria-pressed="false">Search history</button>
       <button id="nav-report" type="button" aria-pressed="false">Daily report</button><button id="nav-notes" type="button" aria-pressed="false">Project notes</button>
     </nav>
     <div class="section-caption">SESSIONS</div>
@@ -25,13 +27,38 @@
     <div class="content">
       <div id="pairing" class="notice hidden"><strong>This browser is not paired yet.</strong><p>Open the private pairing link printed by <code>npm start</code>, or run <code>npm run open</code> on the dashboard machine. For Tailscale access, use its separate HTTPS pairing link. Do not share these links.</p></div>
       <div id="storage-warning" class="notice hidden"></div>
+      <p id="navigation-notice" class="notice hidden" role="status"></p>
       <section id="project-overview" aria-labelledby="overview-heading">
         <div class="page-heading"><div><h1 id="overview-heading" tabindex="-1">Where did I leave off?</h1><p>Your Pi projects, recent work and next steps.</p></div></div>
         <div id="project-totals" class="metrics" aria-label="Project overview"></div>
         <div class="project-filters"><div><label for="project-search">Search projects</label><input id="project-search" type="search" placeholder="Project, request or next step…"></div><div><label for="project-filter">Status</label><select id="project-filter"><option value="">All projects</option><option value="running">Running</option><option value="waiting">Unfinished work</option><option value="attention">Needs attention</option><option value="finished">Last request finished</option><option value="cancelled">Cancelled</option><option value="unknown">Outcome unknown</option><option value="stale">Inactive for 7+ days</option></select></div></div>
-        <p id="project-results" class="project-results" role="status"></p>
+        <div class="project-display-bar"><p id="project-results" class="project-results" role="status"></p><div class="layout-switch" role="group" aria-label="Project layout"><button id="layout-cards" type="button" aria-pressed="true">Cards</button><button id="layout-list" type="button" aria-pressed="false">Compact list</button></div></div>
         <div id="project-list" class="project-list"></div>
         <p class="project-scope">Status and plan steps come from the latest request's records. “Last request finished” does not mean the project is complete. Only projects recorded by the Pi monitoring extension appear.</p>
+      </section>
+      <section id="attention-view" class="hidden" aria-labelledby="attention-heading">
+        <div class="page-heading"><div><h1 id="attention-heading" tabindex="-1">What needs my attention?</h1><p>Unread replies, current errors and reported blockers.</p></div></div>
+        <p id="attention-results" class="project-results" role="status"></p>
+        <div id="attention-list" class="request-list"></div>
+        <div id="attention-empty" class="empty-state"><h2>You're all caught up.</h2><p>No unread replies or current reported issues. Replies are tracked in this browser.</p></div>
+        <p class="project-scope">Opening the exact reply clears its unread marker. Errors and blockers stay while the latest project request still reports them. These records do not verify task or test success.</p>
+      </section>
+      <section id="history-view" class="hidden" aria-labelledby="history-heading">
+        <div class="page-heading"><div><h1 id="history-heading" tabindex="-1">Find a past request.</h1><p>Search captured prompts, responses and observed models across your projects.</p></div></div>
+        <div class="history-filters">
+          <div class="history-query"><label for="history-query">Search history</label><input id="history-query" type="search" placeholder="Words in a request, response or model…"></div>
+          <div><label for="history-project">Project</label><select id="history-project"><option value="">All projects</option></select></div>
+          <div><label for="history-model">Model</label><select id="history-model"><option value="">All observed models</option></select></div>
+          <div><label for="history-verdict">Result</label><select id="history-verdict"><option value="">All results</option><option value="running">Running / last observed</option><option value="completed">Last request finished</option><option value="failed">Error</option><option value="cancelled">Cancelled</option><option value="unknown">Outcome unknown</option></select></div>
+          <div><label for="history-from">From</label><input id="history-from" type="date"></div><div><label for="history-to">Through</label><input id="history-to" type="date"></div>
+          <button id="history-clear" class="button" type="button">Clear filters</button>
+        </div>
+        <p id="history-date-error" class="notice hidden" role="status">Choose a start date on or before the end date.</p>
+        <p id="history-zone" class="project-results"></p><p id="history-results" class="project-results" role="status"></p>
+        <div id="history-list" class="request-list"></div>
+        <div id="history-empty" class="empty-state"><h2>No matching requests.</h2><p>Try different words or clear the filters. Uncaptured or expired text cannot be searched.</p></div>
+        <button id="history-more" class="button hidden" type="button">Show 50 more</button>
+        <p class="project-scope">Search covers the retained live request history, up to 30 requests per session. It includes captured excerpts, not full transcripts or expired journals. Models come from each request's observations. A finished request does not verify project completion or passing tests.</p>
       </section>
       <section id="daily-report" class="hidden" aria-labelledby="report-heading">
         <div class="page-heading"><div><h1 id="report-heading" tabindex="-1">What did I get done?</h1><p>Generate one daily report for all tracked projects with your current Pi model.</p></div></div>
@@ -76,10 +103,11 @@
         </div>
       </section>
       <div id="workspace-details" class="hidden">
+      <div id="request-unavailable" class="empty-state hidden"><h2>This request is unavailable.</h2><p>The exact project, session and request could not be found in retained history. Use Projects to view saved summaries or Search history to find another request.</p></div>
       <section class="page-heading"><div><div class="eyebrow">OBSERVED WORKFLOW</div><h1 id="detail-heading" tabindex="-1">Workflow tracking</h1><p>Requests, models and test reports.</p></div><div class="run-select-wrap"><label for="run-select">Request history</label><select id="run-select"><option>No requests yet</option></select></div></section>
       <section id="empty" class="empty-state"><div class="empty-glyph">⌘</div><h2>Waiting for the first Pi signal.</h2><p>Keep PiScope running. Install the monitoring extension in your project and start a task in Pi.</p><code>npm run install:pi -- /absolute/path/to/your/project</code><p class="small">Then use <code>/reload</code> and <code>/dashboard-status</code> in Pi.</p></section>
       <div id="run-content" class="hidden">
-        <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">SELECTED REQUEST</span><span id="run-status" class="badge">Waiting</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div></section>
+        <section class="prompt-card"><div class="prompt-top"><span class="eyebrow">SELECTED REQUEST</span><span id="run-status" class="badge">Waiting</span></div><h2 id="prompt"></h2><div class="prompt-meta"><span id="run-time"></span><span class="dot-separator">·</span><span id="run-id"></span><span id="freshness" class="freshness"></span></div><div class="request-link-bar"><button id="copy-request-link" class="button" type="button">Copy request link</button><span id="request-link-status" class="project-scope" role="status"></span></div></section>
         <section class="metrics" aria-label="Request overview"><article><span class="metric-label">Observed tools</span><strong id="metric-tools">0</strong><small>Main session + subagent records</small></article><article><span class="metric-label">Subagent tasks</span><strong id="metric-agents">0</strong><small>Separate calls, separate outcomes</small></article><article><span class="metric-label">Reported tokens</span><strong id="metric-tokens">—</strong><small>Not a bill or cost estimate</small></article><article><span class="metric-label">Request duration</span><strong id="metric-duration">—</strong><small id="duration-label">Wall-clock duration</small></article></section>
         <section id="control-panel" class="panel" aria-labelledby="control-heading">
           <div class="panel-header"><div><h2 id="control-heading">Continue this project</h2><p>Review a recommendation or write Other. Nothing starts without your confirmation.</p></div></div>
@@ -104,7 +132,7 @@
         </details>
         <div class="detail-grid">
           <section class="panel timeline-panel"><div class="panel-header"><div><h2>Activity feed</h2><p>Tools, handoffs and outcomes</p></div><input id="event-search" type="search" aria-label="Search events" placeholder="Search events…"></div><div id="timeline" class="timeline" aria-live="off"></div></section>
-          <div class="right-column"><section class="panel next-panel"><div class="panel-header"><h2>Next planned task</h2><span class="tag">PLAN</span></div><div id="next-task"></div></section><section class="panel"><div class="panel-header"><h2>Last response</h2><span class="tag">TEXT</span></div><p id="summary" class="summary"></p></section><section class="privacy-note"><span>◎</span><p>A finished tool does not mean tests passed. Next steps appear only when a workflow is reported. Private model reasoning is not collected.</p></section></div>
+          <div class="right-column"><section class="panel next-panel"><div class="panel-header"><h2>Next planned task</h2><span class="tag">PLAN</span></div><div id="next-task"></div></section><section class="panel"><div class="panel-header"><h2>Last response</h2><span class="tag">TEXT</span></div><div id="summary" class="summary"></div></section><section class="privacy-note"><span>◎</span><p>A finished tool does not mean tests passed. Next steps appear only when a workflow is reported. Private model reasoning is not collected.</p></section></div>
         </div>
       </div>
       </div>

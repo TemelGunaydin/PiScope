@@ -1,4 +1,5 @@
 import { noteRequestHeader, noteRequestPrompt } from './note-request.js';
+import { renderMarkdown } from './markdown.js';
 
 const controlEl = (tag, className, text) => { const e = document.createElement(tag); e.className = className; e.textContent = text; return e; };
 const controlId = id => document.getElementById(id);
@@ -96,7 +97,7 @@ export function renderControls(s, r, control) {
   }
   const response = r.summary || (r.status === 'running' ? 'Pi is working. Its response will appear here.' : 'No model response recorded for this request.');
   const responseText = controlId('control-response-text');
-  if (responseText.textContent !== response) responseText.textContent = response;
+  renderMarkdown(responseText, response);
   const error = modelError(r), errorText = controlId('control-error-text');
   if (errorText.textContent !== error) errorText.textContent = error;
   controlId('control-error').classList.toggle('hidden', !error);

@@ -1164,3 +1164,17 @@ geçici kayıt dizininde çalışır ve test bitince kapanır; kullanıcının d
 ayarlarını veya kayıtlarını kullanmaz. Sentetik canlı kayıtlarla birlikte demo
 kayıtları da üretilir; demoların arayüzde görünmediği doğrulanır. Geri dönüşte
 filtre/odak/kaydırma korunması ve SSE güncellemelerinde sabit sıralama test edilir.
+# Workspace navigation and Markdown (2026-10-25)
+
+`npm run check` and all 273 Node tests passed. `test/workspace-browser.py`
+passed with real HTTP/SSE over loopback and a simulated Tailscale HTTPS origin:
+persistent pins/compact layout, older-request search and combined filters,
+exact project/session/request links, reload and browser Back/Forward, paired
+access, clipboard success/denial, live unread/error/blocker handling, safe
+Markdown with no HTML execution or remote media, mobile layout and 200% text.
+Large-text grid overflow found during this check was fixed at the grid sizing
+boundary; code and tables retain their own scroll regions.
+
+Existing network browser smoke, approved-control, daily-report and project-note
+checks also passed. All records were synthetic; no model calls, personal note
+files, real Tailscale configuration changes or physical phones were used.

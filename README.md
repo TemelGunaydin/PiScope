@@ -2,150 +2,49 @@
 
 # PiScope
 
-**Your Pi projects, at a glance — anywhere.**
+**See what your Pi projects are doing and pick up where you left off.**
 
-A local-first workflow dashboard **for [Pi coding agent](https://pi.dev) users**.
-See what your projects are doing, which agents are working, and where you left
-off — without switching between terminal tabs. With optional **Tailscale Serve**,
-check the same dashboard from your phone while away from home.
+PiScope is a dashboard for people who use the [Pi coding agent](https://pi.dev).
+It brings your projects, latest requests, model responses and agent activity into
+one browser window. You can also check it from your phone with Tailscale.
 
-English · [Turkish setup guide](README.tr.md)
+English · [Türkçe rehber](README.tr.md)
 
-![PiScope workflow dashboard with synthetic test data](docs/preview.png)
+![PiScope showing a sample Pi workflow](docs/preview.png)
 
-*The screenshot uses synthetic data, not real prompts or measured model performance.*
+*This screenshot uses synthetic test data. It contains no real user prompts or measured model performance.*
 
-PiScope is a companion to Pi, not another coding agent. It **observes by default**.
-Optional [approved continuation](docs/CONTROL.md) and [daily report generation](docs/DAILY-REPORTS.md) send your confirmed prompt to
-an existing, idle Pi session; Pi can then edit files or run tools using its
-current model, permissions and quota. PiScope does not choose providers or call
-models directly. No additional model subscription or API key is needed.
-The dashboard UI is in English; your project names, prompts and responses stay
-in their original language.
+You keep working in Pi as usual. PiScope records what Pi reports and shows it in
+the dashboard. Viewing your projects does not make model calls. Sending a new
+request or generating a daily report is optional and requires your confirmation;
+those actions use your existing Pi model, permissions and quota.
 
-## What you can follow
+## What can I do with it?
 
-- **All your monitored Pi projects:** one card per project, even across several sessions.
-- **Recent context:** last request, last response, last work time and reported plan step.
-- **New replies:** a small **New reply** label on project cards and in Projects.
-  Select the project to open its unread reply; opening that reply clears the label.
-- **Daily report:** one **Generate report** button summarizes the selected day
-  across all tracked projects with the current Pi model, plus remaining work and **Copy report**.
-- **Response beside continuation:** read the selected request's **Last model response**
-  inside **Continue this project**, alongside Recommended and Other.
-- **Provider errors:** reported model/provider failures appear on project cards and
-  in a separate detail alert; inactive projects show an **Error** badge.
-- **Live work:** main model, subagent calls, tools, handoffs and activity feed.
-- **Unfinished work:** distinguish running, waiting, blocked and unknown outcomes.
-- **Workflow comparisons:** profile versions, observed models, duration and reported tokens.
-- **Test reports:** explicitly attached JUnit summaries, separate from execution status.
-- **Persistent history:** short project summaries survive dashboard restarts.
-- **Phone access:** private HTTPS viewing over Tailscale, including outside your home Wi-Fi.
-- **Optional project notes:** read [Terminal Todos](docs/TERMINAL-TODOS.md), explicitly link project labels, and turn one note into an editable, reviewed Pi prompt. Source notes are never changed or marked complete.
-- **Optional continuation:** review **Recommended** suggestions or write **Other**;
-  confirm before sending to an open, idle Pi session. Separate control pairing is required.
-
-Cards stay in project-name order instead of jumping around during live updates.
-Use search and status filters, **Open last request**, and **Back to projects** to
-move between the overview and details. Long saved text expands with **Show more**.
-Cards in the same desktop row have equal heights, with next steps and actions
-aligned at the bottom. Expanded text and larger fonts grow the row without
-clipping content; mobile cards keep their natural height.
-
-**“Last request finished” does not mean the entire project is complete or tests
-passed.** Plan steps are agent reports, not proof of execution. Missing outcomes
-remain unknown; missing usage is not zero, and tokens are not a cost estimate.
-
-## Your daily work report
-
-Open **Daily report** to answer “What did I get done today?” Choose a date, then
-click the single **Generate report** button. Review the chosen Pi session, current
-model and exact context from all included projects; **Confirm and generate in Pi**
-starts one normal model request for the entire day, not one per project. It needs
-the [three control opt-ins](#4-optional-continue-pi-from-the-dashboard) and an updated
-extension with `daily_report` and prompt capture on in just that one execution session.
-Other tracked projects can be closed/offline; their retained daily work is still included.
-No new API key, provider integration, model switch or automatically spawned Pi is used.
-Generation consumes the existing model's quota; merely viewing the report does not.
-
-**Use the model from this Pi session** selects the report writer, **not a project
-filter**. A ready session is selected automatically when available; your explicit
-choice is retained. The current model is shown separately, and disconnected
-historical sessions are not offered as new targets. Only one ready execution
-session is needed for the overall report. The confirmation panel separates report
-scope, day, model and Pi session. **View exact prompt and context** expands the
-full input; model-quota and permission warnings stay visible beside confirmation.
-
-**If Generate report is disabled**, the panel beside it explains why and shows
-relevant setup steps; no permissions are enabled automatically:
-
-| State | What to do |
+| What you want to do | Where to go |
 |---|---|
-| Viewing only | Open the separate **Control pairing** link in this browser. Viewing pairing alone cannot send work. |
-| Setup needed / Session needed | Enable collector control, open a current Pi session with a finished request, and use `/dashboard-control on` in that session. |
-| Update needed | Update only the chosen project's extension from the PiScope directory, restart Pi, and re-enable local control. Reporting requires `daily_report` and prompt capture; selecting an old extension alone cannot enable generation. |
-| Busy | Let Pi finish, or select another ready session. PiScope does not interrupt active work. |
-| No context | Choose a day with captured work text. Missing or expired history cannot be reconstructed. |
+| See where you left off | **Projects** shows each project's last request, response and reported next step. |
+| Find what needs a response | **Needs attention** gathers unread replies, current errors and reported blockers. |
+| Find earlier work | **Search history** searches saved prompts and responses, with project, model, result and date filters. |
+| Keep important projects nearby | Use **Pin** and switch between **Cards** and **Compact list**. These choices stay in this browser. |
+| Return to a specific request | Open it and use **Copy request link**. Refresh and browser Back/Forward keep navigation working. |
+| Read or reuse a model response | Responses support Markdown, tables and code blocks with **Copy code**. |
+| Summarize your day | **Daily report** creates one approved summary across tracked projects. |
+| Continue work from the dashboard | **Continue this project** lets you review a suggestion or write your own next request. |
+| Use your existing task notes | **Project notes** can read Terminal Todos notes and help turn one into a reviewed Pi request. |
 
-The LLM combines captured work across tracked projects into one overall daily report, instead of
-listing prompts or model replies. **Remaining / blocked** is separate; plans and
-failed attempts must not be presented as accomplishments. Summaries are AI reports,
-not independent verification of changes or passing tests. Input is bounded, with
-coverage shown; old or omitted work can be missing. More work marks a summary
-out of date, without automatic regeneration. A failed generation keeps the previous
-successful summary rather than replacing it with an error or normal chat response.
+A **request** is a task you send to Pi. A **session** is an open Pi conversation.
+Several sessions in the same project share one project card.
 
-There are no per-project generation buttons or report cards; desktop and phones
-show one report. Use **Previous**, **Next**, **Today** and **Copy report**. Computer and phone use
-the displayed report timezone. Review private content before sharing a copied report.
+**A finished response does not mean the whole project is complete or its tests
+passed.** Plans come from agent reports. Missing results stay unknown.
 
-**After updating:** restart PiScope with your existing control/Tailscale settings,
-refresh the browser, and update only the report-producing project's extension
-from the PiScope directory with `npm run install:pi -- "/absolute/path/to/project" --update`. Restart that
-project's Pi runtime, then explicitly re-enable `/dashboard-control on` when ready.
-Do not interrupt active work just to upgrade. Viewing pairing alone cannot generate.
-[Generation, sources, timezone, retention and limitations](docs/DAILY-REPORTS.md).
+## Get started
 
-## Terminal Todos project notes
+You need **Node.js 22 or later**, a browser and an existing Pi installation.
+There is no `npm install` or frontend build step.
 
-Enable the read-only bridge with `AGENT_DASHBOARD_TODOS=1 npm start`, preserving
-existing control/Tailscale settings. **Project notes** reads the standard local
-Terminal Todos JSON, or an explicit absolute `AGENT_DASHBOARD_TODOS_FILE`.
-No personal note file is read by default.
-
-Use **Link Terminal Todos project labels → Save link** to explicitly associate
-labels with PiScope project identities; identical names are never matched
-implicitly. A project's **Project notes** button filters its mapped notes.
-Unassigned/unlinked notes need a one-time target. **Edit prompt** opens a local
-inline draft: prepend instructions or edit the copy without changing the note.
-**Cancel edit** discards the draft. **Use as prompt** copies the edited draft
-(or original note) into **Other**: edit further, **Review prompt**, check the
-target project/session and current model, then **Confirm and send to Pi**.
-Cancel starts nothing; drafts are not persisted across browser reloads. Tracked
-notes include a visible request-ID header in the reviewed input; the draft stays
-unchanged and the 8,000-character total includes this header.
-After sending, the note card shows **Pending / Sent / Running / Reply ready /
-Error / Unknown**, a saved response excerpt and **View Pi request** for the exact
-linked session/request. These are observed request states, not task-completion
-proof. Missing result-link capability requires updating that project's extension
-and restarting Pi. Ordinary Other inputs need no note-result capability, but
-**all new sends require model-bound approval**: update/restart older project
-extensions and explicitly re-enable `/dashboard-control on`. Monitoring remains
-available; PiScope never switches models. Desktop use is supported; Tailscale
-phone access is optional.
-
-Unlike daily reports, a todo prompt goes **only to that confirmed project/session**;
-other projects' notes are not bundled. The same three control opt-ins and ordinary
-Pi input safeguards apply. Viewing uses no quota; confirmed input uses the existing
-Pi model and permissions. No automatic execution, busy queuing, model switching,
-source editing or completion. **Sent is not completed.** Phone note creation and
-two-way editing/sync are deferred. [Setup, privacy and limits](docs/TERMINAL-TODOS.md).
-
-## 1. Run PiScope locally
-
-You need **Node.js 22+**, a browser, and an existing Pi installation for live
-monitoring. There are **no npm runtime dependencies**, no `npm install` step,
-and no frontend build.
+### 1. Start PiScope
 
 ```bash
 git clone https://github.com/TemelGunaydin/PiScope.git
@@ -153,307 +52,260 @@ cd PiScope
 npm start
 ```
 
-Keep this terminal running. In a **second terminal**, from the PiScope directory:
+Keep this terminal open. In a **second terminal**, open the PiScope folder and run:
 
 ```bash
 npm run open
 ```
 
-This opens the browser with a private pairing link. You can also open the link
-printed by `npm start`. After pairing, use **http://127.0.0.1:7331** on the same
-machine. `npm start` starts the server; `npm run open` only opens and pairs your
-browser. It does not start the server.
+This opens and pairs your browser with the running dashboard. Pairing means
+allowing that browser to read your local PiScope data. You can also open the
+private pairing link printed by `npm start`.
 
-> Treat pairing links as passwords. Do not post them in issues, screenshots or
-> public chats. PiScope is a local application, not a GitHub Pages website.
+After pairing, visit [http://127.0.0.1:7331](http://127.0.0.1:7331).
+`npm run open` only opens the browser; `npm start` must still be running.
+Treat pairing links like passwords and keep them private.
 
-macOS has been exercised locally; core CI is configured for Linux and macOS.
-Windows is not currently validated. Live model/subagent compatibility was
-checked with Pi **0.87.1** and pi-open-agents **0.1.22**. Other subagent packages
-may need an adapter; model identities are not tied to a specific provider.
+### 2. Connect a project
 
-## 2. Add your Pi projects
-
-There is no manual “Add project” form and no disk scan. **Install the monitoring
-extension into each project, then work in Pi as usual.** Python, Swift, Node.js
-and other projects can be monitored — the target does not need `package.json`.
-
-### Install from the PiScope directory
+From the **PiScope folder**, run this once for each project you want to follow.
+Replace the example path with the project's full folder path:
 
 ```bash
-# Run these in PiScope, NOT in the projects you want to monitor.
-npm run install:pi -- "/absolute/path/to/project-one"
-npm run install:pi -- "/absolute/path/to/project-two"
+npm run install:pi -- "/absolute/path/to/your/project"
 ```
 
-The installer copies `.pi/extensions/agent-dashboard/` into each selected
-project. It does not change your models, API keys, MCP settings or agent
-configurations. Use only one copy per Pi session: avoid installing the same
-extension both globally and locally.
+The installer adds the monitoring extension under
+`.pi/extensions/agent-dashboard/` in that project. Your project can use any
+language; it does not need `package.json`. Use one extension copy per Pi session,
+not both a global and a project-local copy.
 
-### Open Pi in the target project
+### 3. Open Pi and do some work
+
+In another terminal, open your project:
 
 ```bash
-cd /absolute/path/to/project-one
+cd /absolute/path/to/your/project
 pi
 ```
 
-In Pi:
+Inside Pi, run:
 
 ```text
 /reload
 /dashboard-status
 ```
 
-You should see **`PiScope: connected`**. Give Pi a normal task; the project will
-appear in PiScope when its work is recorded. Repeat for other projects. If you
-already have a Pi session open in the project, try `/reload`; if the commands
-are missing or the old extension remains loaded, restart Pi.
-`/dashboard-status` checks delivery — it does not start a task.
+Look for **`PiScope: connected`**, then give Pi a normal task. The project appears
+in the dashboard when PiScope records its work. Repeat steps 2 and 3 for other
+projects. If Pi does not recognize the commands, restart Pi in that project.
 
-### Optional: show the agent's plan
+## Everyday use
 
-Model and tool events are monitored automatically. Stage lists and next steps
-require your agent to use the extension's **`workflow_report`** tool. To append
-optional reporting instructions to the project's `AGENTS.md`:
+- Start on **Projects**. Open a project's latest request to see its response,
+  models, tools and activity. Use **Back to projects** to return to your filters.
+- Open **Needs attention** to find unread replies and current issues. Opening the
+  exact reply clears its unread label. Reading an error does not resolve it.
+- Use **Search history** for earlier requests. For example, search for `login`,
+  select a project, and narrow the date range. Dates use the timezone shown on
+  screen. Only retained text is searchable, up to 30 requests per session;
+  expired or uncaptured text cannot be recovered.
+- Use **Copy request link** to bookmark a request. The link contains no pairing
+  password, so another browser must pair separately. Expired links show an
+  unavailable message instead of opening a different request.
+- Use **Pin** for frequent projects and **Compact list** to fit more projects on
+  screen. Pinned projects appear first; names keep a stable order during updates.
+- Read responses with Markdown formatting and **Copy code**. Raw HTML remains
+  text and remote images do not load automatically.
 
-```bash
-npm run install:pi -- "/absolute/path/to/project" --update --instructions
-```
+Unread markers, pins and layout choices belong to this browser. Your phone and
+computer can have different choices. The dashboard interface is English; your
+project names, prompts and responses keep their original language.
 
-`--update` replaces only this extension and backs up the previous copy.
-`--instructions` preserves existing instructions and backs them up before
-appending guidance. Omit it if you do not want to change `AGENTS.md`. If your
-orchestrator limits available tools, allow `workflow_report` in its existing
-configuration. This tool reports a plan; it does not run or delegate the work.
+Project cards may show a reported next step. To enable plan reporting, see
+[project memory and workflow reporting](docs/PROJECTS.md) and
+[workflow profiles](docs/WORKFLOWS.md). Model and tool activity is recorded without
+requiring a reported plan.
 
-### Update or remove a project installation
+## Optional: send your next task from the dashboard
 
-After pulling updates to PiScope:
+Enable this only if you want to send work to an existing, idle Pi session.
+Three separate permissions are required:
 
-```bash
-npm run install:pi -- "/absolute/path/to/project" --update
-```
+1. Restart PiScope with control enabled. Keep any Tailscale or notes settings you already use:
 
-Restart that project's Pi runtime after updating: `/reload` alone may keep old
-imported modules. Re-enable `/dashboard-control on` if you use control. Restart
-PiScope when collector code changes, preserving your control/Tailscale settings.
-Web-only changes need just a browser refresh, not an extension reinstall.
-To uninstall, remove only `.pi/extensions/agent-dashboard/` and restart Pi.
-Recorded history is kept.
-Existing data and installs retain their original `agent-dashboard` paths and
-`AGENT_DASHBOARD_*` settings for compatibility with earlier versions.
+   ```bash
+   AGENT_DASHBOARD_CONTROL=1 npm start
+   ```
 
-## 3. Follow progress from your phone with Tailscale
+2. Update the target project's extension from the PiScope folder:
 
-**Away from home?** Leave Pi working on your computer and check its projects,
-agent activity and latest responses from your phone over mobile data or another
-Wi-Fi network. No public server or router port forwarding is needed.
+   ```bash
+   npm run install:pi -- "/absolute/path/to/your/project" --update
+   ```
 
-Install [Tailscale](https://tailscale.com) on the computer running PiScope and on
-your phone. Sign both into the same tailnet and keep Tailscale connected. The
-computer must stay **awake, online, with PiScope running**; live progress also
-requires the Pi session to keep running. The normal pairing link grants viewing
-only; [optional control](#4-optional-continue-pi-from-the-dashboard) requires a
-separate opt-in and pairing.
+   Restart Pi in that project, finish a normal request, then run
+   `/dashboard-control on` in Pi.
 
-### Find your computer's Tailscale name
+3. Open the **Control pairing** link printed by PiScope in the browser you want
+   to use. The ordinary viewing link does not grant permission to send work.
 
-On the computer:
+Open the project's latest request. Under **Continue this project**, select a
+**Recommended** suggestion or write your request in **Other**. Review the exact
+text, target project, session and current model, then choose **Confirm and send
+to Pi**. Nothing is sent until you confirm.
 
-```bash
-tailscale status --json | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>console.log(JSON.parse(s).Self.DNSName.replace(/\.$/,"")))'
-tailscale serve status
-```
+The request uses Pi's existing tools and permissions, so it can change files,
+run commands and consume model quota. PiScope does not start closed Pi sessions
+or interrupt busy ones. A **Sent** receipt means delivery, not task completion.
+Use `/dashboard-control off` in Pi to stop accepting new dashboard requests.
 
-Replace `my-computer.my-tailnet.ts.net` below with your machine's exact name.
-The name belongs to the **computer**, not the project. Different apps need
-separate HTTPS ports. This example uses **8443** so an existing app on **443**
-can stay untouched; check that 8443 is free too.
+[Control setup and troubleshooting](docs/CONTROL.md)
 
-### Start PiScope with its HTTPS origin
+## Optional: create a daily work report
 
-Stop the existing dashboard with `Ctrl+C`, then run from the PiScope directory:
+After enabling the three control permissions above:
 
-```bash
-AGENT_DASHBOARD_TAILSCALE_ORIGIN="https://my-computer.my-tailnet.ts.net:8443" npm start
-```
+1. Open **Daily report** and choose a date.
+2. Choose one ready Pi session to write the report.
+3. Select **Generate report**, review the included context, and confirm.
+4. Read the summary and **Remaining / blocked** section, then use **Copy report** if needed.
 
-In another terminal, enable the private proxy:
+The selected session supplies the model. The report covers captured work across
+all tracked projects for that day, including projects whose Pi sessions are now
+closed. It sends **one approved model request** for the day and uses that model's
+existing quota. The report is an AI summary, not an independent test result.
 
-```bash
-tailscale serve --bg --https=8443 http://127.0.0.1:7331
-tailscale serve status
-```
+If generation is unavailable, the panel explains the missing setup. Older
+extensions need an update and a Pi restart to support report generation.
 
-Tailscale may ask you to enable HTTPS for your tailnet; follow its setup link.
-**Use Serve, not Funnel.** Serve is private to your tailnet; Funnel is public.
+[Daily report guide](docs/DAILY-REPORTS.md)
 
-### Pair the phone's browser
+## Optional: use Terminal Todos notes
 
-Open the **Tailscale browser pairing** link printed by `npm start` in a **new tab
-on your phone**. Keep the token private. After pairing, bookmark the plain URL:
-
-```text
-https://my-computer.my-tailnet.ts.net:8443/
-```
-
-The same HTTPS URL works on the computer too:
+If you already use [Terminal Todos](https://github.com/TemelGunaydin/terminal-todos),
+you can read its notes in **Project notes**. Enable the integration when starting
+PiScope, keeping any existing control and Tailscale settings:
 
 ```bash
-npm run open -- --tailscale  # Opens and pairs this computer's browser only
-npm run open                # Local access still works
+AGENT_DASHBOARD_TODOS=1 npm start
 ```
 
-You do **not** need to run `npm run open` before every phone visit. Pair once per
-browser, then use the bookmark while the server is running. Local and HTTPS
-hostnames pair independently. The HTTPS origin setting is required on each
-PiScope start; plain `npm start` without it enables local-only access.
+Choose the correct PiScope project for a note. You can edit a local prompt copy,
+then use **Use as prompt** to prepare it in **Other**. Sending still requires the
+control permissions and final confirmation described above. Reading notes needs
+no model call; sending a request uses your existing Pi model and quota.
 
-To disable only PiScope's Serve endpoint:
+PiScope never changes or completes the original note. Saved project-label links
+require browser control permission. The default notes file is
+`~/.local/share/terminal-todos/todos.json`, or the equivalent location under an
+absolute `XDG_DATA_HOME`. Set an absolute `AGENT_DASHBOARD_TODOS_FILE` if you use
+another location.
+
+[Terminal Todos setup, linking and result tracking](docs/TERMINAL-TODOS.md)
+
+## Optional: check progress from your phone
+
+Install Tailscale on your computer and phone, sign both into the same private
+network, and use **Tailscale Serve** to reach PiScope over HTTPS. Your computer
+must stay awake, online and running PiScope; live work also needs Pi to stay open.
+
+Follow the [phone setup guide](docs/TAILSCALE.md) for the exact hostname, free
+HTTPS port and pairing steps. Open the printed **Tailscale browser pairing**
+link on your phone once, then bookmark the plain HTTPS address. Sending work
+from the phone also needs separate Control pairing in that phone's browser.
+
+**Use Serve, not Funnel.** Funnel would expose the endpoint publicly. Do not
+replace another application's existing Serve route.
+
+## Update PiScope
+
+From the PiScope folder:
 
 ```bash
-tailscale serve --https=8443 off
+git pull
 ```
 
-Do not reset all Serve routes or overwrite another app's port. PiScope still
-listens on loopback: `http://100.x.y.z:7331` is **not** a supported access URL.
-If you change `PORT`, update Serve's backend target too.
+Restart PiScope with the same control, notes and Tailscale settings you were
+using, then refresh your browser. When an update changes the Pi extension,
+update it in each project that needs the change:
 
-A paired browser can read/export **all** retained projects. Restrict access to
-trusted devices/users through your tailnet grants/ACLs. Pi ingestion remains
-local. See [full Tailscale setup and troubleshooting](docs/TAILSCALE.md).
-
-## 4. Optional: continue Pi from the dashboard
-
-Control is **off by default**, including on the phone. To enable it:
-
-1. Restart PiScope with `AGENT_DASHBOARD_CONTROL=1 npm start`. Keep your
-   `AGENT_DASHBOARD_TAILSCALE_ORIGIN` setting too if using the phone.
-2. From PiScope, update the target project's extension with
-   `npm run install:pi -- "/absolute/path/to/project" --update`.
-3. Restart Pi in that project to load the updated extension, then run
-   `/dashboard-control on` and `/dashboard-status`.
-4. Open the **Control pairing** link printed by PiScope in the intended browser.
-   On iPhone, open it in a new Safari tab; pairing the Mac does not pair the phone.
-
-Open the project's latest request. Choose **Recommended → Review and start**,
-or write **Other → Review prompt**. Inspect the target and exact prompt, then
-**Confirm and send to Pi**. No task starts without that click. Suggestions come
-from `workflow_report`; nothing is invented or automatically continued.
-
-The same panel shows the selected request's **Last model response**, even in
-view-only mode. Long recorded excerpts scroll; unrelated live updates preserve
-reading position, text selection and unsent Other drafts. Pi-reported errors,
-such as Codex overload, appear separately rather than as successful output.
-A new attempt or successful reply clears the current warning; historical errors
-remain in the activity feed. Active projects retain **Running**. PiScope never
-automatically retries these errors or changes models; Pi's own retry settings
-still apply. Older records may have only a generic error notice. Detailed error
-capture requires the updated project extension and Pi/collector restarts above.
-
-Closed, busy, unsettled and old-request targets are blocked. Double submissions
-are reserved; an **unknown** receipt is never automatically retried. **Submitted**
-means sent to Pi's input, not successful execution. Existing Pi permissions and
-model/workflow configuration stay in place; work may consume model quota.
-Use `/dashboard-control off` or restart PiScope without the control setting to
-revoke new submissions. This does not abort existing Pi work.
-
-[Activation, phone pairing, recommendations, receipts and security details](docs/CONTROL.md).
-
-## Workflow profiles and test reports
-
-To compare workflow versions, add `.pi/agent-dashboard.workflow.json` to a
-monitored project. Start with [the example](examples/workflow-profile.json),
-using your actual agent names. Profiles label workflows; they do not choose
-models. New requests capture their own profile and observed model identities.
-Use the same `taskSet` for comparable workloads; that label is not proof of
-identical inputs. [Detailed workflow guide](docs/WORKFLOWS.md) (Turkish).
-
-After a request finishes, before starting another, attach a project-local JUnit
-report from that request in the same Pi session:
-
-```text
-/dashboard-evidence reports/junit.xml
+```bash
+npm run install:pi -- "/absolute/path/to/your/project" --update
 ```
 
-PiScope reads the report; it does not run tests. Old, invalid or out-of-project
-reports are rejected. Empty or entirely skipped reports are inconclusive.
-An imported report is not independent proof of current code quality or test
-execution. [Supported formats and trust boundaries](docs/EVIDENCE.md) (Turkish).
+Restart Pi in that project and re-enable `/dashboard-control on` if you use it.
+A browser-only update does not require reinstalling the Pi extension. To remove
+the extension, delete only `.pi/extensions/agent-dashboard/` from that project
+and restart Pi. Recorded history is kept.
+
+## Something not working?
+
+| What you see | What to check |
+|---|---|
+| The dashboard will not open | Keep `npm start` running, then run `npm run open` from another terminal in PiScope. |
+| **Pairing required** | Open the private pairing link in this browser. Local and Tailscale addresses pair separately. |
+| No project cards | Install the extension in your project, open Pi there and give it a task. There is no manual Add project form. |
+| No reported next step | The agent has not reported a plan. Tool/model monitoring still works. |
+| Sending or report generation is disabled | Check the on-screen reason, the three control permissions and whether Pi is idle. Update older extensions if requested. |
+| A saved request link is unavailable | Its exact history may have expired. Look for the project's saved summary under Projects. |
 
 ## Data and privacy
 
-- Records stay on the Pi machine in `~/.agent-workflow-dashboard/` (the retained
-  compatibility path). No cloud telemetry, external frontend CDN or direct model calls.
-  Opt-in approved prompts resume Pi with its existing model usage.
-- Set `AGENT_DASHBOARD_HOME` in **both Pi and PiScope** to change the data directory.
-  Keep it outside the repository. Do not commit records or pairing information.
-- If the server is offline, Pi persists accepted events and retries delivery.
-  Default queue limits: **5,000 pending events / 20 MiB per client**. New events
-  are rejected at capacity; accepted history is kept. Check `/dashboard-status`.
-- The journal rotates and detailed history is bounded. Short project summaries
-  survive longer (up to **500 live projects**, separately from hidden demo data).
-  Daily context retains up to **1,000 day/request records and 12 MiB per mode**;
-  generated reports separately retain up to **500 entries and 2 MiB**, one overall
-  report per day; retained legacy per-project reports share that budget.
-  Exports contain retained state, not an unlimited archive. Deleting journals
-  alone does not erase project summaries or daily excerpts.
-  [Project memory](docs/PROJECTS.md) · [Daily reports](docs/DAILY-REPORTS.md).
-- Prompt/response excerpts and provider error messages can contain private
-  information. Error details are bounded and redacted; secret redaction is not
-  complete data-loss prevention. To omit prompt, task, response and detailed error text:
+Records stay on the Pi computer in `~/.agent-workflow-dashboard/`. PiScope has
+no cloud telemetry and needs no additional model API key or subscription.
+Set `AGENT_DASHBOARD_HOME` in both Pi and PiScope to use another data folder;
+keep that folder outside the repository.
 
-  ```bash
-  AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
-  ```
+Captured prompts, responses and errors can contain private information. To stop
+capturing those texts in a Pi session:
 
-  File names, model identities and reported stages may still be recorded.
-  This also omits reported recommendations and accomplishments; generic error
-  notices remain visible. Daily generation is disabled with this setting.
-  It does not purge previously captured or generated data.
-  Control prompts still reach Pi when approved.
-- Reply read markers stay in this browser's local storage: up to 500 full
-  project/session/request identities, no copied text. First visit starts quietly;
-  clearing browser storage resets this baseline. Other browsers have their own state.
-- Same-user OS processes can read local records. Tailscale is an extra network
-  boundary, not per-project or multi-user authorization. Review exports before
-  sharing, and keep pairing links, queues and `connection.json` private.
+```bash
+AGENT_DASHBOARD_CAPTURE_PROMPTS=0 pi --continue
+```
 
-## Development and contributing
+This also disables daily report generation in that session. It does not erase
+previous records; file names, model names and reported stages may still appear.
+Secret masking is best effort, so review exports and copied reports before sharing.
+
+History is limited in size. Project summaries can outlive detailed events, and
+**Export history** exports retained state, not an unlimited archive. An authorized
+browser can read all retained projects. Keep pairing links and local records
+private. [Storage limits](docs/PROJECTS.md) · [Security policy](SECURITY.md)
+
+## Development and further reading
 
 ```bash
 npm run check
 npm test
-# Optional installed-Pi integration check (no model calls):
-npm run test:pi
-npm run test:pi:control  # Real Pi input delivery, intercepted before any model call
 ```
 
-Core tests need no Pi installation, credentials or paid models. Optional browser
-checks use a disposable collector, synthetic data and no personal history:
+Core tests need no Pi installation, credentials or paid model. For synthetic
+browser checks, see [Contributing](CONTRIBUTING.md). Examples:
 
 ```bash
-# Requires Python Playwright + Chromium; --tailscale also requires openssl.
-python test/browser-smoke.py --network
-python test/browser-smoke.py --tailscale
-python test/control-browser.py
-python test/control-browser.py --tailscale
-python test/daily-browser.py
-python test/daily-browser.py --tailscale
+python3 test/browser-smoke.py --network
+python3 test/workspace-browser.py
+python3 test/workspace-browser.py --tailscale
 ```
 
-The Tailscale test simulates an HTTPS proxy; real phone access must still be
-verified on your tailnet. macOS checks do not establish every OS/Pi/provider
-combination. [Verification history](docs/VERIFICATION.md).
+Browser checks require Python Playwright and Chromium; HTTPS simulation also
+requires OpenSSL. Optional installed-Pi checks are `npm run test:pi` and
+`npm run test:pi:control`; they make no model calls.
 
-Bug reports and focused contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[Code of Conduct](CODE_OF_CONDUCT.md) and [Security policy](SECURITY.md).
+macOS has been exercised locally; core CI is configured for Linux and macOS.
+Windows has not been validated. See the [verification record](docs/VERIFICATION.md)
+for tested Pi/extension versions and the distinction between simulated HTTPS
+and real phone access.
+
+- [Project history, navigation and Markdown](docs/PROJECTS.md)
+- [Workflow comparisons](docs/WORKFLOWS.md) · [Imported JUnit reports](docs/EVIDENCE.md)
+- [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md) · [Security policy](SECURITY.md)
 
 ## License
 
-[MIT](LICENSE). PiScope is an independent community project, not an official
-product of Pi, Tailscale, OpenAI or any model provider. Pi and pi-open-agents
-are separate projects; mentioning them does not imply endorsement.
-
-[Third-party notices](THIRD_PARTY_NOTICES.md): the scoped SpinKit Rotating Plane component.
+[MIT](LICENSE). PiScope is an independent community project and is not an
+official product of Pi, Tailscale, OpenAI or any model provider.
+[Third-party notices](THIRD_PARTY_NOTICES.md) cover the locally included SpinKit
+component and Marked parser.

@@ -41,6 +41,11 @@ Error/Unknown durumu, sınırlı yanıtı ve tam ilgili Pi isteğine bağlantıs
 korunur; kaynak notlar değiştirilmez veya otomatik tamamlanmaz;
 [kurulum ve sınırlar](TERMINAL-TODOS.md).
 
+Dikkat bekleyenler, saklanan isteklerde proje/model/sonuç/tarih filtreli arama,
+tam istek bağlantıları, kalıcı kompakt görünüm ve proje sabitleme eklendi.
+Yanıtlar yerel Markdown ve kod kopyalama desteğiyle gösterilir; HTML çalıştırılmaz,
+dış görseller yüklenmez. Bunlar izleme verisiyle çalışır, model isteği başlatmaz.
+
 ## Sonraki işler
 
 Yürütme performansı ölçümünün ilk dilimi eklendi (teknik tamamlanma / sonuçsuz
@@ -48,7 +53,7 @@ ayrımı, çağrı bazlı süre, proje geçmişi toplamı). Sıradaki adımlar:
 
 - Test runner/exit-code ve commit bağlamıyla yürütme kanıtını güçlendirme; gerekirse xcresult adapter'ı.
 - Yeni Pi/alt agent sürümleri ve farklı sağlayıcı hata biçimleri için uyumluluk fixture’larını genişletme.
-- Ayrı tüm-journal dışa aktarma, arama ve saklama sınırı arayüzü.
+- Ayrı tüm-journal dışa aktarma/arama ve saklama sınırı arayüzü; mevcut arama saklanan isteklerle sınırlıdır.
 - İhtiyaç ve açık onayla telefondan not ekleme veya iki yönlü TODO düzenleme;
   mevcut Terminal Todos dilimi yalnız okuma, düzenlenebilir/onaylı prompt gönderimi
   ve son isteğin gözlenen sonucu ile sınırlıdır.

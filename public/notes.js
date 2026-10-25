@@ -1,3 +1,4 @@
+import { renderMarkdown } from './markdown.js';
 const noteId = id => document.getElementById(id);
 const noteNode = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
 let notesSource, notesProjects = [], notesControl, notesActions, notesFilter = '';
@@ -145,7 +146,7 @@ export function renderProjectNotes(source, projects = [], control) {
       text(card.badge, names[activity.status] || 'Unknown'); card.badge.className = `badge ${activity.status === 'queued' ? 'pending' : activity.status === 'reply' ? 'idle' : activity.status}`;
       text(card.activityMeta, `Project ID: ${activity.projectId}\nPi session: ${activity.sessionId}\n${activity.model || 'Current Pi model'} · ${activity.createdAt}`);
       text(card.reason, activity.reason || (activity.status === 'queued' ? 'Waiting for the opted-in Pi session. Nothing is complete yet.' : 'Pi is working. This does not complete the source note.'));
-      text(card.reply, activity.summary || ''); card.reply.classList.toggle('hidden', !activity.summary);
+      renderMarkdown(card.reply, activity.summary || ''); card.reply.classList.toggle('hidden', !activity.summary);
       card.open.disabled = !activity.detailAvailable;
       text(card.retention, activity.detailAvailable ? 'Open the exact linked request. The excerpt above is bounded and redacted.' : activity.runId ? 'Pi request detail is no longer retained. Only the saved excerpt is available.' : 'No linked Pi request has been observed yet. Check the terminal if delivery is uncertain.');
     }
