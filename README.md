@@ -155,6 +155,11 @@ Open the project's latest request. Under **Continue this project**, select a
 text, target project, session and current model, then choose **Confirm and send
 to Pi**. Nothing is sent until you confirm.
 
+**Other** keeps a separate draft for each project in this tab, including after
+refresh. Returning to a project restores your text; review the current target
+again before sending. If browser storage is unavailable, the form explains that
+the draft can only survive navigation within the current page.
+
 The request uses Pi's existing tools and permissions, so it can change files,
 run commands and consume model quota. PiScope does not start closed Pi sessions
 or interrupt busy ones. A **Sent** receipt means delivery, not task completion.

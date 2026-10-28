@@ -57,6 +57,11 @@ also survive filters and navigation within the page; they are not saved to disk,
 sent to the collector while editing, or restored after a browser reload. Editing
 alone needs no send grant and uses no model quota.
 
+Once copied into **Other**, the text and its note reference use the project's
+tab-local draft storage and survive reload. This does not restore approval:
+review the current target/model again before sending. The inline note editor
+itself still has page-local drafts only. See [Other draft storage](CONTROL.md#recommended-and-other).
+
 Reading uses no model quota. Sending requires all [three control opt-ins](CONTROL.md):
 collector control, a separately control-paired browser, and local runtime
 `/dashboard-control on`. Saving links requires collector/browser control, but

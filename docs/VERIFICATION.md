@@ -1178,3 +1178,22 @@ boundary; code and tables retain their own scroll regions.
 Existing network browser smoke, approved-control, daily-report and project-note
 checks also passed. All records were synthetic; no model calls, personal note
 files, real Tailscale configuration changes or physical phones were used.
+
+## Project drafts and live reading (2026-10-28)
+
+Before changing product code, `test/drafts-live-browser.py` reproduced all three
+failures over real HTTP/SSE: lost project draft, lost history reading state and
+lost attention reading state. After the fixes, the same checks and their extended
+regressions passed over loopback and a simulated Tailscale HTTPS origin.
+
+Coverage includes exact-project separation, reload without restored approval,
+copied-note identity, fresh review, successful-send clearing, independent Other
+text during Recommended work, unavailable browser storage, unchanged/changed
+source selections, focus, open details, mobile/desktop reading position, insertion
+above the reader and removal of the focused card. All data and Pi responses were
+synthetic; no model calls or personal notes were used. The installed Chrome was
+selected with `BROWSER_EXECUTABLE`.
+
+All 278 Node tests, the 62-module syntax check, existing network browser smoke,
+workspace, control and notes browser regressions passed. Draft storage is browser
+tab-local; no collector persistence or Pi extension changes were introduced.

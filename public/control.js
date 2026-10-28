@@ -1,9 +1,31 @@
 import { noteRequestHeader, noteRequestPrompt } from './note-request.js';
 import { renderMarkdown } from './markdown.js';
+import { ProjectDrafts } from './workspace.js';
 
 const controlEl = (tag, className, text) => { const e = document.createElement(tag); e.className = className; e.textContent = text; return e; };
 const controlId = id => document.getElementById(id);
 let authorized = false, current, draft, sending = false, receipt, noteRef, recommendationsKey = '';
+let draftStorage;
+try { draftStorage = window.sessionStorage; } catch { /* Page-local drafts still work. */ }
+const projectDrafts = new ProjectDrafts(draftStorage);
+
+function showDraftStatus() {
+  const text = controlId('control-other-prompt').value;
+  const message = !text ? '' : projectDrafts.persistent
+    ? 'Draft saved for this project in this tab. Review the target before sending.'
+    : 'Draft kept in this page only; browser storage is unavailable.';
+  if (controlId('control-draft-status').textContent !== message) controlId('control-draft-status').textContent = message;
+  controlId('control-draft-status').classList.toggle('hidden', !text);
+}
+function saveOtherDraft() {
+  if (current) projectDrafts.set(current.s.projectId, controlId('control-other-prompt').value, noteRef);
+  showDraftStatus();
+}
+function restoreOtherDraft(projectId) {
+  const saved = projectDrafts.get(projectId);
+  controlId('control-other-prompt').value = saved?.text || ''; noteRef = saved?.todoRef;
+  showDraftStatus();
+}
 
 export function modelError(run) {
   if (typeof run?.errorMessage === 'string') return run.errorMessage;
@@ -31,6 +53,7 @@ export function prepareOtherPrompt(s, r, prompt, todoRef) {
   if (sending || !current || current.s.id !== s.id || current.r.id !== r.id || typeof prompt !== 'string' || unavailable()) return false;
   draft = undefined; receipt = undefined; noteRef = todoRef; controlId('control-review').classList.add('hidden');
   controlId('control-other-prompt').value = prompt; controlId('control-other-prompt').focus();
+  saveOtherDraft();
   controlId('control-receipt').textContent = 'Note copied into Other. Edit and review it before sending; later note changes do not update this draft.';
   return true;
 }
@@ -59,11 +82,16 @@ function review(prompt, recommendationId) {
 export async function initializeControls(onSubmitted) {
   const capability = await fetch('/api/control');
   authorized = capability.ok && (await capability.json()).canSubmit === true;
+  controlId('control-other-prompt').oninput = () => {
+    saveOtherDraft();
+    if (draft && !sending) { draft = undefined; controlId('control-review').classList.add('hidden'); controlId('control-confirm').disabled = true; }
+  };
   controlId('control-other-form').onsubmit = e => { e.preventDefault(); const prompt = controlId('control-other-prompt').value; if (prompt.trim()) review(prompt); };
   controlId('control-cancel').onclick = () => { draft = undefined; controlId('control-review').classList.add('hidden'); controlId('control-other-prompt').focus(); };
   controlId('control-confirm').onclick = async () => {
     if (!draft || sending || unavailable()) return;
-    const request = draft; sending = true; controlId('control-confirm').disabled = true;
+    const request = draft, submitted = request.recommendationId ? undefined : projectDrafts.get(request.projectId);
+    sending = true; controlId('control-confirm').disabled = true;
     controlId('control-receipt').textContent = 'Sending…';
     try {
       const response = await fetch('/api/control/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
@@ -71,7 +99,11 @@ export async function initializeControls(onSubmitted) {
       if (!response.ok) throw new Error(result.error || 'Request rejected');
       receipt = result; draft = undefined;
       controlId('control-review').classList.add('hidden');
-      controlId('control-other-prompt').value = ''; noteRef = undefined;
+      const saved = projectDrafts.get(request.projectId);
+      if (submitted && saved?.text === submitted.text && saved?.todoRef === submitted.todoRef) {
+        projectDrafts.set(request.projectId, '');
+        if (current?.s.projectId === request.projectId) restoreOtherDraft(request.projectId);
+      }
       onSubmitted(result);
     } catch (error) {
       // Preserve the same id and preview on network uncertainty; retries are idempotent.
@@ -81,9 +113,10 @@ export async function initializeControls(onSubmitted) {
 }
 export function renderControls(s, r, control) {
   if (!s || !r) return;
-  if (current && (current.s.id !== s.id || current.r.id !== r.id)) {
+  const changed = !current || current.s.id !== s.id || current.r.id !== r.id;
+  if (changed) {
     draft = undefined; noteRef = undefined; controlId('control-review').classList.add('hidden');
-    controlId('control-other-prompt').value = ''; recommendationsKey = '';
+    restoreOtherDraft(s.projectId); recommendationsKey = '';
     controlId('control-response-text').scrollTop = 0;
     controlId('control-receipt').textContent = ''; if (!sending) receipt = undefined;
   }

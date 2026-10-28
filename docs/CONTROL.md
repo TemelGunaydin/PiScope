@@ -113,6 +113,23 @@ The panel offers:
 - **Other:** write your own prompt (up to 8,000 characters), choose **Review
   prompt**, then confirm. **Cancel** leaves work unstarted.
 
+Other text is saved by full project ID in this tab's `sessionStorage`, separately
+from browser preferences. Switching projects, sessions or requests and refreshing
+the page restores the editable text, including an optional copied-note reference.
+Approval, target session/model and delivery receipts are never restored as consent;
+review the current target again. Editing after review invalidates that preview.
+A successful Other submission clears only its unchanged submitted draft;
+Recommended work leaves independent Other text intact. Clearing the field removes
+its saved draft. Nothing is sent while saving or restoring.
+
+This tab keeps up to 100 recently edited project drafts within 512 Ki characters
+of serialized storage. Overlong copied notes are retained up to 64,000 characters,
+but the existing 8,000-character send limit still applies. Closing the tab follows
+the browser's session-storage lifecycle. When storage is unavailable, drafts
+survive navigation only within the current page and the form says so. Draft text
+can contain private information. Saving/restoring it does not add it to collector
+records or exports; confirmed Pi requests follow the normal capture settings.
+
 Suggestions come from `workflow_report.recommendations`, not guesses based on
 Finished or Needs attention. The tool's guidance asks the model to report
 suggestions at the end of a request; abrupt failures may have none. Use Other

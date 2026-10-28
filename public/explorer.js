@@ -2,8 +2,9 @@ import { attentionRequests, retainedRequests, searchRequests, workspacePath } fr
 
 const explorerId = id => document.getElementById(id);
 const explorerNode = (tag, cls, text) => { const node = document.createElement(tag); if (cls) node.className = cls; if (text !== undefined) node.textContent = text; return node; };
-let explorerSnapshot, explorerOpen, explorerSaved, explorerKey = '', attentionKey = '', historyLimit = 50;
+let explorerSnapshot, explorerOpen, explorerSaved, historyLimit = 50;
 const historyFields = ['history-query', 'history-project', 'history-model', 'history-verdict', 'history-from', 'history-to'];
+const explorerText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 
 function rememberHistoryFilters() {
   try { history.replaceState({ ...history.state, historyFilters: Object.fromEntries(historyFields.map(id => [id, explorerId(id).value])) }, '', location.href); } catch { /* Opaque test/embedded contexts may disable history. */ }
@@ -34,7 +35,6 @@ function explorerCard(item, attention) {
   const card = explorerNode('article', 'request-card');
   card.dataset.project = item.projectId; card.dataset.session = item.sessionId; card.dataset.request = item.runId;
   const heading = explorerNode('div', 'request-card-head'), name = explorerNode('h2', '', item.projectName), badges = explorerNode('div', 'request-badges');
-  for (const reason of item.reasons || [item.status === 'running' ? 'Running / last observed' : ({ completed: 'Last request finished', failed: 'Error', cancelled: 'Cancelled', unknown: 'Outcome unknown' }[item.verdict])]) badges.append(explorerNode('span', `badge ${attention ? item.tone : item.verdict === 'failed' ? 'error' : item.verdict === 'completed' ? 'done' : 'unknown'}`, reason));
   heading.append(name, badges);
   const meta = explorerNode('p', 'request-meta', `${explorerDate(item.startedAt)}${item.models?.length ? ' · ' + item.models.join(', ') : ''}`);
   const identities = explorerNode('details', 'request-identities'); identities.append(explorerNode('summary', '', 'Request identity'), explorerNode('p', '', `Project: ${item.projectId}\nSession: ${item.sessionId}\nRequest: ${item.runId}`));
@@ -46,11 +46,62 @@ function explorerCard(item, attention) {
   open.href = workspacePath(route); open.setAttribute('aria-label', `${item.projectName}: ${item.retained ? 'open request' : 'view saved summary'}`);
   open.onclick = e => {
     if (e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault(); (item.retained ? explorerOpen : explorerSaved)(item);
+    e.preventDefault(); (card.item.retained ? explorerOpen : explorerSaved)(card.item);
   };
   actions.append(open);
-  if (!item.retained) actions.append(explorerNode('span', 'request-meta', 'Detailed history has expired.'));
+  const retention = explorerNode('span', 'request-meta', 'Detailed history has expired.'); actions.append(retention);
   card.append(heading, meta, prompt, response, identities, actions); return card;
+}
+
+function updateExplorerCard(card, item, attention) {
+  card.item = item;
+  explorerText(card.querySelector('h2'), item.projectName);
+  explorerText(card.querySelector('.request-meta'), `${explorerDate(item.startedAt)}${item.models?.length ? ' · ' + item.models.join(', ') : ''}`);
+  explorerText(card.querySelector('.request-prompt'), item.prompt || 'Request text not captured.');
+  explorerText(card.querySelector('.request-excerpt'), item.errorMessage || item.summary || 'No captured response text.');
+  const badges = card.querySelector('.request-badges');
+  const reasons = item.reasons || [item.status === 'running' ? 'Running / last observed' : ({ completed: 'Last request finished', failed: 'Error', cancelled: 'Cancelled', unknown: 'Outcome unknown' }[item.verdict])];
+  const tone = attention ? item.tone : item.verdict === 'failed' ? 'error' : item.verdict === 'completed' ? 'done' : 'unknown';
+  const badgeKey = JSON.stringify([reasons, tone]);
+  if (badges.dataset.key !== badgeKey) { badges.dataset.key = badgeKey; badges.replaceChildren(...reasons.map(reason => explorerNode('span', `badge ${tone}`, reason))); }
+  const open = card.querySelector('a');
+  explorerText(open, item.retained ? 'Open request' : 'View saved summary');
+  open.setAttribute('aria-label', `${item.projectName}: ${item.retained ? 'open request' : 'view saved summary'}`);
+  card.querySelector('.request-actions span').classList.toggle('hidden', item.retained);
+}
+
+function renderExplorerList(list, items, attention) {
+  const previous = new Map([...list.children].map(card => [card.dataset.key, card]));
+  const focused = list.contains(document.activeElement) ? document.activeElement : undefined;
+  const selection = getSelection(), selected = selection?.rangeCount && !selection.isCollapsed && list.contains(selection.anchorNode) && list.contains(selection.focusNode)
+    ? { anchorNode: selection.anchorNode, anchorOffset: selection.anchorOffset, focusNode: selection.focusNode, focusOffset: selection.focusOffset, text: selection.toString() } : undefined;
+  const top = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+  const visible = card => card && card.getBoundingClientRect().bottom > top && card.getBoundingClientRect().top < innerHeight;
+  const selectedCard = selected?.anchorNode.parentElement?.closest('.request-card'), focusedCard = focused?.closest('.request-card');
+  const anchor = visible(selectedCard) ? selectedCard : visible(focusedCard) ? focusedCard : [...list.children].find(visible);
+  const anchorTop = anchor?.getBoundingClientRect().top;
+  const cards = items.map(item => {
+    const key = JSON.stringify([item.projectId, item.sessionId, item.runId]);
+    const card = previous.get(key) || explorerCard(item, attention); card.dataset.key = key;
+    updateExplorerCard(card, item, attention); return card;
+  });
+  const retained = new Set(cards);
+  for (const card of [...list.children]) if (!retained.has(card)) card.remove();
+  for (let i = 0; i < cards.length; i++) if (list.children[i] !== cards[i]) list.insertBefore(cards[i], list.children[i] || null);
+  if (focused && document.activeElement !== focused) {
+    (focused.isConnected ? focused : explorerId(attention ? 'attention-heading' : 'history-heading')).focus({ preventScroll: true });
+  }
+  // A moved node can lose its native selection. Restore only still-connected
+  // source nodes; changed/removed text must never be fabricated as current text.
+  if (selected) {
+    const length = node => node.nodeType === 3 ? node.length : node.childNodes.length;
+    if (!selected.anchorNode.isConnected || !selected.focusNode.isConnected || selected.anchorOffset > length(selected.anchorNode) || selected.focusOffset > length(selected.focusNode)) selection.removeAllRanges();
+    else {
+      if (selection.anchorNode !== selected.anchorNode || selection.anchorOffset !== selected.anchorOffset || selection.focusNode !== selected.focusNode || selection.focusOffset !== selected.focusOffset) selection.setBaseAndExtent(selected.anchorNode, selected.anchorOffset, selected.focusNode, selected.focusOffset);
+      if (selection.toString() !== selected.text) selection.removeAllRanges();
+    }
+  }
+  if (anchor?.isConnected) { const delta = anchor.getBoundingClientRect().top - anchorTop; if (Math.abs(delta) > .5) window.scrollBy(0, delta); }
 }
 
 export function initializeExplorer({ open, saved }) {
@@ -70,11 +121,7 @@ export function renderExplorer(snapshot, reads, activeView) {
   const items = attentionRequests(snapshot.projectOverview?.items || [], snapshot.sessions || [], reads);
   const count = explorerId('attention-count'); count.textContent = String(items.length); count.classList.toggle('hidden', !items.length);
   if (activeView === 'attention') {
-    const key = JSON.stringify(items);
-    if (key !== attentionKey) {
-      attentionKey = key;
-      explorerId('attention-list').replaceChildren(...items.map(item => explorerCard(item, true)));
-    }
+    renderExplorerList(explorerId('attention-list'), items, true);
     explorerId('attention-results').textContent = `${items.length} ${items.length === 1 ? 'request needs' : 'requests need'} your attention.`;
     explorerId('attention-empty').classList.toggle('hidden', Boolean(items.length));
   }
@@ -92,8 +139,8 @@ function renderRequestHistory() {
   const invalid = Boolean(filters.from && filters.to && filters.from > filters.to);
   explorerId('history-date-error').classList.toggle('hidden', !invalid);
   const matches = invalid ? [] : searchRequests(entries, filters, explorerSnapshot.dailyReport?.timeZone);
-  const visible = matches.slice(0, historyLimit), key = JSON.stringify(visible);
-  if (key !== explorerKey) { explorerKey = key; explorerId('history-list').replaceChildren(...visible.map(item => explorerCard(item, false))); }
+  const visible = matches.slice(0, historyLimit);
+  renderExplorerList(explorerId('history-list'), visible, false);
   explorerId('history-results').textContent = `${matches.length} matching ${matches.length === 1 ? 'request' : 'requests'} · Showing ${visible.length} of ${entries.length} retained requests.`;
   explorerId('history-zone').textContent = `Dates use ${explorerSnapshot.dailyReport?.timeZone || 'your browser timezone'}.`;
   explorerId('history-more').classList.toggle('hidden', visible.length >= matches.length);

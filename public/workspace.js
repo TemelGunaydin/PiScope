@@ -1,5 +1,38 @@
 const workspaceId = value => typeof value === 'string' && /^[a-zA-Z0-9_.:\-]{1,160}$/.test(value);
 export const PROJECT_PREFERENCES_KEY = 'piscope.projects.v1';
+export const PROJECT_DRAFTS_KEY = 'piscope.project-drafts.v1';
+const DRAFT_LIMIT = 100, DRAFT_CHARS = 64000, DRAFT_STORAGE_CHARS = 512 * 1024;
+const validProjectDraft = row => Array.isArray(row) && row.length === 3 && workspaceId(row[0]) &&
+  typeof row[1] === 'string' && row[1].length <= DRAFT_CHARS && (row[2] === null || typeof row[2] === 'string' && /^[a-f0-9]{64}$/.test(row[2]));
+
+// Only editable text and an optional note reference survive tab reloads. Approval,
+// model, session, request IDs and delivery receipts are never restored as consent.
+export class ProjectDrafts {
+  constructor(storage) {
+    this.storage = storage; this.entries = new Map(); this.persistent = Boolean(storage);
+    try {
+      const raw = storage?.getItem(PROJECT_DRAFTS_KEY);
+      if (!raw || raw.length > DRAFT_STORAGE_CHARS) return;
+      const saved = JSON.parse(raw);
+      if (saved.version !== 1 || !Array.isArray(saved.drafts) || saved.drafts.length > DRAFT_LIMIT || !saved.drafts.every(validProjectDraft)) return;
+      for (const [projectId, text, todoRef] of saved.drafts) this.entries.set(projectId, { text, todoRef: todoRef || undefined });
+    } catch { this.persistent = false; }
+  }
+  get(projectId) { const entry = this.entries.get(projectId); return entry && { ...entry }; }
+  set(projectId, text, todoRef) {
+    if (!validProjectDraft([projectId, text, todoRef ?? null])) return false;
+    this.entries.delete(projectId);
+    if (text) this.entries.set(projectId, { text, todoRef });
+    const encode = () => JSON.stringify({ version: 1, drafts: [...this.entries].map(([id, d]) => [id, d.text, d.todoRef ?? null]) });
+    let raw = encode();
+    while (this.entries.size > DRAFT_LIMIT || raw.length > DRAFT_STORAGE_CHARS) { this.entries.delete(this.entries.keys().next().value); raw = encode(); }
+    try {
+      if (!this.storage) throw Error('Storage unavailable');
+      this.storage.setItem(PROJECT_DRAFTS_KEY, raw); this.persistent = true;
+    } catch { this.persistent = false; }
+    return true;
+  }
+}
 
 export class ProjectPreferences {
   constructor(storage) {

@@ -156,6 +156,11 @@ Projenin son isteğini aç. **Continue this project** altında bir **Recommended
 oturumu ve mevcut modeli incele; **Confirm and send to Pi** ile onayla.
 Sen onaylamadan istek gönderilmez.
 
+**Other**, her proje için ayrı taslak tutar; aynı sekmeyi yenileyince de metin
+geri gelir. Projeye döndüğünde taslağını bulursun, göndermeden önce güncel hedefi
+yeniden inceleyip onaylarsın. Tarayıcı depolaması kullanılamıyorsa form, taslağın
+yalnızca mevcut sayfa içindeki geçişlerde korunabildiğini belirtir.
+
 Gönderilen istek Pi'nin mevcut araçlarını ve izinlerini kullanır; dosya
 değiştirebilir, komut çalıştırabilir ve model kotası tüketebilir. PiScope kapalı
 Pi oturumlarını başlatmaz, meşgul olan işi kesmez. **Sent**, isteğin iletildiğini

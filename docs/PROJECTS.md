@@ -92,6 +92,13 @@ Search filters survive in-page navigation and browser history, including after
 reloading a request. Filter values stay in browser session history, not the URL
 or exported state.
 
+Live history/attention cards are retained by the full project/session/request
+identity. Changes to another request preserve open identity details, unchanged
+text selection, keyboard focus and the visible reading position, including when
+new rows appear above it. Same-card changes update only the changed fields.
+Removed source text is not recreated as a selection; removing the focused card
+returns focus to that view's heading instead of selecting another request.
+
 Request URLs contain only view and full project/session/request IDs. **Copy request
 link** uses the current origin and contains no pairing token or captured text;
 another browser must pair independently. Navigation never dispatches Pi input.
